@@ -15,8 +15,11 @@ export default function BottomNav() {
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 pb-safe">
-      <div className="mx-4 mb-4 glass-strong rounded-2xl px-2 py-2">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-40 pb-safe border-t"
+      style={{ backgroundColor: 'var(--surface-primary)', borderColor: 'var(--border)' }}
+    >
+      <div className="px-2 py-2">
         <div className="flex items-center justify-around">
           {items.map(({ to, icon: Icon, label }) => (
             <NavLink
