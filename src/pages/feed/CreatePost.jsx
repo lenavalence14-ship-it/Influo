@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { ArrowLeft, Image as ImageIcon, X, Type, Check } from 'lucide-react'
@@ -14,15 +14,20 @@ const TEXT_COLORS = ['#ffffff', '#000000', '#f43f5e', '#3b82f6', '#22c55e', '#ea
 
 export default function CreatePost() {
   const [searchParams] = useSearchParams()
-  const isStory = searchParams.get('type') === 'story'
+  const { postId } = useParams()
+  const isEditing = Boolean(postId)
   const { influencerProfile } = useAuth()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
 
+  const [isStory, setIsStory] = useState(searchParams.get('type') === 'story')
+  const [loadingExisting, setLoadingExisting] = useState(isEditing)
+
   // step 1: sélection, step 2: éditeur plein écran
-  const [step, setStep] = useState('select')
+  const [step, setStep] = useState(isEditing ? 'edit' : 'select')
   const [files, setFiles] = useState([])
-  const [previews, setPreviews] = useState([])
+  const [previews, setPreviews] = useState([]) // fichiers locaux à uploader (nouveau post)
+  const [existingMediaUrls, setExistingMediaUrls] = useState([]) // médias déjà en ligne (mode édition)
   const [legende, setLegende] = useState('')
   const [format, setFormat] = useState('carre')
   const [loading, setLoading] = useState(false)
@@ -32,7 +37,30 @@ export default function CreatePost() {
   const [texteOverlay, setTexteOverlay] = useState('')
   const [textePos, setTextePos] = useState({ x: 50, y: 50 })
   const [texteCouleur, setTexteCouleur] = useState('#ffffff')
-  const dragRef = useRef(null)
+
+  useEffect(() => {
+    if (!isEditing) return
+    const loadPost = async () => {
+      const { data } = await supabase
+        .from('posts')
+        .select('*, post_medias(media_url, position)')
+        .eq('id', postId)
+        .maybeSingle()
+
+      if (data) {
+        setIsStory(data.type === 'story')
+        setLegende(data.legende || '')
+        setFormat(data.crop_format || 'carre')
+        setTexteOverlay(data.texte_overlay || '')
+        setTextePos({ x: data.texte_x ?? 50, y: data.texte_y ?? 50 })
+        setTexteCouleur(data.texte_couleur || '#ffffff')
+        const sorted = [...(data.post_medias || [])].sort((a, b) => a.position - b.position)
+        setExistingMediaUrls(sorted.map((m) => m.media_url))
+      }
+      setLoadingExisting(false)
+    }
+    loadPost()
+  }, [isEditing, postId])
 
   const handleFilesChange = (e) => {
     const selected = Array.from(e.target.files || [])
@@ -43,8 +71,26 @@ export default function CreatePost() {
   }
 
   const handlePublish = async () => {
-    if (files.length === 0) return
+    if (!isEditing && files.length === 0) return
     setLoading(true)
+
+    if (isEditing) {
+      await supabase
+        .from('posts')
+        .update({
+          legende: isStory ? null : legende,
+          crop_format: isStory ? 'vertical' : format,
+          texte_overlay: isStory && texteOverlay ? texteOverlay : null,
+          texte_x: isStory ? textePos.x : null,
+          texte_y: isStory ? textePos.y : null,
+          texte_couleur: isStory ? texteCouleur : null,
+        })
+        .eq('id', postId)
+
+      setLoading(false)
+      navigate(-1)
+      return
+    }
 
     const { data: post, error } = await supabase
       .from('posts')
@@ -79,7 +125,15 @@ export default function CreatePost() {
     navigate('/')
   }
 
-  // --- Étape 1 : sélection de fichier ---
+  if (loadingExisting) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+      </div>
+    )
+  }
+
+  // --- Étape 1 : sélection de fichier (uniquement pour une nouvelle publication) ---
   if (step === 'select') {
     return (
       <div className="px-5 pt-6 pb-6">
@@ -108,7 +162,8 @@ export default function CreatePost() {
   }
 
   // --- Étape 2 : éditeur plein écran ---
-  const mainPreview = previews[0]
+  const displayMedias = isEditing ? existingMediaUrls : previews
+  const mainPreview = displayMedias[0]
 
   const handleMediaTap = (e) => {
     if (!isStory) return
@@ -123,11 +178,14 @@ export default function CreatePost() {
     <div className="fixed inset-0 z-[100] bg-black flex flex-col">
       {/* header */}
       <div className="flex items-center justify-between px-4 py-3 shrink-0 relative z-10">
-        <button onClick={() => setStep('select')} className="text-white p-1">
+        <button
+          onClick={() => (isEditing ? navigate(-1) : setStep('select'))}
+          className="text-white p-1"
+        >
           <X size={24} />
         </button>
         <span className="text-white text-sm font-medium">
-          {isStory ? 'Nouvelle story' : 'Nouvelle publication'}
+          {isEditing ? 'Modifier' : isStory ? 'Nouvelle story' : 'Nouvelle publication'}
         </span>
         {isStory ? (
           <button
@@ -168,9 +226,9 @@ export default function CreatePost() {
         ) : (
           <div className="w-full max-w-[380px]">
             <div className={`relative w-full ${FORMATS.find((f) => f.value === format)?.aspect} rounded-2xl overflow-hidden bg-neutral-900`}>
-              {files.length > 1 ? (
+              {displayMedias.length > 1 ? (
                 <div className="grid grid-cols-3 gap-1 w-full h-full">
-                  {previews.map((p, i) => (
+                  {displayMedias.map((p, i) => (
                     <div key={i} className="aspect-square overflow-hidden">
                       <img src={p} alt="" className="w-full h-full object-cover" />
                     </div>
@@ -180,6 +238,11 @@ export default function CreatePost() {
                 <img src={mainPreview} alt="" className="w-full h-full object-cover" />
               )}
             </div>
+            {isEditing && (
+              <p className="text-white/40 text-xs text-center mt-3">
+                Pour changer la photo, supprime cette publication et republie.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -240,9 +303,9 @@ export default function CreatePost() {
           disabled={loading}
           className="w-full rounded-full py-3.5 bg-white text-black font-semibold disabled:opacity-40 flex items-center justify-center gap-2"
         >
-          {loading ? 'Publication...' : (
+          {loading ? 'Enregistrement...' : (
             <>
-              <Check size={18} strokeWidth={2.5} /> Publier
+              <Check size={18} strokeWidth={2.5} /> {isEditing ? 'Enregistrer' : 'Publier'}
             </>
           )}
         </button>
