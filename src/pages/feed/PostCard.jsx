@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { Heart, MessageCircle, Send, MoreHorizontal, X, Trash2, Pencil } from 'lucide-react'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
+import Card from '../../components/ui/Card'
+import Avatar from '../../components/ui/Avatar'
+import BottomSheet from '../../components/ui/BottomSheet'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
@@ -50,23 +53,23 @@ export default function PostCard({ post, onDeleted }) {
 
   return (
     <article className="mb-6 animate-fade-in">
-      <div className="glass-strong rounded-3xl overflow-hidden">
+      <Card variant="strong">
         {/* header */}
         <div className="flex items-center justify-between p-4">
           <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-3">
-            <img
-              src={influencer?.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${influencer?.id}`}
-              alt=""
-              className="w-10 h-10 rounded-full object-cover"
-            />
-            <div className="flex items-center gap-1.5">
-              <span className="font-medium text-sm">{influencer?.users?.nom_complet}</span>
+            <Avatar src={influencer?.users?.photo_url} seed={influencer?.id} size="md" />
+            <div className="flex items-center gap-2">
+              <span className="text-body-medium">{influencer?.users?.nom_complet}</span>
               {influencer?.verifie && <VerifiedBadge size={15} />}
             </div>
           </Link>
 
           {isOwner && (
-            <button onClick={() => setShowMenu(true)} className="p-1.5 -mr-1.5 text-[var(--text-secondary)]">
+            <button
+              onClick={() => setShowMenu(true)}
+              aria-label="Options"
+              className="w-11 h-11 -mr-2 flex items-center justify-center text-[var(--text-secondary)]"
+            >
               <MoreHorizontal size={20} />
             </button>
           )}
@@ -81,62 +84,52 @@ export default function PostCard({ post, onDeleted }) {
 
         {/* actions */}
         <div className="flex items-center gap-4 px-4 pt-3">
-          <button onClick={toggleLike} className="active:scale-90 transition-transform">
-            <Heart
-              size={24}
-              className={liked ? 'fill-red-500 text-red-500' : ''}
-              strokeWidth={2}
-            />
+          <button onClick={toggleLike} className="active:scale-90 transition-transform duration-200">
+            <Heart size={24} className={liked ? 'fill-red-500 text-red-500' : ''} strokeWidth={2} />
           </button>
-          <button onClick={() => setShowComments((s) => !s)} className="active:scale-90 transition-transform">
+          <button onClick={() => setShowComments((s) => !s)} className="active:scale-90 transition-transform duration-200">
             <MessageCircle size={24} strokeWidth={2} />
           </button>
-          <button className="active:scale-90 transition-transform">
+          <button className="active:scale-90 transition-transform duration-200">
             <Send size={22} strokeWidth={2} />
           </button>
         </div>
 
         {/* like count */}
-        <p className="px-4 pt-2 text-sm font-medium">{likeCount} j'aime</p>
+        <p className="px-4 pt-2 text-body-medium">{likeCount} j'aime</p>
 
         {/* caption */}
         {post.legende && (
-          <p className="px-4 pt-1 pb-4 text-sm">
-            <span className="font-medium mr-1.5">{influencer?.users?.nom_complet}</span>
+          <p className="px-4 pt-1 pb-4 text-body">
+            <span className="text-body-medium mr-1.5">{influencer?.users?.nom_complet}</span>
             {post.legende}
           </p>
         )}
-      </div>
+      </Card>
 
       {showComments && <CommentsSheet postId={post.id} onClose={() => setShowComments(false)} />}
 
       {showMenu && (
-        <div className="fixed inset-0 z-[100] flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowMenu(false)} />
-          <div className="relative bg-[var(--bg-elevated)] rounded-t-3xl pb-6 animate-slide-up" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-[var(--border-subtle)]" />
-            </div>
-            <button
-              onClick={() => { setShowMenu(false); navigate(`/publier/${post.id}/modifier`) }}
-              className="w-full flex items-center gap-3 px-5 py-3.5 text-sm"
-            >
-              <Pencil size={18} /> Modifier la publication
-            </button>
-            <button
-              onClick={handleDelete}
-              className="w-full flex items-center gap-3 px-5 py-3.5 text-sm text-red-500"
-            >
-              <Trash2 size={18} /> Supprimer la publication
-            </button>
-            <button
-              onClick={() => setShowMenu(false)}
-              className="w-full flex items-center gap-3 px-5 py-3.5 text-sm text-[var(--text-secondary)]"
-            >
-              <X size={18} /> Annuler
-            </button>
-          </div>
-        </div>
+        <BottomSheet onClose={() => setShowMenu(false)}>
+          <button
+            onClick={() => { setShowMenu(false); navigate(`/publier/${post.id}/modifier`) }}
+            className="w-full flex items-center gap-3 px-5 py-3 text-body"
+          >
+            <Pencil size={18} /> Modifier la publication
+          </button>
+          <button
+            onClick={handleDelete}
+            className="w-full flex items-center gap-3 px-5 py-3 text-body text-red-500"
+          >
+            <Trash2 size={18} /> Supprimer la publication
+          </button>
+          <button
+            onClick={() => setShowMenu(false)}
+            className="w-full flex items-center gap-3 px-5 py-3 text-body text-[var(--text-secondary)]"
+          >
+            <X size={18} /> Annuler
+          </button>
+        </BottomSheet>
       )}
     </article>
   )
