@@ -4,7 +4,8 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import Button from '../../components/ui/Button'
-import { LogOut, Plus } from 'lucide-react'
+import { LogOut, Plus, X } from 'lucide-react'
+import PostCard from '../feed/PostCard'
 
 export default function InfluencerProfile() {
   const { id } = useParams() // id du profils_influenceur ; si absent, c'est "mon" profil
@@ -12,6 +13,7 @@ export default function InfluencerProfile() {
   const [target, setTarget] = useState(null)
   const [tab, setTab] = useState('publications')
   const [posts, setPosts] = useState([])
+  const [selectedPost, setSelectedPost] = useState(null)
   const [offres, setOffres] = useState([])
   const [reseaux, setReseaux] = useState([])
   const [loading, setLoading] = useState(true)
@@ -41,11 +43,26 @@ export default function InfluencerProfile() {
 
       const { data: postsData } = await supabase
         .from('posts')
-        .select('id, legende, crop_format, post_medias(media_url)')
+        .select(`
+          id, legende, crop_format, created_at,
+          post_medias(media_url, position),
+          profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
+        `)
         .eq('influenceur_id', targetId)
         .in('type', ['photo', 'carrousel'])
         .order('created_at', { ascending: false })
-      setPosts(postsData || [])
+
+      const postIds = (postsData || []).map((p) => p.id)
+      const { data: likes } = postIds.length
+        ? await supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds)
+        : { data: [] }
+
+      const enrichedPosts = (postsData || []).map((p) => ({
+        ...p,
+        like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
+        liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === user?.id) || false,
+      }))
+      setPosts(enrichedPosts)
 
       const offresQuery = supabase.from('offres').select('*').eq('influenceur_id', targetId).order('created_at', { ascending: false })
       const { data: offresData } = isMe ? await offresQuery : await offresQuery.eq('actif', true)
@@ -106,7 +123,7 @@ export default function InfluencerProfile() {
               <h1 className="text-h1">{target.users?.nom_complet}</h1>
               {target.verifie && <VerifiedBadge size={17} />}
             </div>
-            <div className="flex gap-4 text-body">
+            <div className="flex gap-4 text-small">
               <span><strong>{posts.length}</strong> <span className="text-[var(--text-secondary)]">publications</span></span>
               <span><strong>{totalAbonnes.toLocaleString()}</strong> <span className="text-[var(--text-secondary)]">abonnés</span></span>
               <span><strong>{offres.length}</strong> <span className="text-[var(--text-secondary)]">offres</span></span>
@@ -114,7 +131,7 @@ export default function InfluencerProfile() {
           </div>
         </div>
 
-        {target.bio && <p className="text-body mt-4">{target.bio}</p>}
+        {target.bio && <p className="text-small mt-4">{target.bio}</p>}
         {(target.pays || target.ville) && (
           <p className="text-caption mt-1">
             {[target.ville, target.pays].filter(Boolean).join(', ')}
@@ -197,11 +214,15 @@ export default function InfluencerProfile() {
             </div>
           ) : (
             posts.map((p) => (
-              <div key={p.id} className="aspect-square bg-black/20">
+              <button
+                key={p.id}
+                onClick={() => setSelectedPost(p)}
+                className="aspect-square bg-black/20"
+              >
                 {p.post_medias?.[0]?.media_url && (
                   <img src={p.post_medias[0].media_url} alt="" className="w-full h-full object-cover" />
                 )}
-              </div>
+              </button>
             ))
           )}
         </div>
@@ -224,6 +245,29 @@ export default function InfluencerProfile() {
               <OfferCard key={o.id} offre={o} editable={isMe} onChange={reloadOffres} />
             ))
           )}
+        </div>
+      )}
+
+      {selectedPost && (
+        <div className="fixed inset-0 z-[100] bg-[var(--bg-primary)] overflow-y-auto">
+          <div className="flex items-center px-4 py-3 sticky top-0 bg-[var(--bg-primary)]/90 backdrop-blur-xl z-10">
+            <button
+              onClick={() => setSelectedPost(null)}
+              aria-label="Fermer"
+              className="w-11 h-11 -ml-2 flex items-center justify-center"
+            >
+              <X size={22} />
+            </button>
+          </div>
+          <div className="px-4 pb-6">
+            <PostCard
+              post={selectedPost}
+              onDeleted={(id) => {
+                setPosts((ps) => ps.filter((p) => p.id !== id))
+                setSelectedPost(null)
+              }}
+            />
+          </div>
         </div>
       )}
     </div>
