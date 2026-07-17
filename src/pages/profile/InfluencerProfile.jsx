@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import Button from '../../components/ui/Button'
-import { LogOut } from 'lucide-react'
+import { LogOut, Plus } from 'lucide-react'
 
 export default function InfluencerProfile() {
   const { id } = useParams() // id du profils_influenceur ; si absent, c'est "mon" profil
@@ -85,11 +85,22 @@ export default function InfluencerProfile() {
       {/* header profil */}
       <div className="px-5 pt-6 pb-4">
         <div className="flex items-center gap-5">
-          <img
-            src={target.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${target.id}`}
-            alt=""
-            className="w-20 h-20 rounded-full object-cover"
-          />
+          <div className="relative shrink-0">
+            <img
+              src={target.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${target.id}`}
+              alt=""
+              className="w-20 h-20 rounded-full object-cover"
+            />
+            {isMe && (
+              <button
+                onClick={() => navigate('/publier?type=story')}
+                className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[var(--accent,#3b82f6)] border-2 border-[var(--bg-base)] flex items-center justify-center"
+                aria-label="Ajouter une story"
+              >
+                <Plus size={15} className="text-white" strokeWidth={3} />
+              </button>
+            )}
+          </div>
           <div className="flex-1">
             <div className="flex items-center gap-1.5 mb-1">
               <h1 className="font-display font-bold text-lg">{target.users?.nom_complet}</h1>
