@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import Avatar from '../../components/ui/Avatar'
+import VerifiedBadge from '../../components/ui/VerifiedBadge'
 
 export default function CommentsSheet({ postId, onClose, onCommentAdded }) {
   const [comments, setComments] = useState([])
@@ -13,7 +14,7 @@ export default function CommentsSheet({ postId, onClose, onCommentAdded }) {
   const loadComments = async () => {
     const { data } = await supabase
       .from('post_comments')
-      .select('id, contenu, created_at, users(nom_complet, photo_url)')
+      .select('id, contenu, created_at, users(nom_complet, photo_url, profils_influenceur(verifie))')
       .eq('post_id', postId)
       .order('created_at', { ascending: true })
     setComments(data || [])
@@ -65,7 +66,10 @@ export default function CommentsSheet({ postId, onClose, onCommentAdded }) {
               <div key={c.id} className="flex items-start gap-3">
                 <Avatar src={c.users?.photo_url} seed={c.id} size="sm" />
                 <div className="flex-1">
-                  <p className="text-small-medium">{c.users?.nom_complet}</p>
+                  <p className="text-small-medium flex items-center gap-1.5">
+                    {c.users?.nom_complet}
+                    {c.users?.profils_influenceur?.[0]?.verifie && <VerifiedBadge size={13} />}
+                  </p>
                   <p className="text-small mt-0.5" style={{ color: 'var(--text-secondary)' }}>{c.contenu}</p>
                 </div>
               </div>
