@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import Avatar from '../../components/ui/Avatar'
 
-export default function CommentsSheet({ postId, onClose }) {
+export default function CommentsSheet({ postId, onClose, onCommentAdded }) {
   const [comments, setComments] = useState([])
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
@@ -30,6 +30,7 @@ export default function CommentsSheet({ postId, onClose }) {
     const contenu = text
     setText('')
     await supabase.from('post_comments').insert({ post_id: postId, user_id: user.id, contenu })
+    onCommentAdded?.()
     loadComments()
   }
 
