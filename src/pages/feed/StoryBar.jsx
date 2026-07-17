@@ -72,13 +72,13 @@ export default function StoryBar() {
     <>
       <div className="flex gap-4 overflow-x-auto px-4 py-4" style={{ scrollbarWidth: 'none' }}>
         {profile?.role === 'influenceur' && (
-          <div className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer" onClick={handleClickMine}>
+          <div className="flex flex-col items-center gap-2 shrink-0 cursor-pointer" onClick={handleClickMine}>
             <div
               className={`relative w-16 h-16 rounded-full ${
                 hasMyStory ? 'p-[2px] bg-gradient-to-br from-fuchsia-500 via-orange-400 to-yellow-400' : ''
               }`}
             >
-              <div className={`w-full h-full rounded-full ${hasMyStory ? 'bg-[var(--bg-base)] p-[2px]' : ''}`}>
+              <div className={`w-full h-full rounded-full ${hasMyStory ? 'bg-[var(--bg-primary)] p-[2px]' : ''}`}>
                 <img
                   src={myPhotoUrl || `https://api.dicebear.com/9.x/glass/svg?seed=${myInfluencerId}`}
                   alt=""
@@ -86,12 +86,12 @@ export default function StoryBar() {
                 />
               </div>
               {!hasMyStory && (
-                <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-[var(--accent,#3b82f6)] border-2 border-[var(--bg-base)] flex items-center justify-center">
+                <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-[var(--accent)] border-2 border-[var(--bg-primary)] flex items-center justify-center">
                   <Plus size={12} className="text-white" strokeWidth={3} />
                 </div>
               )}
             </div>
-            <span className="text-xs text-[var(--text-secondary)] max-w-[64px] truncate">
+            <span className="text-caption max-w-[64px] truncate">
               {hasMyStory ? 'Ta story' : 'Ton story'}
             </span>
           </div>
@@ -100,11 +100,11 @@ export default function StoryBar() {
         {otherGroups.map((g) => (
           <div
             key={g.influenceurId}
-            className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer"
+            className="flex flex-col items-center gap-2 shrink-0 cursor-pointer"
             onClick={() => setViewerGroupIndex(groups.findIndex((x) => x.influenceurId === g.influenceurId))}
           >
             <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-br from-fuchsia-500 via-orange-400 to-yellow-400">
-              <div className="w-full h-full rounded-full bg-[var(--bg-base)] p-[2px]">
+              <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
                 <img
                   src={g.photoUrl || `https://api.dicebear.com/9.x/glass/svg?seed=${g.influenceurId}`}
                   alt=""
@@ -112,7 +112,7 @@ export default function StoryBar() {
                 />
               </div>
             </div>
-            <span className="text-xs text-[var(--text-secondary)] max-w-[64px] truncate">
+            <span className="text-caption max-w-[64px] truncate">
               {g.nom?.split(' ')[0]}
             </span>
           </div>
