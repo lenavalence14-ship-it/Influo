@@ -4,13 +4,15 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import StoryBar from './StoryBar'
 import PostCard from './PostCard'
-import { Sun, Moon } from 'lucide-react'
+import { Sun, Moon, MessageCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 export default function Feed() {
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(true)
   const { user } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const navigate = useNavigate()
 
   useEffect(() => {
     const loadFeed = async () => {
@@ -50,9 +52,14 @@ export default function Feed() {
     <div>
       <header className="flex items-center justify-between px-5 pt-6 pb-2 sticky top-0 z-30 bg-[var(--bg-base)]/80 backdrop-blur-xl">
         <h1 className="font-display text-2xl font-bold">Influo</h1>
-        <button onClick={toggleTheme} className="glass rounded-full p-2.5">
-          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => navigate('/messages')} className="glass rounded-full p-2.5">
+            <MessageCircle size={17} />
+          </button>
+          <button onClick={toggleTheme} className="glass rounded-full p-2.5">
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+        </div>
       </header>
 
       <StoryBar />
