@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import Avatar from '../../components/ui/Avatar'
 
 export default function CommentsSheet({ postId, onClose }) {
   const [comments, setComments] = useState([])
@@ -34,15 +35,17 @@ export default function CommentsSheet({ postId, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col justify-end">
-      {/* overlay */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
-      {/* sheet */}
-      <div className="relative bg-[var(--bg-elevated)] rounded-t-3xl flex flex-col h-[75vh] animate-slide-up">
-        <div className="flex items-center justify-center relative py-3 border-b border-[var(--border-subtle)] shrink-0">
-          <div className="absolute left-1/2 -translate-x-1/2 -top-1 w-10 h-1 rounded-full bg-[var(--border-subtle)]" />
-          <span className="text-sm font-semibold mt-1">Commentaires</span>
-          <button onClick={onClose} className="absolute right-4 top-1/2 -translate-y-1/2 p-1">
+      <div className="relative bg-[var(--bg-elevated)] rounded-t-2xl flex flex-col h-[75vh] animate-slide-up">
+        <div className="flex items-center justify-center relative py-3 border-b border-[var(--border)] shrink-0">
+          <div className="absolute left-1/2 -translate-x-1/2 top-2 w-10 h-1 rounded-full bg-[var(--border)]" />
+          <span className="text-body-medium mt-2">Commentaires</span>
+          <button
+            onClick={onClose}
+            aria-label="Fermer"
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center"
+          >
             <X size={20} className="text-[var(--text-secondary)]" />
           </button>
         </div>
@@ -53,20 +56,16 @@ export default function CommentsSheet({ postId, onClose }) {
               <div className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin" />
             </div>
           ) : comments.length === 0 ? (
-            <p className="text-center text-sm text-[var(--text-secondary)] py-10">
+            <p className="text-center text-caption py-10">
               Aucun commentaire. Sois le premier à commenter.
             </p>
           ) : (
             comments.map((c) => (
               <div key={c.id} className="flex items-start gap-3">
-                <img
-                  src={c.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${c.id}`}
-                  alt=""
-                  className="w-8 h-8 rounded-full object-cover shrink-0"
-                />
+                <Avatar src={c.users?.photo_url} seed={c.id} size="sm" />
                 <div className="flex-1">
-                  <p className="text-sm">
-                    <span className="font-medium mr-1.5">{c.users?.nom_complet}</span>
+                  <p className="text-body">
+                    <span className="text-body-medium mr-1.5">{c.users?.nom_complet}</span>
                     {c.contenu}
                   </p>
                 </div>
@@ -77,19 +76,19 @@ export default function CommentsSheet({ postId, onClose }) {
 
         <form
           onSubmit={submitComment}
-          className="flex items-center gap-2 px-4 py-3 border-t border-[var(--border-subtle)] shrink-0"
-          style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          className="flex items-center gap-2 px-4 py-3 border-t border-[var(--border)] shrink-0"
+          style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
         >
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Ajouter un commentaire..."
             autoFocus
-            className="flex-1 rounded-full px-4 py-2.5 glass text-sm outline-none placeholder:text-[var(--text-secondary)]"
+            className="flex-1 h-11 rounded-full px-4 glass text-body outline-none placeholder:text-[var(--text-secondary)]"
           />
           <button
             type="submit"
-            className="text-sm font-semibold disabled:opacity-30 shrink-0 px-2"
+            className="text-body-medium disabled:opacity-30 shrink-0 px-2 h-11"
             disabled={!text.trim()}
           >
             Publier
