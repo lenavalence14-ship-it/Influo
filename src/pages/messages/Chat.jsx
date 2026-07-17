@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { ArrowLeft, Paperclip, Send, Camera, Download } from 'lucide-react'
 import Button from '../../components/ui/Button'
+import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { generateReceipt } from '../../lib/receipt'
 
 export default function Chat() {
@@ -25,7 +26,7 @@ export default function Chat() {
   const loadAll = async () => {
     const { data: conv } = await supabase
       .from('conversations')
-      .select('*, client:client_id(nom_complet, photo_url), profils_influenceur(id, users(nom_complet, photo_url)), offres(*)')
+      .select('*, client:client_id(nom_complet, photo_url), profils_influenceur(id, verifie, users(nom_complet, photo_url)), offres(*)')
       .eq('id', id)
       .maybeSingle()
     setConversation(conv)
@@ -241,7 +242,10 @@ export default function Chat() {
           alt=""
           className="w-9 h-9 rounded-full object-cover"
         />
-        <p className="text-body-medium">{other?.nom_complet}</p>
+        <p className="text-body-medium flex items-center gap-1.5">
+          {other?.nom_complet}
+          {!isInfluencer && conversation.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
+        </p>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
