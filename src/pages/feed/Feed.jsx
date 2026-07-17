@@ -37,10 +37,16 @@ export default function Feed() {
         .select('post_id, user_id')
         .in('post_id', postIds)
 
+      const { data: comments } = await supabase
+        .from('post_comments')
+        .select('post_id')
+        .in('post_id', postIds)
+
       const enriched = data.map((p) => ({
         ...p,
         like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
         liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === user.id) || false,
+        comment_count: comments?.filter((c) => c.post_id === p.id).length || 0,
       }))
 
       setPosts(enriched)
