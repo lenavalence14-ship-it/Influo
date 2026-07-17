@@ -21,7 +21,7 @@ export default function Feed() {
         .select(`
           id, legende, crop_format, type, created_at,
           post_medias(media_url, position),
-          profils_influenceur(id, verifie, users(nom_complet, photo_url))
+          profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
         `)
         .in('type', ['photo', 'carrousel'])
         .order('created_at', { ascending: false })
@@ -76,7 +76,13 @@ export default function Feed() {
             </p>
           </div>
         ) : (
-          posts.map((post) => <PostCard key={post.id} post={post} />)
+          posts.map((post) => (
+            <PostCard
+              key={post.id}
+              post={post}
+              onDeleted={(id) => setPosts((ps) => ps.filter((p) => p.id !== id))}
+            />
+          ))
         )}
       </div>
     </div>
