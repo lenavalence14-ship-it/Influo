@@ -100,35 +100,35 @@ export default function CreateOffer() {
 
   return (
     <div className="px-5 pt-6">
-      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-6">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-caption mb-6">
         <ArrowLeft size={16} /> Retour
       </button>
 
-      <h1 className="font-display text-2xl font-bold mb-6">{isEdit ? "Modifier l'offre" : 'Nouvelle offre'}</h1>
+      <h1 className="text-h1 mb-6">{isEdit ? "Modifier l'offre" : 'Nouvelle offre'}</h1>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <label className="block cursor-pointer">
-          <div className="relative aspect-[4/3] rounded-3xl overflow-hidden glass-strong">
+          <div className="relative aspect-[4/3] rounded-2xl overflow-hidden glass-strong">
             {displayedPhoto ? (
               <img src={displayedPhoto} alt="" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-[var(--text-secondary)]">
                 <ImageIcon size={28} />
-                <span className="text-sm">Ajouter une photo</span>
+                <span className="text-body">Ajouter une photo</span>
               </div>
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-4 pointer-events-none">
-              <p className="text-white font-display font-bold text-lg">{titre || 'Titre de ton offre'}</p>
+              <p className="text-white text-h1">{titre || 'Titre de ton offre'}</p>
               <div className="flex items-center gap-3 mt-1">
                 <span className="text-white font-semibold">{prix ? `${prix} €` : '0 €'}</span>
-                <span className="text-white/70 text-sm">{delaiJours ? `${delaiJours}j de délai` : 'Délai'}</span>
+                <span className="text-white/70 text-body">{delaiJours ? `${delaiJours}j de délai` : 'Délai'}</span>
               </div>
             </div>
           </div>
           <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
         </label>
-        <p className="text-xs text-[var(--text-secondary)] -mt-3">
+        <p className="text-caption -mt-3">
           Choisis une photo chic, elle sert de fond à ta carte d'offre.
         </p>
 
@@ -145,11 +145,11 @@ export default function CreateOffer() {
         </div>
 
         <label className="block">
-          <span className="block text-sm mb-2 text-[var(--text-secondary)] font-medium">Plateforme</span>
+          <span className="block text-body mb-2 text-[var(--text-secondary)] font-medium">Plateforme</span>
           <select
             value={plateforme}
             onChange={(e) => setPlateforme(e.target.value)}
-            className="w-full rounded-2xl px-4 py-3.5 glass text-[var(--text-primary)] outline-none appearance-none"
+            className="w-full rounded-2xl px-4 py-3 glass text-[var(--text-primary)] outline-none appearance-none"
           >
             {PLATEFORMES.map((p) => (
               <option key={p} value={p} className="bg-[var(--bg-elevated)]">{p}</option>
@@ -157,7 +157,7 @@ export default function CreateOffer() {
           </select>
         </label>
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-body text-red-400">{error}</p>}
 
         <Button type="submit" fullWidth disabled={loading}>
           {loading ? 'Enregistrement...' : isEdit ? 'Enregistrer les modifications' : "Publier l'offre"}
