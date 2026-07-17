@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import Button from '../../components/ui/Button'
 import { ArrowLeft } from 'lucide-react'
+import VerifiedBadge from '../../components/ui/VerifiedBadge'
 
 export default function NewConversation() {
   const [searchParams] = useSearchParams()
@@ -21,7 +22,7 @@ export default function NewConversation() {
       if (offreId) {
         const { data } = await supabase
           .from('offres')
-          .select('*, profils_influenceur(id, users(nom_complet))')
+          .select('*, profils_influenceur(id, verifie, users(nom_complet))')
           .eq('id', offreId)
           .maybeSingle()
         setOffre(data)
@@ -93,8 +94,9 @@ export default function NewConversation() {
         <ArrowLeft size={16} /> Retour
       </button>
 
-      <h1 className="text-h1 mb-1">
+      <h1 className="text-h1 mb-1 flex items-center gap-1.5">
         Contacter {offre?.profils_influenceur?.users?.nom_complet || ''}
+        {offre?.profils_influenceur?.verifie && <VerifiedBadge size={17} />}
       </h1>
       <p className="text-caption mb-6">
         Modifie le message avant de l'envoyer si tu veux.
