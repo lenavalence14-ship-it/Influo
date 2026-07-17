@@ -28,28 +28,28 @@ export default function ClientDashboard() {
 
   return (
     <div className="px-5 pt-6 pb-6">
-      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-6">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-caption mb-6">
         <ArrowLeft size={16} /> Retour
       </button>
 
-      <h1 className="font-display text-2xl font-bold mb-6">Dashboard</h1>
+      <h1 className="text-h1 mb-6">Dashboard</h1>
 
       <div className="grid grid-cols-2 gap-3 mb-6">
-        <div className="glass-strong rounded-3xl p-4">
-          <p className="text-xs text-[var(--text-secondary)] mb-1">Conversations</p>
-          <p className="font-display text-xl font-bold">{conversations}</p>
+        <div className="glass-strong rounded-2xl p-4">
+          <p className="text-caption mb-1">Conversations</p>
+          <p className="text-h1">{conversations}</p>
         </div>
-        <div className="glass-strong rounded-3xl p-4">
-          <p className="text-xs text-[var(--text-secondary)] mb-1">Commandes</p>
-          <p className="font-display text-xl font-bold">{commandes.length}</p>
+        <div className="glass-strong rounded-2xl p-4">
+          <p className="text-caption mb-1">Commandes</p>
+          <p className="text-h1">{commandes.length}</p>
         </div>
-        <div className="glass-strong rounded-3xl p-4">
-          <p className="text-xs text-[var(--text-secondary)] mb-1">Paiements</p>
-          <p className="font-display text-xl font-bold">{paiements.length}</p>
+        <div className="glass-strong rounded-2xl p-4">
+          <p className="text-caption mb-1">Paiements</p>
+          <p className="text-h1">{paiements.length}</p>
         </div>
-        <div className="glass-strong rounded-3xl p-4">
-          <p className="text-xs text-[var(--text-secondary)] mb-1">Total dépensé</p>
-          <p className="font-display text-xl font-bold">
+        <div className="glass-strong rounded-2xl p-4">
+          <p className="text-caption mb-1">Total dépensé</p>
+          <p className="text-h1">
             {paiements.reduce((s, p) => s + Number(p.montant), 0).toFixed(2)} €
           </p>
         </div>
@@ -58,10 +58,10 @@ export default function ClientDashboard() {
       <h2 className="font-medium mb-3">Historique des prestations</h2>
       <div className="space-y-2">
         {commandes.length === 0 ? (
-          <p className="text-sm text-[var(--text-secondary)]">Aucune commande pour le moment.</p>
+          <p className="text-caption">Aucune commande pour le moment.</p>
         ) : (
           commandes.map((c) => (
-            <div key={c.id} className="glass rounded-2xl p-3 flex justify-between text-sm">
+            <div key={c.id} className="glass rounded-2xl p-3 flex justify-between text-body">
               <span className="text-[var(--text-secondary)]">{c.status.replace(/_/g, ' ')}</span>
               <span className="font-medium">{c.montant} €</span>
             </div>
