@@ -66,7 +66,7 @@ export default function CommentsSheet({ postId, onClose, onCommentAdded }) {
                 <Avatar src={c.users?.photo_url} seed={c.id} size="sm" />
                 <div className="flex-1">
                   <p className="text-small-medium">{c.users?.nom_complet}</p>
-                  <p className="text-small mt-0.5">{c.contenu}</p>
+                  <p className="text-small mt-0.5 text-[var(--text-secondary)] font-light">{c.contenu}</p>
                 </div>
               </div>
             ))
