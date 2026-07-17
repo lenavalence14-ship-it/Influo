@@ -75,7 +75,7 @@ export default function StoryBar() {
           <div className="flex flex-col items-center gap-2 shrink-0 cursor-pointer" onClick={handleClickMine}>
             <div
               className={`relative w-16 h-16 rounded-full ${
-                hasMyStory ? 'p-[2px] bg-gradient-to-br from-fuchsia-500 via-orange-400 to-yellow-400' : ''
+                hasMyStory ? 'p-[2px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400' : ''
               }`}
             >
               <div className={`w-full h-full rounded-full ${hasMyStory ? 'bg-[var(--bg-primary)] p-[2px]' : ''}`}>
@@ -103,7 +103,7 @@ export default function StoryBar() {
             className="flex flex-col items-center gap-2 shrink-0 cursor-pointer"
             onClick={() => setViewerGroupIndex(groups.findIndex((x) => x.influenceurId === g.influenceurId))}
           >
-            <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-br from-fuchsia-500 via-orange-400 to-yellow-400">
+            <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400">
               <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
                 <img
                   src={g.photoUrl || `https://api.dicebear.com/9.x/glass/svg?seed=${g.influenceurId}`}
