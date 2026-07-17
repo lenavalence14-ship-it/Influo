@@ -59,7 +59,7 @@ export default function PostCard({ post, onDeleted }) {
           <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-3">
             <Avatar src={influencer?.users?.photo_url} seed={influencer?.id} size="md" />
             <div className="flex items-center gap-2">
-              <span className="text-body-medium">{influencer?.users?.nom_complet}</span>
+              <span className="text-small-medium">{influencer?.users?.nom_complet}</span>
               {influencer?.verifie && <VerifiedBadge size={15} />}
             </div>
           </Link>
@@ -96,12 +96,12 @@ export default function PostCard({ post, onDeleted }) {
         </div>
 
         {/* like count */}
-        <p className="px-4 pt-2 text-body-medium">{likeCount} j'aime</p>
+        <p className="px-4 pt-2 text-small-medium">{likeCount} j'aime</p>
 
         {/* caption */}
         {post.legende && (
-          <p className="px-4 pt-1 pb-4 text-body">
-            <span className="text-body-medium mr-1.5">{influencer?.users?.nom_complet}</span>
+          <p className="px-4 pt-1 pb-4 text-small">
+            <span className="text-small-medium mr-1.5">{influencer?.users?.nom_complet}</span>
             {post.legende}
           </p>
         )}
