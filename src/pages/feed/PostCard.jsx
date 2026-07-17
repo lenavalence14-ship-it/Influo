@@ -4,6 +4,7 @@ import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Link } from 'react-router-dom'
+import CommentsSheet from './CommentsSheet'
 
 const cropClasses = {
   carre: 'aspect-square',
@@ -84,55 +85,9 @@ export default function PostCard({ post }) {
           </p>
         )}
 
-        {showComments && <CommentsSection postId={post.id} />}
       </div>
+
+      {showComments && <CommentsSheet postId={post.id} onClose={() => setShowComments(false)} />}
     </article>
-  )
-}
-
-function CommentsSection({ postId }) {
-  const [comments, setComments] = useState([])
-  const [text, setText] = useState('')
-  const { user } = useAuth()
-
-  const loadComments = async () => {
-    const { data } = await supabase
-      .from('post_comments')
-      .select('id, contenu, users(nom_complet)')
-      .eq('post_id', postId)
-      .order('created_at', { ascending: true })
-    setComments(data || [])
-  }
-
-  useState(() => { loadComments() }, [])
-
-  const submitComment = async (e) => {
-    e.preventDefault()
-    if (!text.trim()) return
-    await supabase.from('post_comments').insert({ post_id: postId, user_id: user.id, contenu: text })
-    setText('')
-    loadComments()
-  }
-
-  return (
-    <div className="border-t border-[var(--border-subtle)] px-4 py-3 space-y-2">
-      {comments.map((c) => (
-        <p key={c.id} className="text-sm">
-          <span className="font-medium mr-1.5">{c.users?.nom_complet}</span>
-          {c.contenu}
-        </p>
-      ))}
-      <form onSubmit={submitComment} className="flex gap-2 pt-2">
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Ajouter un commentaire..."
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--text-secondary)]"
-        />
-        <button type="submit" className="text-sm font-medium disabled:opacity-30" disabled={!text.trim()}>
-          Publier
-        </button>
-      </form>
-    </div>
   )
 }
