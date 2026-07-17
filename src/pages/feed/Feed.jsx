@@ -79,27 +79,29 @@ export default function Feed() {
 
       <StoryBar />
 
-      <div className="px-4 pt-2">
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
-          </div>
-        ) : posts.length === 0 ? (
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+        </div>
+      ) : posts.length === 0 ? (
+        <div className="px-4 pt-2">
           <Card variant="subtle" padding="lg" className="text-center mt-6">
             <p className="text-body text-[var(--text-secondary)]">
               Aucune publication pour le moment. Suis des influenceurs pour remplir ton feed.
             </p>
           </Card>
-        ) : (
-          posts.map((post) => (
+        </div>
+      ) : (
+        <div className="pt-2">
+          {posts.map((post) => (
             <PostCard
               key={post.id}
               post={post}
               onDeleted={(id) => setPosts((ps) => ps.filter((p) => p.id !== id))}
             />
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
