@@ -58,7 +58,12 @@ export default function Feed() {
   return (
     <div>
       <header className="flex items-center justify-between px-4 pt-6 pb-2 sticky top-0 z-30 bg-[var(--bg-primary)]/80 backdrop-blur-xl">
-        <h1 className="text-h1">Influo</h1>
+        <h1
+  className="text-3xl"
+  style={{ fontFamily: 'var(--font-logo)', color: '#a855f7' }}
+>
+  Influo
+</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate('/messages')}
