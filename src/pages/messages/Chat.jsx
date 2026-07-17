@@ -232,7 +232,7 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-screen">
-      <header className="flex items-center gap-3 px-4 py-4 sticky top-0 bg-[var(--bg-base)]/90 backdrop-blur-xl z-20 border-b border-[var(--border-subtle)]">
+      <header className="flex items-center gap-3 px-4 py-4 sticky top-0 bg-[var(--bg-primary)]/90 backdrop-blur-xl z-20 border-b border-[var(--border)]">
         <button onClick={() => navigate('/messages')}>
           <ArrowLeft size={20} />
         </button>
@@ -241,7 +241,7 @@ export default function Chat() {
           alt=""
           className="w-9 h-9 rounded-full object-cover"
         />
-        <p className="font-medium text-sm">{other?.nom_complet}</p>
+        <p className="text-body-medium">{other?.nom_complet}</p>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
@@ -251,11 +251,11 @@ export default function Chat() {
           return (
             <div key={m.id} className={`flex ${isSystem ? 'justify-center' : isMe ? 'justify-end' : 'justify-start'}`}>
               {isSystem ? (
-                <div className="glass rounded-2xl px-4 py-2 text-xs text-center text-[var(--text-secondary)] max-w-[85%]">
+                <div className="glass rounded-2xl px-4 py-2 text-caption text-center text-[var(--text-secondary)] max-w-[85%]">
                   {m.contenu}
                 </div>
               ) : (
-                <div className={`max-w-[75%] rounded-3xl px-4 py-2.5 text-sm ${isMe ? 'bg-[var(--text-primary)] text-[var(--bg-base)]' : 'glass'}`}>
+                <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-body ${isMe ? 'bg-[var(--text-primary)] text-[var(--bg-primary)]' : 'glass'}`}>
                   {m.fichier_url && m.fichier_type === 'image' ? (
                     <img src={m.fichier_url} alt="" className="rounded-xl mb-1 max-w-full" />
                   ) : m.fichier_url ? (
@@ -285,7 +285,7 @@ export default function Chat() {
               value={paymentAmount}
               onChange={(e) => setPaymentAmount(e.target.value)}
               placeholder="Montant en €"
-              className="flex-1 bg-transparent outline-none text-sm px-2"
+              className="flex-1 bg-transparent outline-none text-body px-2"
             />
             <Button onClick={handleRequestPayment}>Demander</Button>
           </div>
@@ -300,7 +300,7 @@ export default function Chat() {
         {!isInfluencer && ['paiement_effectue', 'en_attente_validation', 'terminee'].includes(commande?.status) && (
           <button
             onClick={handleDownloadReceipt}
-            className="flex items-center justify-center gap-2 text-sm text-[var(--text-secondary)] w-full py-2 mb-1"
+            className="flex items-center justify-center gap-2 text-caption w-full py-2 mb-1"
           >
             <Download size={14} /> Télécharger le reçu
           </button>
@@ -321,11 +321,11 @@ export default function Chat() {
 
       {/* input message */}
       <div className="px-4 pb-6 pt-2 flex items-center gap-2">
-        <button onClick={() => fileInputRef.current?.click()} className="glass rounded-full p-2.5 shrink-0">
+        <button onClick={() => fileInputRef.current?.click()} className="glass rounded-full p-3 shrink-0">
           <Paperclip size={18} />
         </button>
         <input ref={fileInputRef} type="file" onChange={handleFileUpload} className="hidden" />
-        <button onClick={() => cameraInputRef.current?.click()} className="glass rounded-full p-2.5 shrink-0">
+        <button onClick={() => cameraInputRef.current?.click()} className="glass rounded-full p-3 shrink-0">
           <Camera size={18} />
         </button>
         <input
@@ -341,9 +341,9 @@ export default function Chat() {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           placeholder="Message..."
-          className="flex-1 glass rounded-full px-4 py-2.5 outline-none text-sm"
+          className="flex-1 glass rounded-full px-4 py-3 outline-none text-body"
         />
-        <button onClick={handleSend} className="bg-[var(--text-primary)] text-[var(--bg-base)] rounded-full p-2.5 shrink-0">
+        <button onClick={handleSend} className="bg-[var(--text-primary)] text-[var(--bg-primary)] rounded-full p-3 shrink-0">
           <Send size={18} />
         </button>
       </div>
