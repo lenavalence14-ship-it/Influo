@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import StoryViewer from './StoryViewer'
+import VerifiedBadge from '../../components/ui/VerifiedBadge'
 
 export default function StoryBar() {
   const [rawStories, setRawStories] = useState([])
@@ -15,7 +16,7 @@ export default function StoryBar() {
     const { data } = await supabase
       .from('posts')
       .select(
-        'id, influenceur_id, media_url:post_medias(media_url), texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille, created_at, profils_influenceur(id, user_id, users(nom_complet, photo_url))'
+        'id, influenceur_id, media_url:post_medias(media_url), texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille, created_at, profils_influenceur(id, user_id, verifie, users(nom_complet, photo_url))'
       )
       .eq('type', 'story')
       .gt('expire_at', new Date().toISOString())
@@ -36,6 +37,7 @@ export default function StoryBar() {
         influenceurId: infId,
         nom: s.profils_influenceur?.users?.nom_complet,
         photoUrl: s.profils_influenceur?.users?.photo_url,
+        verifie: s.profils_influenceur?.verifie,
         stories: [],
       })
     }
@@ -112,8 +114,9 @@ export default function StoryBar() {
                 />
               </div>
             </div>
-            <span className="text-caption max-w-[64px] truncate">
+            <span className="text-caption max-w-[64px] truncate flex items-center gap-1">
               {g.nom?.split(' ')[0]}
+              {g.verifie && <VerifiedBadge size={11} />}
             </span>
           </div>
         ))}
