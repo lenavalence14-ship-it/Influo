@@ -42,7 +42,7 @@ export default function Signup() {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 relative overflow-hidden bg-[var(--bg-base)] py-10">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 relative overflow-hidden bg-[var(--bg-primary)] py-10">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-white/[0.04] blur-3xl" />
         <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-white/[0.03] blur-3xl" />
@@ -58,8 +58,8 @@ export default function Signup() {
 
       <div className="w-full max-w-sm relative z-10 animate-fade-in">
         <div className="mb-8 text-center">
-          <h1 className="font-display text-4xl font-bold tracking-tight mb-2">Influo</h1>
-          <p className="text-[var(--text-secondary)] text-sm">
+          <h1 className="text-display tracking-tight mb-2">Influo</h1>
+          <p className="text-[var(--text-secondary)] text-body">
             Crée ton compte
           </p>
         </div>
@@ -77,7 +77,7 @@ export default function Signup() {
                 </div>
                 <div>
                   <p className="font-semibold">Je suis influenceur</p>
-                  <p className="text-sm text-[var(--text-secondary)]">
+                  <p className="text-caption">
                     Publie, propose des offres, sois payé
                   </p>
                 </div>
@@ -95,14 +95,14 @@ export default function Signup() {
                 </div>
                 <div>
                   <p className="font-semibold">Je suis une entreprise</p>
-                  <p className="text-sm text-[var(--text-secondary)]">
+                  <p className="text-caption">
                     Trouve des influenceurs, collabore
                   </p>
                 </div>
               </div>
             </GlassCard>
 
-            <p className="text-center mt-6 text-sm text-[var(--text-secondary)]">
+            <p className="text-center mt-6 text-caption">
               Déjà un compte ?{' '}
               <Link to="/connexion" className="text-[var(--text-primary)] font-medium">
                 Se connecter
@@ -113,7 +113,7 @@ export default function Signup() {
           <GlassCard strong className="p-6">
             <button
               onClick={() => setRole(null)}
-              className="text-sm text-[var(--text-secondary)] mb-4"
+              className="text-caption mb-4"
             >
               ← Changer de type de compte
             </button>
@@ -142,7 +142,7 @@ export default function Signup() {
                 required
               />
 
-              {error && <p className="text-sm text-red-400 -mt-2">{error}</p>}
+              {error && <p className="text-body text-red-400 -mt-2">{error}</p>}
 
               <Button type="submit" fullWidth disabled={loading}>
                 {loading ? 'Création...' : 'Créer mon compte'}
