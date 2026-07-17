@@ -46,7 +46,7 @@ export default function OfferDetail() {
 
   return (
     <div>
-      <button onClick={() => navigate(-1)} className="absolute top-6 left-5 z-20 glass rounded-full p-2.5">
+      <button onClick={() => navigate(-1)} className="absolute top-6 left-5 z-20 glass rounded-full p-3">
         <ArrowLeft size={18} />
       </button>
 
@@ -56,27 +56,27 @@ export default function OfferDetail() {
         ) : (
           <div className="w-full h-full bg-white/5" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-base)] via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-primary)] via-black/20 to-transparent" />
       </div>
 
       <div className="px-5 -mt-10 relative z-10">
-        <div className="glass-strong rounded-3xl p-5">
-          <h1 className="font-display text-2xl font-bold mb-1">{offre.titre}</h1>
+        <div className="glass-strong rounded-2xl p-5">
+          <h1 className="text-h1 mb-1">{offre.titre}</h1>
           <div className="flex items-center gap-3 mb-4">
-            <span className="text-xl font-semibold">{offre.prix} €</span>
-            <span className="text-[var(--text-secondary)] text-sm">{offre.delai_jours} jours de délai</span>
-            <span className="glass rounded-full px-2.5 py-1 text-xs">{offre.plateforme}</span>
+            <span className="text-h1">{offre.prix} €</span>
+            <span className="text-[var(--text-secondary)] text-body">{offre.delai_jours} jours de délai</span>
+            <span className="glass rounded-full px-3 py-1 text-caption">{offre.plateforme}</span>
           </div>
-          <p className="text-sm text-[var(--text-secondary)] mb-5">{offre.description}</p>
+          <p className="text-caption mb-6">{offre.description}</p>
 
-          <div className="flex items-center gap-3 py-3 border-t border-[var(--border-subtle)]">
+          <div className="flex items-center gap-3 py-3 border-t border-[var(--border)]">
             <img
               src={offre.profils_influenceur?.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${offre.influenceur_id}`}
               alt=""
               className="w-10 h-10 rounded-full object-cover"
             />
-            <div className="flex items-center gap-1.5">
-              <span className="font-medium text-sm">{offre.profils_influenceur?.users?.nom_complet}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-body-medium">{offre.profils_influenceur?.users?.nom_complet}</span>
               {offre.profils_influenceur?.verifie && <VerifiedBadge size={15} />}
             </div>
           </div>
