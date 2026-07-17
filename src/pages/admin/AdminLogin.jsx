@@ -27,18 +27,18 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 bg-[var(--bg-base)]">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 bg-[var(--bg-primary)]">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="font-display text-3xl font-bold tracking-tight mb-2">Influo</h1>
-          <p className="text-[var(--text-secondary)] text-sm">Espace administrateur</p>
+          <h1 className="text-display tracking-tight mb-2">Influo</h1>
+          <p className="text-[var(--text-secondary)] text-body">Espace administrateur</p>
         </div>
 
         <GlassCard strong className="p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <Input label="Mot de passe" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p className="text-body text-red-400">{error}</p>}
             <Button type="submit" fullWidth disabled={loading}>
               {loading ? 'Connexion...' : 'Se connecter'}
             </Button>
