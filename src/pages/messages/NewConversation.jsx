@@ -89,27 +89,27 @@ export default function NewConversation() {
 
   return (
     <div className="px-5 pt-6">
-      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-6">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-caption mb-6">
         <ArrowLeft size={16} /> Retour
       </button>
 
-      <h1 className="font-display text-2xl font-bold mb-1">
+      <h1 className="text-h1 mb-1">
         Contacter {offre?.profils_influenceur?.users?.nom_complet || ''}
       </h1>
-      <p className="text-sm text-[var(--text-secondary)] mb-6">
+      <p className="text-caption mb-6">
         Modifie le message avant de l'envoyer si tu veux.
       </p>
 
-      <div className="glass-strong rounded-3xl p-4">
+      <div className="glass-strong rounded-2xl p-4">
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           rows={6}
-          className="w-full bg-transparent outline-none resize-none text-sm"
+          className="w-full bg-transparent outline-none resize-none text-body"
         />
       </div>
 
-      <Button fullWidth className="mt-5" onClick={handleSend} disabled={sending || !message.trim()}>
+      <Button fullWidth className="mt-6" onClick={handleSend} disabled={sending || !message.trim()}>
         {sending ? 'Envoi...' : 'Envoyer le message'}
       </Button>
     </div>
