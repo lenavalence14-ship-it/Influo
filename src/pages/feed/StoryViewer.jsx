@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { X, Trash2, Pencil } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import VerifiedBadge from '../../components/ui/VerifiedBadge'
 
 const STORY_DURATION_MS = 5000
 
-// groups: array of { influenceurId, nom, photoUrl, stories: [{id, media_url, texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille}] }
+// groups: array of { influenceurId, nom, photoUrl, verifie, stories: [{id, media_url, texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille}] }
 export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, onClose }) {
   const navigate = useNavigate()
   const [groupIndex, setGroupIndex] = useState(startGroupIndex)
@@ -130,7 +131,10 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
             alt=""
             className="w-9 h-9 rounded-full object-cover"
           />
-          <span className="text-white text-body-medium">{group.nom}</span>
+          <span className="text-white text-body-medium flex items-center gap-1.5">
+            {group.nom}
+            {group.verifie && <VerifiedBadge size={14} />}
+          </span>
         </div>
         <div className="flex items-center">
           {isOwner && (
