@@ -76,8 +76,8 @@ export default function StoryBar() {
         {profile?.role === 'influenceur' && (
           <div className="flex flex-col items-center gap-2 shrink-0 cursor-pointer" onClick={handleClickMine}>
             <div
-              className={`relative w-16 h-16 rounded-full ${
-                hasMyStory ? 'p-[2px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400' : ''
+              className={`relative w-[72px] h-[72px] rounded-full ${
+                hasMyStory ? 'p-[2.5px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400' : ''
               }`}
             >
               <div className={`w-full h-full rounded-full ${hasMyStory ? 'bg-[var(--bg-primary)] p-[2px]' : ''}`}>
@@ -93,7 +93,7 @@ export default function StoryBar() {
                 </div>
               )}
             </div>
-            <span className="text-caption max-w-[64px] truncate">
+            <span className="text-caption max-w-[72px] truncate">
               {hasMyStory ? 'Ta story' : 'Ton story'}
             </span>
           </div>
@@ -105,7 +105,7 @@ export default function StoryBar() {
             className="flex flex-col items-center gap-2 shrink-0 cursor-pointer"
             onClick={() => setViewerGroupIndex(groups.findIndex((x) => x.influenceurId === g.influenceurId))}
           >
-            <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400">
+            <div className="w-[72px] h-[72px] rounded-full p-[2.5px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400">
               <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
                 <img
                   src={g.photoUrl || `https://api.dicebear.com/9.x/glass/svg?seed=${g.influenceurId}`}
@@ -114,7 +114,7 @@ export default function StoryBar() {
                 />
               </div>
             </div>
-            <span className="text-caption max-w-[64px] truncate flex items-center gap-1">
+            <span className="text-caption max-w-[72px] truncate flex items-center gap-1">
               {g.nom?.split(' ')[0]}
               {g.verifie && <VerifiedBadge size={11} />}
             </span>
