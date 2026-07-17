@@ -77,17 +77,17 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] px-5 pt-8 pb-10">
-      <h1 className="font-display text-2xl font-bold mb-1">Administration</h1>
-      <p className="text-sm text-[var(--text-secondary)] mb-6">CEO Influo App</p>
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] px-5 pt-8 pb-10">
+      <h1 className="text-h1 mb-1">Administration</h1>
+      <p className="text-caption mb-6">CEO Influo App</p>
 
       <div className="flex gap-2 overflow-x-auto mb-6 pb-1">
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-              tab === t ? 'bg-[var(--text-primary)] text-[var(--bg-base)]' : 'glass'
+            className={`shrink-0 rounded-full px-4 py-2 text-body-medium transition-colors ${
+              tab === t ? 'bg-[var(--text-primary)] text-[var(--bg-primary)]' : 'glass'
             }`}
           >
             {t}
@@ -110,17 +110,17 @@ export default function AdminDashboard() {
       {tab === 'Utilisateurs' && (
         <div className="space-y-2">
           {users.map((u) => (
-            <div key={u.id} className="glass rounded-2xl p-3 flex justify-between items-center text-sm">
+            <div key={u.id} className="glass rounded-2xl p-3 flex justify-between items-center text-body">
               <div>
                 <p className="font-medium">{u.nom_complet}</p>
-                <p className="text-[var(--text-secondary)] text-xs">{u.email}</p>
+                <p className="text-[var(--text-secondary)] text-caption">{u.email}</p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="glass rounded-full px-2.5 py-1 text-xs">{u.role}</span>
+                <span className="glass rounded-full px-3 py-1 text-caption">{u.role}</span>
                 {u.role === 'influenceur' && u.profils_influenceur?.id && (
                   <button
                     onClick={() => toggleVerifie(u)}
-                    className={`rounded-full p-1.5 transition-colors ${
+                    className={`rounded-full p-2 transition-colors ${
                       u.profils_influenceur?.verifie ? 'bg-blue-500 text-white' : 'glass text-[var(--text-secondary)]'
                     }`}
                     title={u.profils_influenceur?.verifie ? 'Retirer la vérification' : 'Vérifier ce profil'}
@@ -137,9 +137,9 @@ export default function AdminDashboard() {
       {tab === 'Offres' && (
         <div className="space-y-2">
           {offres.map((o) => (
-            <div key={o.id} className="glass rounded-2xl p-3 text-sm">
+            <div key={o.id} className="glass rounded-2xl p-3 text-body">
               <p className="font-medium">{o.titre}</p>
-              <p className="text-[var(--text-secondary)] text-xs">
+              <p className="text-[var(--text-secondary)] text-caption">
                 {o.profils_influenceur?.users?.nom_complet} · {o.prix} € · {o.actif ? 'active' : 'inactive'}
               </p>
             </div>
@@ -150,7 +150,7 @@ export default function AdminDashboard() {
       {tab === 'Paiements' && (
         <div className="space-y-2">
           {paiements.map((p) => (
-            <div key={p.id} className="glass rounded-2xl p-3 flex justify-between text-sm">
+            <div key={p.id} className="glass rounded-2xl p-3 flex justify-between text-body">
               <span className="text-[var(--text-secondary)]">{p.reference?.slice(0, 8)}</span>
               <span className="font-medium">{p.montant} € (comm. {p.commission} €)</span>
             </div>
@@ -161,7 +161,7 @@ export default function AdminDashboard() {
       {tab === 'Retraits' && (
         <div className="space-y-2">
           {retraits.map((r) => (
-            <div key={r.id} className="glass rounded-2xl p-3 text-sm">
+            <div key={r.id} className="glass rounded-2xl p-3 text-body">
               <div className="flex justify-between items-center mb-2">
                 <span>{r.profils_influenceur?.users?.nom_complet}</span>
                 <span className="font-medium">{r.montant} €</span>
@@ -170,7 +170,7 @@ export default function AdminDashboard() {
                 <select
                   value={r.status}
                   onChange={(e) => handleRetraitStatus(r.id, e.target.value)}
-                  className="glass rounded-full px-3 py-1 text-xs outline-none"
+                  className="glass rounded-full px-3 py-1 text-caption outline-none"
                 >
                   <option value="en_attente" className="bg-[var(--bg-elevated)]">en attente</option>
                   <option value="traite" className="bg-[var(--bg-elevated)]">traité</option>
@@ -187,10 +187,10 @@ export default function AdminDashboard() {
 
 function StatCard({ icon: Icon, label, value, className = '' }) {
   return (
-    <div className={`glass-strong rounded-3xl p-4 ${className}`}>
+    <div className={`glass-strong rounded-2xl p-4 ${className}`}>
       <Icon size={18} className="mb-2 text-[var(--text-secondary)]" />
-      <p className="text-xs text-[var(--text-secondary)] mb-1">{label}</p>
-      <p className="font-display text-lg font-bold">{value}</p>
+      <p className="text-caption mb-1">{label}</p>
+      <p className="text-h1">{value}</p>
     </div>
   )
 }
