@@ -2,7 +2,7 @@ export default function Input({ label, type = 'text', value, onChange, placehold
   return (
     <label className="block">
       {label && (
-        <span className="block text-sm mb-2 text-[var(--text-secondary)] font-medium">
+        <span className="block text-caption-medium mb-2 text-[var(--text-secondary)]">
           {label}
         </span>
       )}
@@ -13,7 +13,7 @@ export default function Input({ label, type = 'text', value, onChange, placehold
         onChange={onChange}
         placeholder={placeholder}
         required={required}
-        className="w-full rounded-2xl px-4 py-3.5 glass text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--text-primary)]/30 transition-colors"
+        className="w-full h-12 rounded-2xl px-4 glass text-body text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] outline-none focus:border-[var(--text-primary)]/30 transition-colors duration-200"
         {...rest}
       />
     </label>
