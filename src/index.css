@@ -6,21 +6,40 @@
 }
 
 :root {
-  --bg-base: #0a0a0a;
-  --bg-elevated: #141414;
+  /* --- Design tokens --- */
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #050505;
+  --surface-primary: #141414;
+  --surface-secondary: #1c1c1c;
+  --border: rgba(255, 255, 255, 0.08);
   --text-primary: #f5f5f5;
   --text-secondary: #a3a3a3;
-  --border-subtle: rgba(255, 255, 255, 0.08);
+  --accent: #3b82f6;
+
   --glass-bg: rgba(255, 255, 255, 0.06);
   --glass-border: rgba(255, 255, 255, 0.12);
+
+  /* --- Aliases rétrocompatibles (ancien naming conservé pour ne pas tout réécrire d'un coup) --- */
+  --bg-base: var(--bg-primary);
+  --bg-elevated: var(--surface-primary);
+  --border-subtle: var(--border);
+
+  /* --- Rayons standard --- */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-avatar: 24px;
 }
 
 .light {
-  --bg-base: #f5f5f5;
-  --bg-elevated: #ffffff;
+  --bg-primary: #f5f5f5;
+  --bg-secondary: #ececec;
+  --surface-primary: #ffffff;
+  --surface-secondary: #f0f0f0;
+  --border: rgba(0, 0, 0, 0.08);
   --text-primary: #0a0a0a;
   --text-secondary: #6b6b6b;
-  --border-subtle: rgba(0, 0, 0, 0.08);
+  --accent: #3b82f6;
+
   --glass-bg: rgba(0, 0, 0, 0.04);
   --glass-border: rgba(0, 0, 0, 0.1);
 }
@@ -30,7 +49,7 @@
 }
 
 body {
-  background-color: var(--bg-base);
+  background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-body);
   transition: background-color 0.2s ease, color 0.2s ease;
@@ -58,12 +77,51 @@ body {
   scrollbar-width: none;
 }
 
+/* --- Échelle typographique unique --- */
+.text-display {
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.text-h1 {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+.text-h2 {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+.text-body {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+.text-body-medium {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+}
+.text-caption {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+}
+.text-caption-medium {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-in {
-  animation: fadeIn 0.35s ease-out;
+  animation: fadeIn 0.2s ease-out;
 }
 
 @keyframes slideUp {
@@ -71,5 +129,5 @@ body {
   to { transform: translateY(0); }
 }
 .animate-slide-up {
-  animation: slideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+  animation: slideUp 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
