@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import StoryBar from './StoryBar'
 import PostCard from './PostCard'
+import Card from '../../components/ui/Card'
 import { Sun, Moon, MessageCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -50,14 +51,22 @@ export default function Feed() {
 
   return (
     <div>
-      <header className="flex items-center justify-between px-5 pt-6 pb-2 sticky top-0 z-30 bg-[var(--bg-base)]/80 backdrop-blur-xl">
-        <h1 className="font-display text-2xl font-bold">Influo</h1>
+      <header className="flex items-center justify-between px-4 pt-6 pb-2 sticky top-0 z-30 bg-[var(--bg-primary)]/80 backdrop-blur-xl">
+        <h1 className="text-h1">Influo</h1>
         <div className="flex items-center gap-2">
-          <button onClick={() => navigate('/messages')} className="glass rounded-full p-2.5">
-            <MessageCircle size={17} />
+          <button
+            onClick={() => navigate('/messages')}
+            aria-label="Messages"
+            className="glass rounded-2xl w-11 h-11 flex items-center justify-center"
+          >
+            <MessageCircle size={19} />
           </button>
-          <button onClick={toggleTheme} className="glass rounded-full p-2.5">
-            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          <button
+            onClick={toggleTheme}
+            aria-label="Changer de thème"
+            className="glass rounded-2xl w-11 h-11 flex items-center justify-center"
+          >
+            {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
           </button>
         </div>
       </header>
@@ -70,11 +79,11 @@ export default function Feed() {
             <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
           </div>
         ) : posts.length === 0 ? (
-          <div className="glass rounded-3xl p-8 text-center mt-6">
-            <p className="text-[var(--text-secondary)]">
+          <Card variant="subtle" padding="lg" className="text-center mt-6">
+            <p className="text-body text-[var(--text-secondary)]">
               Aucune publication pour le moment. Suis des influenceurs pour remplir ton feed.
             </p>
-          </div>
+          </Card>
         ) : (
           posts.map((post) => (
             <PostCard
