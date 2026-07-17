@@ -2,7 +2,7 @@ export default function GlassCard({ children, className = '', strong = false, on
   return (
     <div
       onClick={onClick}
-      className={`${strong ? 'glass-strong' : 'glass'} rounded-3xl ${className}`}
+      className={`${strong ? 'glass-strong' : 'glass'} rounded-2xl ${className}`}
     >
       {children}
     </div>
