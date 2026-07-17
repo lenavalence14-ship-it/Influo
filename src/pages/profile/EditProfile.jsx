@@ -80,11 +80,11 @@ export default function EditProfile() {
 
   return (
     <div className="px-5 pt-6 pb-6">
-      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-6">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-caption mb-6">
         <ArrowLeft size={16} /> Retour
       </button>
 
-      <h1 className="font-display text-2xl font-bold mb-6">Modifier le profil</h1>
+      <h1 className="text-h1 mb-6">Modifier le profil</h1>
 
       <div className="space-y-4">
         <div className="flex justify-center mb-2">
@@ -95,7 +95,7 @@ export default function EditProfile() {
               className="w-24 h-24 rounded-full object-cover"
             />
             <div className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[var(--text-primary)] flex items-center justify-center">
-              <Camera size={15} className="text-[var(--bg-base)]" />
+              <Camera size={15} className="text-[var(--bg-primary)]" />
             </div>
             <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
           </label>
@@ -106,12 +106,12 @@ export default function EditProfile() {
         {influencerProfile && (
           <>
             <label className="block">
-              <span className="block text-sm mb-2 text-[var(--text-secondary)] font-medium">Bio</span>
+              <span className="block text-body mb-2 text-[var(--text-secondary)] font-medium">Bio</span>
               <textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 rows={3}
-                className="w-full rounded-2xl px-4 py-3 glass outline-none resize-none text-sm"
+                className="w-full rounded-2xl px-4 py-3 glass outline-none resize-none text-body"
               />
             </label>
             <Input label="Pays" value={pays} onChange={(e) => setPays(e.target.value)} />
@@ -119,7 +119,7 @@ export default function EditProfile() {
 
             <div>
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium">Réseaux sociaux</span>
+                <span className="text-body-medium">Réseaux sociaux</span>
                 <button onClick={addReseau} className="glass rounded-full p-2">
                   <Plus size={16} />
                 </button>
@@ -131,7 +131,7 @@ export default function EditProfile() {
                       <select
                         value={r.plateforme}
                         onChange={(e) => updateReseau(i, 'plateforme', e.target.value)}
-                        className="bg-transparent text-sm outline-none"
+                        className="bg-transparent text-body outline-none"
                       >
                         {PLATEFORMES.map((p) => (
                           <option key={p} value={p} className="bg-[var(--bg-elevated)]">{p}</option>
@@ -145,20 +145,20 @@ export default function EditProfile() {
                       value={r.nom_compte}
                       onChange={(e) => updateReseau(i, 'nom_compte', e.target.value)}
                       placeholder="Nom du compte"
-                      className="w-full bg-transparent text-sm outline-none border-b border-[var(--border-subtle)] pb-1"
+                      className="w-full bg-transparent text-body outline-none border-b border-[var(--border)] pb-1"
                     />
                     <input
                       value={r.lien_profil}
                       onChange={(e) => updateReseau(i, 'lien_profil', e.target.value)}
                       placeholder="Lien du profil"
-                      className="w-full bg-transparent text-sm outline-none border-b border-[var(--border-subtle)] pb-1"
+                      className="w-full bg-transparent text-body outline-none border-b border-[var(--border)] pb-1"
                     />
                     <input
                       type="number"
                       value={r.nombre_abonnes}
                       onChange={(e) => updateReseau(i, 'nombre_abonnes', e.target.value)}
                       placeholder="Nombre d'abonnés"
-                      className="w-full bg-transparent text-sm outline-none"
+                      className="w-full bg-transparent text-body outline-none"
                     />
                   </div>
                 ))}
