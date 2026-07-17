@@ -46,11 +46,11 @@ export default function ConversationsList() {
   return (
     <div>
       <header className="px-5 pt-6 pb-4">
-        <h1 className="font-display text-2xl font-bold">Messages</h1>
+        <h1 className="text-h1">Messages</h1>
       </header>
 
       {conversations.length === 0 ? (
-        <div className="glass rounded-3xl p-8 text-center mx-4">
+        <div className="glass rounded-2xl p-8 text-center mx-4">
           <p className="text-[var(--text-secondary)]">Aucune conversation pour le moment.</p>
         </div>
       ) : (
@@ -72,8 +72,8 @@ export default function ConversationsList() {
                   className="w-14 h-14 rounded-full object-cover"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{other?.nom_complet}</p>
-                  <p className="text-sm text-[var(--text-secondary)] truncate">
+                  <p className="text-body-medium">{other?.nom_complet}</p>
+                  <p className="text-caption truncate">
                     {lastMsg?.contenu || (c.offres?.titre && `Offre : ${c.offres.titre}`) || 'Nouvelle conversation'}
                   </p>
                 </div>
