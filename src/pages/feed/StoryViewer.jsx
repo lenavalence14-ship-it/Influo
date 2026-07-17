@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Trash2 } from 'lucide-react'
+import { X, Trash2, Pencil } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
 const STORY_DURATION_MS = 5000
 
 // groups: array of { influenceurId, nom, photoUrl, stories: [{id, media_url, texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille}] }
 export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, onClose }) {
+  const navigate = useNavigate()
   const [groupIndex, setGroupIndex] = useState(startGroupIndex)
   const [storyIndex, setStoryIndex] = useState(0)
   const [progress, setProgress] = useState(0)
@@ -132,9 +134,14 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
         </div>
         <div className="flex items-center gap-1">
           {isOwner && (
-            <button onClick={handleDelete} className="text-white p-2">
-              <Trash2 size={20} />
-            </button>
+            <>
+              <button onClick={() => navigate(`/publier/${story.id}/modifier`)} className="text-white p-2">
+                <Pencil size={19} />
+              </button>
+              <button onClick={handleDelete} className="text-white p-2">
+                <Trash2 size={20} />
+              </button>
+            </>
           )}
           <button onClick={onClose} className="text-white p-1">
             <X size={24} />
