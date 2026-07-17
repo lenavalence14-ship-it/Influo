@@ -21,24 +21,24 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 relative overflow-hidden bg-[var(--bg-base)]">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 relative overflow-hidden bg-[var(--bg-primary)]">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-white/[0.04] blur-3xl" />
       </div>
 
       <div className="w-full max-w-sm relative z-10 animate-fade-in">
-        <Link to="/connexion" className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-8">
+        <Link to="/connexion" className="inline-flex items-center gap-2 text-caption mb-8">
           <ArrowLeft size={16} /> Retour
         </Link>
 
-        <h1 className="font-display text-2xl font-bold mb-2">Mot de passe oublié</h1>
-        <p className="text-[var(--text-secondary)] text-sm mb-8">
+        <h1 className="text-h1 mb-2">Mot de passe oublié</h1>
+        <p className="text-[var(--text-secondary)] text-body mb-8">
           Entre ton email, on t'envoie un lien de réinitialisation.
         </p>
 
         <GlassCard strong className="p-6">
           {sent ? (
-            <p className="text-sm text-center py-4">
+            <p className="text-body text-center py-4">
               Si un compte existe avec cet email, un lien vient d'être envoyé.
             </p>
           ) : (
