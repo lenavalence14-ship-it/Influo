@@ -24,17 +24,17 @@ export default function Notifications() {
   return (
     <div>
       <header className="px-5 pt-6 pb-4">
-        <h1 className="font-display text-2xl font-bold">Notifications</h1>
+        <h1 className="text-h1">Notifications</h1>
       </header>
 
       {notifications.length === 0 ? (
-        <div className="glass rounded-3xl p-8 text-center mx-4">
+        <div className="glass rounded-2xl p-8 text-center mx-4">
           <p className="text-[var(--text-secondary)]">Rien de nouveau pour le moment.</p>
         </div>
       ) : (
         <div className="px-4 space-y-2">
           {notifications.map((n) => (
-            <div key={n.id} className={`glass rounded-2xl p-4 text-sm ${!n.lu ? 'glass-strong' : ''}`}>
+            <div key={n.id} className={`glass rounded-2xl p-4 text-body ${!n.lu ? 'glass-strong' : ''}`}>
               {n.contenu}
             </div>
           ))}
