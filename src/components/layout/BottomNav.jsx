@@ -16,15 +16,16 @@ export default function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 pb-safe">
-      <div className="mx-3 mb-3 glass-strong rounded-3xl px-2 py-2">
+      <div className="mx-4 mb-4 glass-strong rounded-2xl px-2 py-2">
         <div className="flex items-center justify-around">
           {items.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
+              aria-label={label}
               className={({ isActive }) =>
-                `flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all ${
+                `flex items-center justify-center w-11 h-11 rounded-2xl transition-opacity duration-200 ${
                   isActive ? 'opacity-100' : 'opacity-50'
                 }`
               }
