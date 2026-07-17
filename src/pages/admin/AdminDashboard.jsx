@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Users, TrendingUp, DollarSign, Percent } from 'lucide-react'
+import { Users, TrendingUp, DollarSign, Percent, BadgeCheck } from 'lucide-react'
 
 const TABS = ['Statistiques', 'Utilisateurs', 'Offres', 'Paiements', 'Retraits']
 
@@ -40,7 +40,10 @@ export default function AdminDashboard() {
   useEffect(() => {
     const loadTabData = async () => {
       if (tab === 'Utilisateurs') {
-        const { data } = await supabase.from('users').select('*').order('created_at', { ascending: false })
+        const { data } = await supabase
+          .from('users')
+          .select('*, profils_influenceur(id, verifie)')
+          .order('created_at', { ascending: false })
         setUsers(data || [])
       } else if (tab === 'Offres') {
         const { data } = await supabase.from('offres').select('*, profils_influenceur(users(nom_complet))').order('created_at', { ascending: false })
@@ -59,6 +62,18 @@ export default function AdminDashboard() {
   const handleRetraitStatus = async (retraitId, status) => {
     await supabase.from('retraits').update({ status }).eq('id', retraitId)
     setRetraits((rs) => rs.map((r) => (r.id === retraitId ? { ...r, status } : r)))
+  }
+
+  const toggleVerifie = async (u) => {
+    const profilId = u.profils_influenceur?.id
+    if (!profilId) return
+    const nextValue = !u.profils_influenceur?.verifie
+    await supabase.from('profils_influenceur').update({ verifie: nextValue }).eq('id', profilId)
+    setUsers((us) =>
+      us.map((x) =>
+        x.id === u.id ? { ...x, profils_influenceur: { ...x.profils_influenceur, verifie: nextValue } } : x
+      )
+    )
   }
 
   return (
@@ -100,7 +115,20 @@ export default function AdminDashboard() {
                 <p className="font-medium">{u.nom_complet}</p>
                 <p className="text-[var(--text-secondary)] text-xs">{u.email}</p>
               </div>
-              <span className="glass rounded-full px-2.5 py-1 text-xs">{u.role}</span>
+              <div className="flex items-center gap-2">
+                <span className="glass rounded-full px-2.5 py-1 text-xs">{u.role}</span>
+                {u.role === 'influenceur' && u.profils_influenceur?.id && (
+                  <button
+                    onClick={() => toggleVerifie(u)}
+                    className={`rounded-full p-1.5 transition-colors ${
+                      u.profils_influenceur?.verifie ? 'bg-blue-500 text-white' : 'glass text-[var(--text-secondary)]'
+                    }`}
+                    title={u.profils_influenceur?.verifie ? 'Retirer la vérification' : 'Vérifier ce profil'}
+                  >
+                    <BadgeCheck size={15} />
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
