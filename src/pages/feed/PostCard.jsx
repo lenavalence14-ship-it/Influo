@@ -53,8 +53,8 @@ export default function PostCard({ post, onDeleted }) {
   if (deleted) return null
 
   return (
-    <article className="mb-6 animate-fade-in">
-      <Card variant="strong">
+    <article className="border-b animate-fade-in" style={{ borderColor: 'var(--border)' }}>
+      <Card variant="strong" className="rounded-none">
         {/* header */}
         <div className="flex items-center justify-between p-4">
           <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-3">
