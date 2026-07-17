@@ -33,6 +33,9 @@ export default function ClientProfile() {
       </div>
 
       <div className="space-y-3">
+        <Button variant="glass" fullWidth onClick={() => navigate('/profil/modifier')}>
+          Modifier le profil
+        </Button>
         <Button variant="glass" fullWidth onClick={() => navigate('/dashboard')}>
           Mon dashboard
         </Button>
