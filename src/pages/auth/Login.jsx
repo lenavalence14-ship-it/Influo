@@ -30,7 +30,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 relative overflow-hidden bg-[var(--bg-base)]">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 relative overflow-hidden bg-[var(--bg-primary)]">
       {/* Fond dégradé subtil pour donner du relief au glass */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-white/[0.04] blur-3xl" />
@@ -47,8 +47,8 @@ export default function Login() {
 
       <div className="w-full max-w-sm relative z-10 animate-fade-in">
         <div className="mb-10 text-center">
-          <h1 className="font-display text-4xl font-bold tracking-tight mb-2">Influo</h1>
-          <p className="text-[var(--text-secondary)] text-sm">
+          <h1 className="text-display tracking-tight mb-2">Influo</h1>
+          <p className="text-[var(--text-secondary)] text-body">
             Connecte-toi pour continuer
           </p>
         </div>
@@ -73,11 +73,11 @@ export default function Login() {
             />
 
             {error && (
-              <p className="text-sm text-red-400 -mt-2">{error}</p>
+              <p className="text-body text-red-400 -mt-2">{error}</p>
             )}
 
             <div className="text-right -mt-2">
-              <Link to="/mot-de-passe-oublie" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+              <Link to="/mot-de-passe-oublie" className="text-caption hover:text-[var(--text-primary)] transition-colors">
                 Mot de passe oublié ?
               </Link>
             </div>
@@ -88,7 +88,7 @@ export default function Login() {
           </form>
         </GlassCard>
 
-        <p className="text-center mt-6 text-sm text-[var(--text-secondary)]">
+        <p className="text-center mt-6 text-caption">
           Pas encore de compte ?{' '}
           <Link to="/inscription" className="text-[var(--text-primary)] font-medium">
             Créer un compte
