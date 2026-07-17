@@ -20,6 +20,7 @@ export default function PostCard({ post, onDeleted }) {
   const navigate = useNavigate()
   const [liked, setLiked] = useState(post.liked_by_me)
   const [likeCount, setLikeCount] = useState(post.like_count || 0)
+  const [commentCount, setCommentCount] = useState(post.comment_count || 0)
   const [showComments, setShowComments] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [deleted, setDeleted] = useState(false)
@@ -87,16 +88,17 @@ export default function PostCard({ post, onDeleted }) {
           <button onClick={toggleLike} className="active:scale-90 transition-transform duration-200">
             <Heart size={24} className={liked ? 'fill-red-500 text-red-500' : ''} strokeWidth={2} />
           </button>
-          <button onClick={() => setShowComments((s) => !s)} className="active:scale-90 transition-transform duration-200">
+          <button
+            onClick={() => setShowComments((s) => !s)}
+            className="flex items-center gap-1.5 active:scale-90 transition-transform duration-200"
+          >
             <MessageCircle size={24} strokeWidth={2} />
+            {commentCount > 0 && <span className="text-small-medium">{commentCount}</span>}
           </button>
           <button className="active:scale-90 transition-transform duration-200">
             <Send size={22} strokeWidth={2} />
           </button>
         </div>
-
-        {/* like count */}
-        <p className="px-4 pt-2 text-small-medium">{likeCount} j'aime</p>
 
         {/* caption */}
         {post.legende && (
@@ -107,7 +109,13 @@ export default function PostCard({ post, onDeleted }) {
         )}
       </Card>
 
-      {showComments && <CommentsSheet postId={post.id} onClose={() => setShowComments(false)} />}
+      {showComments && (
+        <CommentsSheet
+          postId={post.id}
+          onClose={() => setShowComments(false)}
+          onCommentAdded={() => setCommentCount((c) => c + 1)}
+        />
+      )}
 
       {showMenu && (
         <BottomSheet onClose={() => setShowMenu(false)}>
