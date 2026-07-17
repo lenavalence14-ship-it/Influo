@@ -137,16 +137,16 @@ export default function CreatePost() {
   if (step === 'select') {
     return (
       <div className="px-5 pt-6 pb-6">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-6">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-caption mb-6">
           <ArrowLeft size={16} /> Retour
         </button>
-        <h1 className="font-display text-2xl font-bold mb-6">
+        <h1 className="text-h1 mb-6">
           {isStory ? 'Nouvelle story' : 'Nouvelle publication'}
         </h1>
         <label className="block cursor-pointer">
-          <div className={`${isStory ? 'aspect-[9/16]' : 'aspect-square'} rounded-3xl glass-strong flex flex-col items-center justify-center gap-2 text-[var(--text-secondary)]`}>
+          <div className={`${isStory ? 'aspect-[9/16]' : 'aspect-square'} rounded-2xl glass-strong flex flex-col items-center justify-center gap-2 text-[var(--text-secondary)]`}>
             <ImageIcon size={28} />
-            <span className="text-sm">Choisir {isStory ? 'une photo' : 'une ou plusieurs photos'}</span>
+            <span className="text-body">Choisir {isStory ? 'une photo' : 'une ou plusieurs photos'}</span>
           </div>
           <input
             ref={fileInputRef}
@@ -180,17 +180,17 @@ export default function CreatePost() {
       <div className="flex items-center justify-between px-4 py-3 shrink-0 relative z-10">
         <button
           onClick={() => (isEditing ? navigate(-1) : setStep('select'))}
-          className="text-white p-1"
+          aria-label="Fermer" className="text-white w-11 h-11 flex items-center justify-center"
         >
           <X size={24} />
         </button>
-        <span className="text-white text-sm font-medium">
+        <span className="text-white text-body-medium">
           {isEditing ? 'Modifier' : isStory ? 'Nouvelle story' : 'Nouvelle publication'}
         </span>
         {isStory ? (
           <button
             onClick={() => setAddingText((a) => !a)}
-            className={`p-2 rounded-full ${addingText ? 'bg-white text-black' : 'text-white'}`}
+            aria-label="Ajouter du texte" className={`w-11 h-11 flex items-center justify-center rounded-full ${addingText ? 'bg-white text-black' : 'text-white'}`}
           >
             <Type size={20} />
           </button>
@@ -239,7 +239,7 @@ export default function CreatePost() {
               )}
             </div>
             {isEditing && (
-              <p className="text-white/40 text-xs text-center mt-3">
+              <p className="text-white/40 text-caption text-center mt-3">
                 Pour changer la photo, supprime cette publication et republie.
               </p>
             )}
@@ -265,9 +265,9 @@ export default function CreatePost() {
             onChange={(e) => setTexteOverlay(e.target.value)}
             placeholder="Ajouter du texte..."
             autoFocus
-            className="w-full rounded-2xl px-4 py-3 bg-white/10 text-white outline-none text-sm placeholder:text-white/50"
+            className="w-full h-12 rounded-2xl px-4 bg-white/10 text-white outline-none text-body placeholder:text-white/50"
           />
-          <p className="text-white/50 text-xs mt-2">Touche l'image pour repositionner le texte</p>
+          <p className="text-white/50 text-caption mt-2">Touche l'image pour repositionner le texte</p>
         </div>
       )}
 
@@ -280,7 +280,7 @@ export default function CreatePost() {
                 <button
                   key={f.value}
                   onClick={() => setFormat(f.value)}
-                  className={`flex-1 rounded-2xl py-2.5 text-xs font-medium transition-colors ${
+                  className={`flex-1 rounded-2xl py-3 text-caption-medium transition-colors ${
                     format === f.value ? 'bg-white text-black' : 'bg-white/10 text-white'
                   }`}
                 >
@@ -293,7 +293,7 @@ export default function CreatePost() {
               onChange={(e) => setLegende(e.target.value)}
               rows={2}
               placeholder="Écris une légende..."
-              className="w-full rounded-2xl px-4 py-3 bg-white/10 text-white outline-none resize-none text-sm placeholder:text-white/50 mb-3"
+              className="w-full rounded-2xl px-4 py-3 bg-white/10 text-white outline-none resize-none text-body placeholder:text-white/50 mb-3"
             />
           </>
         )}
@@ -301,7 +301,7 @@ export default function CreatePost() {
         <button
           onClick={handlePublish}
           disabled={loading}
-          className="w-full rounded-full py-3.5 bg-white text-black font-semibold disabled:opacity-40 flex items-center justify-center gap-2"
+          className="w-full h-12 rounded-full bg-white text-black text-body-medium disabled:opacity-40 flex items-center justify-center gap-2"
         >
           {loading ? 'Enregistrement...' : (
             <>
