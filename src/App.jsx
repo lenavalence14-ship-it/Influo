@@ -61,6 +61,7 @@ function AppRoutes() {
         <Route path="/recherche" element={<Search />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/publier" element={<CreatePost />} />
+        <Route path="/publier/:postId/modifier" element={<CreatePost />} />
         <Route path="/profil" element={<MyProfileRouter />} />
         <Route path="/profil/modifier" element={<EditProfile />} />
         <Route path="/influenceur/:id" element={<InfluencerProfile />} />
