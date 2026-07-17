@@ -49,27 +49,27 @@ export default function InfluencerDashboard() {
 
   return (
     <div className="px-5 pt-6 pb-6">
-      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-6">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-caption mb-6">
         <ArrowLeft size={16} /> Retour
       </button>
 
-      <h1 className="font-display text-2xl font-bold mb-6">Dashboard</h1>
+      <h1 className="text-h1 mb-6">Dashboard</h1>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
         {cards.map((c) => (
-          <div key={c.label} className="glass-strong rounded-3xl p-4">
-            <p className="text-xs text-[var(--text-secondary)] mb-1">{c.label}</p>
-            <p className="font-display text-xl font-bold">{c.value}</p>
+          <div key={c.label} className="glass-strong rounded-2xl p-4">
+            <p className="text-caption mb-1">{c.label}</p>
+            <p className="text-h1">{c.value}</p>
           </div>
         ))}
       </div>
 
       <button
         onClick={() => navigate('/wallet')}
-        className="glass-strong rounded-3xl p-4 flex items-center gap-3 w-full mt-2"
+        className="glass-strong rounded-2xl p-4 flex items-center gap-3 w-full mt-2"
       >
         <WalletIcon size={20} />
-        <span className="font-medium text-sm">Voir mon portefeuille</span>
+        <span className="text-body-medium">Voir mon portefeuille</span>
       </button>
     </div>
   )
