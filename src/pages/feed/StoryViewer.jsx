@@ -1,25 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { X, Trash2 } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 
 const STORY_DURATION_MS = 5000
 
 // groups: array of { influenceurId, nom, photoUrl, stories: [{id, media_url, texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille}] }
-export default function StoryViewer({ groups, startGroupIndex, onClose }) {
+export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, onClose }) {
   const [groupIndex, setGroupIndex] = useState(startGroupIndex)
   const [storyIndex, setStoryIndex] = useState(0)
   const [progress, setProgress] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const [localGroups, setLocalGroups] = useState(groups)
   const timerRef = useRef(null)
   const rafRef = useRef(null)
   const startRef = useRef(null)
+  const elapsedRef = useRef(0)
 
-  const group = groups[groupIndex]
+  const group = localGroups[groupIndex]
   const story = group?.stories?.[storyIndex]
+  const isOwner = group?.influenceurId === myInfluencerId
 
   const goNext = () => {
     if (!group) return onClose()
     if (storyIndex < group.stories.length - 1) {
       setStoryIndex((i) => i + 1)
-    } else if (groupIndex < groups.length - 1) {
+    } else if (groupIndex < localGroups.length - 1) {
       setGroupIndex((g) => g + 1)
       setStoryIndex(0)
     } else {
@@ -31,13 +36,14 @@ export default function StoryViewer({ groups, startGroupIndex, onClose }) {
     if (storyIndex > 0) {
       setStoryIndex((i) => i - 1)
     } else if (groupIndex > 0) {
-      const prevGroup = groups[groupIndex - 1]
+      const prevGroup = localGroups[groupIndex - 1]
       setGroupIndex((g) => g - 1)
       setStoryIndex(prevGroup.stories.length - 1)
     }
   }
 
   useEffect(() => {
+    if (paused) return
     setProgress(0)
     startRef.current = performance.now()
 
@@ -57,7 +63,7 @@ export default function StoryViewer({ groups, startGroupIndex, onClose }) {
       clearTimeout(timerRef.current)
       cancelAnimationFrame(rafRef.current)
     }
-  }, [groupIndex, storyIndex])
+  }, [groupIndex, storyIndex, paused])
 
   if (!story) return null
 
@@ -66,6 +72,35 @@ export default function StoryViewer({ groups, startGroupIndex, onClose }) {
     const width = window.innerWidth
     if (x < width * 0.35) goPrev()
     else goNext()
+  }
+
+  const handleDelete = async () => {
+    setPaused(true)
+    if (!window.confirm('Supprimer définitivement cette story ?')) {
+      setPaused(false)
+      return
+    }
+    await supabase.from('posts').delete().eq('id', story.id)
+
+    const updatedStories = group.stories.filter((s) => s.id !== story.id)
+    if (updatedStories.length === 0) {
+      // plus de story pour cet influenceur, on retire le groupe entier
+      const newGroups = localGroups.filter((_, i) => i !== groupIndex)
+      if (newGroups.length === 0) {
+        onClose()
+        return
+      }
+      setLocalGroups(newGroups)
+      setGroupIndex((i) => Math.min(i, newGroups.length - 1))
+      setStoryIndex(0)
+    } else {
+      const newGroups = localGroups.map((g, i) =>
+        i === groupIndex ? { ...g, stories: updatedStories } : g
+      )
+      setLocalGroups(newGroups)
+      setStoryIndex((i) => Math.min(i, updatedStories.length - 1))
+    }
+    setPaused(false)
   }
 
   return (
@@ -95,9 +130,16 @@ export default function StoryViewer({ groups, startGroupIndex, onClose }) {
           />
           <span className="text-white text-sm font-medium">{group.nom}</span>
         </div>
-        <button onClick={onClose} className="text-white p-1">
-          <X size={24} />
-        </button>
+        <div className="flex items-center gap-1">
+          {isOwner && (
+            <button onClick={handleDelete} className="text-white p-2">
+              <Trash2 size={20} />
+            </button>
+          )}
+          <button onClick={onClose} className="text-white p-1">
+            <X size={24} />
+          </button>
+        </div>
       </div>
 
       {/* media */}
