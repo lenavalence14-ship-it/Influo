@@ -124,26 +124,34 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
 
       {/* header */}
       <div className="flex items-center justify-between px-4 py-3 shrink-0">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <img
             src={group.photoUrl || `https://api.dicebear.com/9.x/glass/svg?seed=${group.influenceurId}`}
             alt=""
             className="w-9 h-9 rounded-full object-cover"
           />
-          <span className="text-white text-sm font-medium">{group.nom}</span>
+          <span className="text-white text-body-medium">{group.nom}</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center">
           {isOwner && (
             <>
-              <button onClick={() => navigate(`/publier/${story.id}/modifier`)} className="text-white p-2">
+              <button
+                onClick={() => navigate(`/publier/${story.id}/modifier`)}
+                aria-label="Modifier"
+                className="text-white w-11 h-11 flex items-center justify-center"
+              >
                 <Pencil size={19} />
               </button>
-              <button onClick={handleDelete} className="text-white p-2">
+              <button
+                onClick={handleDelete}
+                aria-label="Supprimer"
+                className="text-white w-11 h-11 flex items-center justify-center"
+              >
                 <Trash2 size={20} />
               </button>
             </>
           )}
-          <button onClick={onClose} className="text-white p-1">
+          <button onClick={onClose} aria-label="Fermer" className="text-white w-11 h-11 flex items-center justify-center">
             <X size={24} />
           </button>
         </div>
