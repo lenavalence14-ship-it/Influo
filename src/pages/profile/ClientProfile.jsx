@@ -17,7 +17,7 @@ export default function ClientProfile() {
   return (
     <div className="px-5 pt-6 pb-6">
       <div className="flex justify-end mb-4">
-        <button onClick={toggleTheme} className="glass rounded-full p-2.5">
+        <button onClick={toggleTheme} className="glass rounded-full p-3">
           {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
         </button>
       </div>
@@ -28,8 +28,8 @@ export default function ClientProfile() {
           alt=""
           className="w-24 h-24 rounded-full object-cover mb-4"
         />
-        <h1 className="font-display text-xl font-bold">{profile?.nom_complet}</h1>
-        <p className="text-sm text-[var(--text-secondary)]">{profile?.email}</p>
+        <h1 className="text-h1">{profile?.nom_complet}</h1>
+        <p className="text-caption">{profile?.email}</p>
       </div>
 
       <div className="space-y-3">
