@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import VerifiedBadge from '../../components/ui/VerifiedBadge'
 
 export default function ConversationsList() {
   const [conversations, setConversations] = useState([])
@@ -16,7 +17,7 @@ export default function ConversationsList() {
         .select(`
           id, updated_at,
           client:client_id(nom_complet, photo_url),
-          profils_influenceur(id, users(nom_complet, photo_url)),
+          profils_influenceur(id, verifie, users(nom_complet, photo_url)),
           offres(titre),
           messages(contenu, created_at, is_system)
         `)
@@ -72,7 +73,10 @@ export default function ConversationsList() {
                   className="w-14 h-14 rounded-full object-cover"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-body-medium">{other?.nom_complet}</p>
+                  <p className="text-body-medium flex items-center gap-1.5">
+                    {other?.nom_complet}
+                    {!isInfluencer && c.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
+                  </p>
                   <p className="text-caption truncate">
                     {lastMsg?.contenu || (c.offres?.titre && `Offre : ${c.offres.titre}`) || 'Nouvelle conversation'}
                   </p>
