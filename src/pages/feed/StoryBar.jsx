@@ -123,6 +123,7 @@ export default function StoryBar() {
         <StoryViewer
           groups={groups}
           startGroupIndex={viewerGroupIndex}
+          myInfluencerId={myInfluencerId}
           onClose={() => {
             setViewerGroupIndex(null)
             loadStories()
