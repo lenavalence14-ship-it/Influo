@@ -11,6 +11,7 @@ export default function BottomSheet({ children, onClose, height = 'auto', title 
     <div className="fixed inset-0 z-[100] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
+
       <div
         className={`relative bg-[var(--bg-elevated)] rounded-t-2xl flex flex-col animate-slide-up ${
           height === 'tall' ? 'h-[75vh]' : ''
