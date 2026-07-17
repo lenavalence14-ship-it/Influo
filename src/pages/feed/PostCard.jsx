@@ -3,7 +3,7 @@ import { Heart, MessageCircle, Send, MoreHorizontal, X, Trash2, Pencil } from 'l
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import CommentsSheet from './CommentsSheet'
 
 const cropClasses = {
@@ -14,12 +14,11 @@ const cropClasses = {
 
 export default function PostCard({ post, onDeleted }) {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [liked, setLiked] = useState(post.liked_by_me)
   const [likeCount, setLikeCount] = useState(post.like_count || 0)
   const [showComments, setShowComments] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [legende, setLegende] = useState(post.legende || '')
   const [deleted, setDeleted] = useState(false)
 
   const influencer = post.profils_influenceur
@@ -43,12 +42,6 @@ export default function PostCard({ post, onDeleted }) {
     await supabase.from('posts').delete().eq('id', post.id)
     setDeleted(true)
     onDeleted?.(post.id)
-  }
-
-  const handleSaveLegende = async () => {
-    await supabase.from('posts').update({ legende }).eq('id', post.id)
-    setEditing(false)
-    setShowMenu(false)
   }
 
   const mediaUrl = post.post_medias?.[0]?.media_url
@@ -107,29 +100,11 @@ export default function PostCard({ post, onDeleted }) {
         <p className="px-4 pt-2 text-sm font-medium">{likeCount} j'aime</p>
 
         {/* caption */}
-        {editing ? (
-          <div className="px-4 pt-1 pb-4">
-            <textarea
-              value={legende}
-              onChange={(e) => setLegende(e.target.value)}
-              rows={2}
-              className="w-full rounded-2xl px-3 py-2 glass outline-none resize-none text-sm"
-              autoFocus
-            />
-            <div className="flex gap-2 mt-2">
-              <button onClick={handleSaveLegende} className="text-xs font-semibold">Enregistrer</button>
-              <button onClick={() => { setEditing(false); setLegende(post.legende || '') }} className="text-xs text-[var(--text-secondary)]">
-                Annuler
-              </button>
-            </div>
-          </div>
-        ) : (
-          legende && (
-            <p className="px-4 pt-1 pb-4 text-sm">
-              <span className="font-medium mr-1.5">{influencer?.users?.nom_complet}</span>
-              {legende}
-            </p>
-          )
+        {post.legende && (
+          <p className="px-4 pt-1 pb-4 text-sm">
+            <span className="font-medium mr-1.5">{influencer?.users?.nom_complet}</span>
+            {post.legende}
+          </p>
         )}
       </div>
 
@@ -143,10 +118,10 @@ export default function PostCard({ post, onDeleted }) {
               <div className="w-10 h-1 rounded-full bg-[var(--border-subtle)]" />
             </div>
             <button
-              onClick={() => { setEditing(true); setShowMenu(false) }}
+              onClick={() => { setShowMenu(false); navigate(`/publier/${post.id}/modifier`) }}
               className="w-full flex items-center gap-3 px-5 py-3.5 text-sm"
             >
-              <Pencil size={18} /> Modifier la légende
+              <Pencil size={18} /> Modifier la publication
             </button>
             <button
               onClick={handleDelete}
