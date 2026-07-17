@@ -62,7 +62,6 @@ export default function PostCard({ post, onDeleted }) {
             <div className="flex items-center gap-2">
               <span className="text-small-medium">{influencer?.users?.nom_complet}</span>
               {influencer?.verifie && <VerifiedBadge size={15} />}
-              <span className="inline-block w-2 h-2 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
             </div>
           </Link>
 
