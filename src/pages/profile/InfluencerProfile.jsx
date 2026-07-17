@@ -94,7 +94,7 @@ export default function InfluencerProfile() {
             {isMe && (
               <button
                 onClick={() => navigate('/publier?type=story')}
-                className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[var(--accent,#3b82f6)] border-2 border-[var(--bg-base)] flex items-center justify-center"
+                className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[var(--accent)] border-2 border-[var(--bg-primary)] flex items-center justify-center"
                 aria-label="Ajouter une story"
               >
                 <Plus size={15} className="text-white" strokeWidth={3} />
@@ -102,11 +102,11 @@ export default function InfluencerProfile() {
             )}
           </div>
           <div className="flex-1">
-            <div className="flex items-center gap-1.5 mb-1">
-              <h1 className="font-display font-bold text-lg">{target.users?.nom_complet}</h1>
+            <div className="flex items-center gap-2 mb-1">
+              <h1 className="text-h1">{target.users?.nom_complet}</h1>
               {target.verifie && <VerifiedBadge size={17} />}
             </div>
-            <div className="flex gap-4 text-sm">
+            <div className="flex gap-4 text-body">
               <span><strong>{posts.length}</strong> <span className="text-[var(--text-secondary)]">publications</span></span>
               <span><strong>{totalAbonnes.toLocaleString()}</strong> <span className="text-[var(--text-secondary)]">abonnés</span></span>
               <span><strong>{offres.length}</strong> <span className="text-[var(--text-secondary)]">offres</span></span>
@@ -114,9 +114,9 @@ export default function InfluencerProfile() {
           </div>
         </div>
 
-        {target.bio && <p className="text-sm mt-4">{target.bio}</p>}
+        {target.bio && <p className="text-body mt-4">{target.bio}</p>}
         {(target.pays || target.ville) && (
-          <p className="text-sm text-[var(--text-secondary)] mt-1">
+          <p className="text-caption mt-1">
             {[target.ville, target.pays].filter(Boolean).join(', ')}
           </p>
         )}
@@ -130,7 +130,7 @@ export default function InfluencerProfile() {
                 href={r.lien_profil}
                 target="_blank"
                 rel="noreferrer"
-                className="glass rounded-full px-3 py-1.5 text-xs font-medium"
+                className="glass rounded-full px-3 py-2 text-caption-medium"
               >
                 {r.plateforme} · {r.nombre_abonnes?.toLocaleString()}
               </a>
@@ -138,7 +138,7 @@ export default function InfluencerProfile() {
           </div>
         )}
 
-        <div className="mt-5 flex gap-2">
+        <div className="mt-6 flex gap-2">
           {isMe ? (
             <>
               <Button variant="glass" fullWidth onClick={() => navigate('/profil/modifier')}>
@@ -161,7 +161,7 @@ export default function InfluencerProfile() {
         {isMe && (
           <button
             onClick={async () => { await signOut(); navigate('/connexion') }}
-            className="flex items-center gap-2 text-sm text-red-400 mt-4"
+            className="flex items-center gap-2 text-body text-red-400 mt-4"
           >
             <LogOut size={15} /> Se déconnecter
           </button>
@@ -169,10 +169,10 @@ export default function InfluencerProfile() {
       </div>
 
       {/* onglets */}
-      <div className="flex border-t border-[var(--border-subtle)] sticky top-0 bg-[var(--bg-base)]/90 backdrop-blur-xl z-20">
+      <div className="flex border-t border-[var(--border)] sticky top-0 bg-[var(--bg-primary)]/90 backdrop-blur-xl z-20">
         <button
           onClick={() => setTab('publications')}
-          className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+          className={`flex-1 py-3 text-body-medium border-b-2 transition-colors ${
             tab === 'publications' ? 'border-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'
           }`}
         >
@@ -180,7 +180,7 @@ export default function InfluencerProfile() {
         </button>
         <button
           onClick={() => setTab('offres')}
-          className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+          className={`flex-1 py-3 text-body-medium border-b-2 transition-colors ${
             tab === 'offres' ? 'border-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'
           }`}
         >
@@ -192,7 +192,7 @@ export default function InfluencerProfile() {
       {tab === 'publications' ? (
         <div className="grid grid-cols-3 gap-0.5 p-0.5">
           {posts.length === 0 ? (
-            <div className="col-span-3 py-16 text-center text-[var(--text-secondary)] text-sm">
+            <div className="col-span-3 py-16 text-center text-[var(--text-secondary)] text-body">
               Aucune publication.
             </div>
           ) : (
@@ -210,13 +210,13 @@ export default function InfluencerProfile() {
           {isMe && (
             <button
               onClick={() => navigate('/offre/nouvelle')}
-              className="glass rounded-2xl px-4 py-3 text-sm font-medium w-full"
+              className="glass rounded-2xl px-4 py-3 text-body-medium w-full"
             >
               + Nouvelle offre
             </button>
           )}
           {offresAffichees.length === 0 ? (
-            <div className="py-16 text-center text-[var(--text-secondary)] text-sm">
+            <div className="py-16 text-center text-[var(--text-secondary)] text-body">
               Aucune offre disponible.
             </div>
           ) : (
@@ -256,21 +256,21 @@ function OfferCard({ offre, editable, onChange }) {
 
   return (
     <div
-      className="glass-strong rounded-3xl overflow-hidden cursor-pointer relative"
+      className="glass-strong rounded-2xl overflow-hidden cursor-pointer relative"
       onClick={() => navigate(`/offre/${offre.id}`)}
     >
       <div className="relative aspect-[4/3] bg-gradient-to-br from-white/10 to-transparent">
         {offre.photo_url ? (
           <img src={offre.photo_url} alt="" className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] text-sm">
+          <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] text-body">
             Aucune image
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
         {!offre.actif && (
-          <div className="absolute top-3 left-3 glass rounded-full px-2.5 py-1 text-xs text-white">
+          <div className="absolute top-3 left-3 glass rounded-full px-3 py-1 text-caption text-white">
             Désactivée
           </div>
         )}
@@ -285,13 +285,13 @@ function OfferCard({ offre, editable, onChange }) {
             </button>
             {menuOpen && (
               <div className="absolute right-0 mt-2 glass-strong rounded-2xl overflow-hidden w-40 z-10">
-                <button onClick={handleEdit} className="block w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10">
+                <button onClick={handleEdit} className="block w-full text-left px-4 py-3 text-body text-white hover:bg-white/10">
                   Modifier
                 </button>
-                <button onClick={handleToggleActive} className="block w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10">
+                <button onClick={handleToggleActive} className="block w-full text-left px-4 py-3 text-body text-white hover:bg-white/10">
                   {offre.actif ? 'Désactiver' : 'Activer'}
                 </button>
-                <button onClick={handleDelete} className="block w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-white/10">
+                <button onClick={handleDelete} className="block w-full text-left px-4 py-3 text-body text-red-400 hover:bg-white/10">
                   Supprimer
                 </button>
               </div>
@@ -300,10 +300,10 @@ function OfferCard({ offre, editable, onChange }) {
         )}
 
         <div className="absolute bottom-0 left-0 right-0 p-4">
-          <p className="text-white font-display font-bold text-lg">{offre.titre}</p>
+          <p className="text-white text-h1">{offre.titre}</p>
           <div className="flex items-center gap-3 mt-1">
             <span className="text-white font-semibold">{offre.prix} €</span>
-            <span className="text-white/70 text-sm">{offre.delai_jours}j de délai</span>
+            <span className="text-white/70 text-body">{offre.delai_jours}j de délai</span>
           </div>
         </div>
       </div>
