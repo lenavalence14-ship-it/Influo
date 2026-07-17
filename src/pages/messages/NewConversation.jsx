@@ -11,6 +11,7 @@ export default function NewConversation() {
   const offreId = searchParams.get('offre')
   const influenceurIdParam = searchParams.get('influenceur')
   const [offre, setOffre] = useState(null)
+  const [influenceurDirect, setInfluenceurDirect] = useState(null)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -29,13 +30,21 @@ export default function NewConversation() {
         setMessage(
           `Bonjour ! Je suis intéressé(e) par votre offre "${data?.titre}" à ${data?.prix} € (délai ${data?.delai_jours} jours). Pouvons-nous en discuter ?`
         )
+      } else if (influenceurIdParam) {
+        const { data } = await supabase
+          .from('profils_influenceur')
+          .select('id, verifie, users(nom_complet)')
+          .eq('id', influenceurIdParam)
+          .maybeSingle()
+        setInfluenceurDirect(data)
+        setMessage('Bonjour ! Je souhaiterais discuter d\'une collaboration avec vous.')
       } else {
         setMessage('Bonjour ! Je souhaiterais discuter d\'une collaboration avec vous.')
       }
       setLoading(false)
     }
     load()
-  }, [offreId])
+  }, [offreId, influenceurIdParam])
 
   const handleSend = async () => {
     setSending(true)
@@ -80,6 +89,8 @@ export default function NewConversation() {
     navigate(`/messages/${conversationId}`)
   }
 
+  const influencer = offre?.profils_influenceur || influenceurDirect
+
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -95,8 +106,8 @@ export default function NewConversation() {
       </button>
 
       <h1 className="text-h1 mb-1 flex items-center gap-1.5">
-        Contacter {offre?.profils_influenceur?.users?.nom_complet || ''}
-        {offre?.profils_influenceur?.verifie && <VerifiedBadge size={17} />}
+        Contacter {influencer?.users?.nom_complet || ''}
+        {influencer?.verifie && <VerifiedBadge size={17} />}
       </h1>
       <p className="text-caption mb-6">
         Modifie le message avant de l'envoyer si tu veux.
