@@ -53,7 +53,7 @@ export default function PostCard({ post, onDeleted }) {
   if (deleted) return null
 
   return (
-    <article className="border-b animate-fade-in" style={{ borderColor: 'var(--border)' }}>
+    <article className="mb-4 animate-fade-in">
       <Card variant="strong">
         {/* header */}
         <div className="flex items-center justify-between p-4">
