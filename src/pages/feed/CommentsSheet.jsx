@@ -64,10 +64,8 @@ export default function CommentsSheet({ postId, onClose }) {
               <div key={c.id} className="flex items-start gap-3">
                 <Avatar src={c.users?.photo_url} seed={c.id} size="sm" />
                 <div className="flex-1">
-                  <p className="text-body">
-                    <span className="text-body-medium mr-1.5">{c.users?.nom_complet}</span>
-                    {c.contenu}
-                  </p>
+                  <p className="text-small-medium">{c.users?.nom_complet}</p>
+                  <p className="text-small mt-0.5">{c.contenu}</p>
                 </div>
               </div>
             ))
