@@ -102,8 +102,8 @@ export default function PostCard({ post, onDeleted }) {
 
         {/* caption */}
         {post.legende && (
-          <p className="px-4 pt-1 pb-4 text-small text-[var(--text-secondary)] font-light">
-            <span className="text-small-medium text-[var(--text-primary)] mr-1.5">{influencer?.users?.nom_complet}</span>
+          <p className="px-4 pt-1 pb-4 text-small" style={{ color: 'var(--text-secondary)' }}>
+            <span className="text-small-medium mr-1.5" style={{ color: 'var(--text-primary)' }}>{influencer?.users?.nom_complet}</span>
             {post.legende}
           </p>
         )}
