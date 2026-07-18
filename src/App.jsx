@@ -49,6 +49,16 @@ function AppRoutes() {
       <Route path="/admin/connexion" element={<AdminLogin />} />
       <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
+      {/* Chat (séparé, pas de bottom nav — plein écran comme Messenger) */}
+      <Route
+        path="/messages/:id"
+        element={
+          <ProtectedRoute>
+            <Chat />
+          </ProtectedRoute>
+        }
+      />
+
       {/* App principale avec bottom nav */}
       <Route
         element={
@@ -70,7 +80,6 @@ function AppRoutes() {
         <Route path="/offre/:id" element={<OfferDetail />} />
         <Route path="/messages" element={<ConversationsList />} />
         <Route path="/messages/nouveau" element={<NewConversation />} />
-        <Route path="/messages/:id" element={<Chat />} />
         <Route path="/dashboard" element={<MyDashboardRouter />} />
         <Route path="/wallet" element={<Wallet />} />
       </Route>
