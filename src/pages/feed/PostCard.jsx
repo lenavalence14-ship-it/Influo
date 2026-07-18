@@ -59,6 +59,7 @@ export default function PostCard({ post, onDeleted }) {
   }
 
   const mediaUrl = post.post_medias?.[0]?.media_url
+  const isVideo = post.type === 'video' || post.post_medias?.[0]?.media_type === 'video'
 
   if (deleted) return null
 
@@ -101,7 +102,11 @@ export default function PostCard({ post, onDeleted }) {
         {/* media */}
         {mediaUrl && (
           <div className={`w-full ${cropClasses[post.crop_format] || 'aspect-square'} bg-black/20 overflow-hidden`}>
-            <img src={mediaUrl} alt="" className="w-full h-full object-cover" />
+            {isVideo ? (
+              <video src={mediaUrl} className="w-full h-full object-cover" controls playsInline preload="metadata" />
+            ) : (
+              <img src={mediaUrl} alt="" className="w-full h-full object-cover" />
+            )}
           </div>
         )}
 
