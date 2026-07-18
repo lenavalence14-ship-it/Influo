@@ -208,7 +208,7 @@ export default function CreatePost() {
           >
             {format !== 'vertical' && (
               <div
-                className="absolute inset-0 scale-125 blur-2xl brightness-50"
+                className="absolute inset-0 scale-150 blur-3xl brightness-[0.35]"
                 style={{ backgroundImage: `url(${mainPreview})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
               />
             )}
