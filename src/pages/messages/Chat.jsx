@@ -2,10 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { ArrowLeft, Paperclip, Send, Camera, Download } from 'lucide-react'
+import { ArrowLeft, Paperclip, Send, Camera, Download, Image as ImageIcon, Check } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { generateReceipt } from '../../lib/receipt'
+
+const FORMATS = [
+  { value: 'carre', label: '1:1' },
+  { value: 'horizontal', label: '4:3' },
+  { value: 'vertical', label: '4:5' },
+]
 
 export default function Chat() {
   const { id } = useParams()
@@ -15,6 +21,17 @@ export default function Chat() {
   const [text, setText] = useState('')
   const [showPaymentAsk, setShowPaymentAsk] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
+
+  // --- état du formulaire de livraison (collaboration vérifiée) ---
+  const [showDeliverForm, setShowDeliverForm] = useState(false)
+  const [deliverLienInstagram, setDeliverLienInstagram] = useState('')
+  const [deliverLienTiktok, setDeliverLienTiktok] = useState('')
+  const [deliverFile, setDeliverFile] = useState(null)
+  const [deliverPreview, setDeliverPreview] = useState(null)
+  const [deliverFormat, setDeliverFormat] = useState('carre')
+  const [deliverLoading, setDeliverLoading] = useState(false)
+  const deliverFileInputRef = useRef(null)
+
   const { user, profile, influencerProfile } = useAuth()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
@@ -186,16 +203,91 @@ export default function Chat() {
     })
   }
 
-  const handleDeliver = async () => {
-    const lien = window.prompt('Lien de la publication (TikTok, Instagram, YouTube...) :')
-    if (!lien) return
-    await supabase.from('commandes').update({ status: 'en_attente_validation', lien_livraison: lien }).eq('id', commande.id)
-    await sendSystemMessage(`📎 Prestation livrée : ${lien}`, lien)
-    setCommande((c) => ({ ...c, status: 'en_attente_validation', lien_livraison: lien }))
+  // --- Livraison : formulaire (liens + média de la vraie publication) ---
+  const handleDeliverFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setDeliverFile(file)
+    setDeliverPreview(URL.createObjectURL(file))
   }
 
+  const handleDeliverSubmit = async () => {
+    if (!deliverLienInstagram && !deliverLienTiktok) return
+    if (!deliverFile) return
+    setDeliverLoading(true)
+
+    // upload du média dans le bucket "posts" (lecture publique, nécessaire pour le feed)
+    const fileName = `${influencerProfile.id}/livraisons/${commande.id}-${Date.now()}-${deliverFile.name}`
+    const { error: uploadError } = await supabase.storage.from('posts').upload(fileName, deliverFile)
+    if (uploadError) {
+      setDeliverLoading(false)
+      return
+    }
+    const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
+    const mediaUrl = urlData.publicUrl
+
+    await supabase
+      .from('commandes')
+      .update({
+        status: 'en_attente_validation',
+        lien_livraison: deliverLienInstagram || deliverLienTiktok,
+        lien_instagram: deliverLienInstagram || null,
+        lien_tiktok: deliverLienTiktok || null,
+        media_livraison_url: mediaUrl,
+        media_crop_format: deliverFormat,
+      })
+      .eq('id', commande.id)
+
+    await sendSystemMessage(
+      `📎 Prestation livrée${deliverLienInstagram ? ` — Instagram : ${deliverLienInstagram}` : ''}${deliverLienTiktok ? ` — TikTok : ${deliverLienTiktok}` : ''}`,
+      mediaUrl
+    )
+
+    setCommande((c) => ({
+      ...c,
+      status: 'en_attente_validation',
+      lien_livraison: deliverLienInstagram || deliverLienTiktok,
+      lien_instagram: deliverLienInstagram || null,
+      lien_tiktok: deliverLienTiktok || null,
+      media_livraison_url: mediaUrl,
+      media_crop_format: deliverFormat,
+    }))
+
+    setDeliverLoading(false)
+    setShowDeliverForm(false)
+    setDeliverLienInstagram('')
+    setDeliverLienTiktok('')
+    setDeliverFile(null)
+    setDeliverPreview(null)
+  }
+
+  // --- Validation client : crée automatiquement le post "collaboration vérifiée" dans le feed ---
   const handleConfirmReception = async () => {
     await supabase.from('commandes').update({ status: 'terminee' }).eq('id', commande.id)
+
+    // création automatique du post de collaboration vérifiée dans le feed
+    if (commande.media_livraison_url) {
+      const { data: newPost } = await supabase
+        .from('posts')
+        .insert({
+          influenceur_id: commande.influenceur_id,
+          type: 'photo',
+          crop_format: commande.media_crop_format || 'carre',
+          commande_id: commande.id,
+          client_id: commande.client_id,
+        })
+        .select()
+        .single()
+
+      if (newPost) {
+        await supabase.from('post_medias').insert({
+          post_id: newPost.id,
+          media_url: commande.media_livraison_url,
+          position: 0,
+        })
+        await supabase.from('commandes').update({ post_id: newPost.id }).eq('id', commande.id)
+      }
+    }
 
     const { data: wallet } = await supabase
       .from('wallets')
@@ -310,10 +402,85 @@ export default function Chat() {
           </button>
         )}
 
-        {isInfluencer && commande?.status === 'paiement_effectue' && (
-          <Button variant="glass" fullWidth onClick={handleDeliver} className="mb-2">
+        {isInfluencer && commande?.status === 'paiement_effectue' && !showDeliverForm && (
+          <Button variant="glass" fullWidth onClick={() => setShowDeliverForm(true)} className="mb-2">
             Livrer la prestation
           </Button>
+        )}
+
+        {isInfluencer && showDeliverForm && (
+          <div className="glass-strong rounded-2xl p-4 mb-2 space-y-3">
+            <p className="text-caption text-[var(--text-secondary)]">
+              Envoie le média de ta publication réelle + le(s) lien(s). Elle apparaîtra comme collaboration vérifiée dans le feed.
+            </p>
+
+            <label className="block cursor-pointer">
+              {deliverPreview ? (
+                <div className={`w-full ${deliverFormat === 'carre' ? 'aspect-square' : deliverFormat === 'horizontal' ? 'aspect-[4/3]' : 'aspect-[4/5]'} rounded-2xl overflow-hidden bg-black/20`}>
+                  <img src={deliverPreview} alt="" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="w-full aspect-square rounded-2xl glass flex flex-col items-center justify-center gap-2 text-[var(--text-secondary)]">
+                  <ImageIcon size={24} />
+                  <span className="text-caption">Choisir le média de la publication</span>
+                </div>
+              )}
+              <input
+                ref={deliverFileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleDeliverFileChange}
+                className="hidden"
+              />
+            </label>
+
+            <div className="flex gap-2">
+              {FORMATS.map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => setDeliverFormat(f.value)}
+                  className={`flex-1 rounded-2xl py-2 text-caption-medium transition-colors ${
+                    deliverFormat === f.value ? 'bg-[var(--text-primary)] text-[var(--bg-primary)]' : 'glass'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <input
+              type="url"
+              value={deliverLienInstagram}
+              onChange={(e) => setDeliverLienInstagram(e.target.value)}
+              placeholder="Lien Instagram (optionnel)"
+              className="w-full glass rounded-2xl px-4 py-3 outline-none text-body"
+            />
+            <input
+              type="url"
+              value={deliverLienTiktok}
+              onChange={(e) => setDeliverLienTiktok(e.target.value)}
+              placeholder="Lien TikTok (optionnel)"
+              className="w-full glass rounded-2xl px-4 py-3 outline-none text-body"
+            />
+            <p className="text-caption text-[var(--text-secondary)]">Au moins un lien est requis.</p>
+
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setShowDeliverForm(false)} className="flex-1">
+                Annuler
+              </Button>
+              <Button
+                onClick={handleDeliverSubmit}
+                disabled={deliverLoading || (!deliverLienInstagram && !deliverLienTiktok) || !deliverFile}
+                className="flex-1"
+              >
+                {deliverLoading ? 'Envoi...' : (
+                  <span className="flex items-center justify-center gap-2">
+                    <Check size={16} /> Livrer
+                  </span>
+                )}
+              </Button>
+            </div>
+          </div>
         )}
 
         {!isInfluencer && commande?.status === 'en_attente_validation' && (
