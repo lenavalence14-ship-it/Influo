@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import Button from '../../components/ui/Button'
-import { LogOut, Plus, X, Link2 } from 'lucide-react'
+import { LogOut, Plus, X, Link2, Grid3x3, Video } from 'lucide-react'
 import { InstagramIcon, TikTokIcon, FacebookIcon, YouTubeIcon, XIcon, SnapchatIcon } from '../../components/ui/SocialIcons'
 
 const PLATFORM_ICONS = {
@@ -23,6 +23,7 @@ export default function InfluencerProfile() {
   const { user, profile, influencerProfile, signOut } = useAuth()
   const [target, setTarget] = useState(null)
   const [tab, setTab] = useState('publications')
+  const [subTab, setSubTab] = useState('grille')
   const [posts, setPosts] = useState([])
   const [selectedPost, setSelectedPost] = useState(null)
   const [offres, setOffres] = useState([])
@@ -111,8 +112,21 @@ export default function InfluencerProfile() {
 
   return (
     <div>
+      {/* barre du haut : icône de déconnexion, façon "..." Instagram, uniquement sur mon propre profil */}
+      {isMe && (
+        <div className="flex justify-end px-5 pt-4">
+          <button
+            onClick={async () => { await signOut(); navigate('/connexion') }}
+            aria-label="Se déconnecter"
+            className="w-9 h-9 flex items-center justify-center"
+          >
+            <LogOut size={20} className="text-red-400" />
+          </button>
+        </div>
+      )}
+
       {/* header profil */}
-      <div className="px-5 pt-6 pb-4">
+      <div className="px-5 pt-2 pb-4">
         <div className="flex items-center gap-5">
           <div className="relative shrink-0">
             {activeStoryIds.has(target.id) ? (
@@ -212,14 +226,6 @@ export default function InfluencerProfile() {
           )}
         </div>
 
-        {isMe && (
-          <button
-            onClick={async () => { await signOut(); navigate('/connexion') }}
-            className="flex items-center gap-2 text-body text-red-400 mt-4"
-          >
-            <LogOut size={15} /> Se déconnecter
-          </button>
-        )}
       </div>
 
       {/* onglets */}
@@ -230,7 +236,7 @@ export default function InfluencerProfile() {
             tab === 'publications' ? 'border-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'
           }`}
         >
-          Publications
+          Collaboration vérifiée
         </button>
         <button
           onClick={() => setTab('offres')}
@@ -238,12 +244,41 @@ export default function InfluencerProfile() {
             tab === 'offres' ? 'border-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'
           }`}
         >
-          Offres
+          Offre
         </button>
       </div>
 
+      {/* sous-barre grille / vidéo, uniquement dans l'onglet Collaboration vérifiée */}
+      {tab === 'publications' && (
+        <div className="flex border-b border-[var(--border)]">
+          <button
+            onClick={() => setSubTab('grille')}
+            aria-label="Grille"
+            className={`flex-1 py-2.5 flex items-center justify-center ${
+              subTab === 'grille' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
+            }`}
+          >
+            <Grid3x3 size={20} />
+          </button>
+          <button
+            onClick={() => setSubTab('video')}
+            aria-label="Vidéo"
+            className={`flex-1 py-2.5 flex items-center justify-center ${
+              subTab === 'video' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
+            }`}
+          >
+            <Video size={20} />
+          </button>
+        </div>
+      )}
+
       {/* contenu onglet */}
       {tab === 'publications' ? (
+        subTab === 'video' ? (
+          <div className="py-16 text-center text-[var(--text-secondary)] text-body">
+            Les vidéos arrivent bientôt.
+          </div>
+        ) : (
         <div className="grid grid-cols-3 gap-0.5 p-0.5">
           {posts.length === 0 ? (
             <div className="col-span-3 py-16 text-center text-[var(--text-secondary)] text-body">
@@ -263,6 +298,7 @@ export default function InfluencerProfile() {
             ))
           )}
         </div>
+        )
       ) : (
         <div className="p-4 space-y-4">
           {isMe && (
