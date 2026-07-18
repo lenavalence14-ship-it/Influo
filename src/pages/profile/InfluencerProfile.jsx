@@ -301,7 +301,7 @@ export default function InfluencerProfile() {
                 filteredPosts.map((p) => (
                   <button
                     key={p.id}
-                    onClick={() => setSelectedPost(p)}
+                    onClick={() => (p.type === 'video' ? navigate(`/video/${p.id}`) : setSelectedPost(p))}
                     className="aspect-[4/5] bg-black/20 relative"
                   >
                     {p.post_medias?.[0]?.media_url && (
