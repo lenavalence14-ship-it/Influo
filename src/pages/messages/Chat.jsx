@@ -6,6 +6,7 @@ import { ArrowLeft, Paperclip, Send, Camera, Download, Image as ImageIcon, Check
 import Button from '../../components/ui/Button'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { generateReceipt } from '../../lib/receipt'
+import { timeShort } from '../../lib/time'
 
 const FORMATS = [
   { value: 'carre', label: '1:1' },
@@ -349,20 +350,27 @@ export default function Chat() {
           const isMe = m.sender_id === user.id
           const isSystem = !m.sender_id
           return (
-            <div key={m.id} className={`flex ${isSystem ? 'justify-center' : isMe ? 'justify-end' : 'justify-start'}`}>
+            <div key={m.id} className={`flex flex-col ${isSystem ? 'items-center' : isMe ? 'items-end' : 'items-start'}`}>
               {isSystem ? (
                 <div className="glass rounded-2xl px-4 py-2 text-caption text-center text-[var(--text-secondary)] max-w-[85%]">
                   {m.contenu}
                 </div>
               ) : (
-                <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-body ${isMe ? 'bg-[var(--text-primary)] text-[var(--bg-primary)]' : 'glass'}`}>
-                  {m.fichier_url && m.fichier_type === 'image' ? (
-                    <img src={m.fichier_url} alt="" className="rounded-xl mb-1 max-w-full" />
-                  ) : m.fichier_url ? (
-                    <a href={m.fichier_url} target="_blank" rel="noreferrer" className="underline">Fichier joint</a>
-                  ) : null}
-                  {m.contenu}
-                </div>
+                <>
+                  <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-body ${isMe ? 'bg-[var(--text-primary)] text-[var(--bg-primary)]' : 'glass'}`}>
+                    {m.fichier_url && m.fichier_type === 'image' ? (
+                      <img src={m.fichier_url} alt="" className="rounded-xl mb-1 max-w-full" />
+                    ) : m.fichier_url ? (
+                      <a href={m.fichier_url} target="_blank" rel="noreferrer" className="underline">Fichier joint</a>
+                    ) : null}
+                    {m.contenu}
+                  </div>
+                  {m.created_at && (
+                    <span className="text-[11px] mt-1 px-1" style={{ color: 'var(--text-secondary)' }}>
+                      {timeShort(m.created_at)}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           )
@@ -521,12 +529,4 @@ export default function Chat() {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           placeholder="Message..."
-          className="flex-1 glass rounded-full px-4 py-3 outline-none text-body"
-        />
-        <button onClick={handleSend} className="bg-[var(--text-primary)] text-[var(--bg-primary)] rounded-full p-3 shrink-0">
-          <Send size={18} />
-        </button>
-      </div>
-    </div>
-  )
-}
+          className="f
