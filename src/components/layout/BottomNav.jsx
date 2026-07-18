@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Home, Search, PlusSquare, Heart, User } from 'lucide-react'
+import { Home, Search, Video, Heart, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useUnreadCounts } from '../../hooks/useUnreadCounts'
 
@@ -11,7 +11,7 @@ export default function BottomNav() {
   const items = [
     { to: '/', icon: Home, label: 'Accueil' },
     { to: '/recherche', icon: Search, label: 'Recherche' },
-    ...(canPublish ? [{ to: '/publier', icon: PlusSquare, label: 'Publier' }] : []),
+    ...(canPublish ? [{ to: '/publier', icon: Video, label: 'Vidéo' }] : []),
     { to: '/notifications', icon: Heart, label: 'Notifications', dot: hasUnreadNotifications },
     { to: '/profil', icon: User, label: 'Profil' },
   ]
