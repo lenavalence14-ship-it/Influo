@@ -15,13 +15,21 @@ const SIZES = {
 export default function Avatar({ src, seed, size = 'md', className = '', ring = false }) {
   const fallback = `https://api.dicebear.com/9.x/glass/svg?seed=${seed || 'default'}`
 
+  if (ring) {
+    return (
+      <div className={`${SIZES[size]} rounded-full p-[2.5px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400 shrink-0 ${className}`}>
+        <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
+          <img src={src || fallback} alt="" className="w-full h-full rounded-full object-cover" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <img
       src={src || fallback}
       alt=""
-      className={`${SIZES[size]} rounded-full object-cover shrink-0 ${
-        ring ? 'ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--bg-primary)]' : ''
-      } ${className}`}
+      className={`${SIZES[size]} rounded-full object-cover shrink-0 ${className}`}
     />
   )
 }
