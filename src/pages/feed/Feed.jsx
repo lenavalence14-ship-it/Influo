@@ -7,6 +7,7 @@ import PostCard from './PostCard'
 import Card from '../../components/ui/Card'
 import { Sun, Moon, MessageCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useUnreadCounts } from '../../hooks/useUnreadCounts'
 
 export default function Feed() {
   const [posts, setPosts] = useState([])
@@ -14,6 +15,7 @@ export default function Feed() {
   const { user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
+  const { hasUnreadMessages } = useUnreadCounts()
 
   useEffect(() => {
     const loadFeed = async () => {
@@ -72,9 +74,12 @@ export default function Feed() {
           <button
             onClick={() => navigate('/messages')}
             aria-label="Messages"
-            className="glass rounded-2xl w-11 h-11 flex items-center justify-center"
+            className="relative glass rounded-2xl w-11 h-11 flex items-center justify-center"
           >
             <MessageCircle size={19} />
+            {hasUnreadMessages && (
+              <span className="absolute top-2 right-2.5 w-2 h-2 rounded-full bg-violet-500" />
+            )}
           </button>
           <button
             onClick={toggleTheme}
