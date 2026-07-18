@@ -7,7 +7,7 @@ import { ArrowLeft, Image as ImageIcon, X, Type, Check } from 'lucide-react'
 const FORMATS = [
   { value: 'carre', label: '1:1', aspect: 'aspect-square' },
   { value: 'horizontal', label: '4:3', aspect: 'aspect-[4/3]' },
-  { value: 'vertical', label: '3:4', aspect: 'aspect-[3/4]' },
+  { value: 'vertical', label: '2:3', aspect: 'aspect-[2/3]' },
   { value: 'vertical_45', label: '4:5', aspect: 'aspect-[4/5]' },
 ]
 
