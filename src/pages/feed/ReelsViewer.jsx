@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft, Plus } from 'lucide-react'
+import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft, Plus, Volume2, VolumeX } from 'lucide-react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -16,6 +16,7 @@ export default function ReelsViewer() {
   const containerRef = useRef(null)
   const videoRefs = useRef([])
   const hasScrolledToStart = useRef(false)
+  const [muted, setMuted] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -76,6 +77,7 @@ export default function ReelsViewer() {
           if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
             setActiveIndex(idx)
             video.currentTime = 0
+            video.muted = muted
             video.play().catch(() => {})
           } else {
             video.pause()
@@ -90,6 +92,12 @@ export default function ReelsViewer() {
 
     return () => observer.disconnect()
   }, [reels])
+
+  // applique immédiatement mute/unmute à la vidéo en cours de lecture
+  useEffect(() => {
+    const video = videoRefs.current[activeIndex]
+    if (video) video.muted = muted
+  }, [muted, activeIndex])
 
   if (loading) {
     return (
@@ -113,18 +121,18 @@ export default function ReelsViewer() {
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-30 bg-black overflow-y-scroll snap-y snap-mandatory"
+      className="fixed top-0 left-0 right-0 bottom-0 z-30 bg-black overflow-y-scroll snap-y snap-mandatory"
       style={{ scrollSnapType: 'y mandatory' }}
     >
       <div
-        className="fixed top-0 left-0 right-0 z-40 flex items-center px-2 pt-3 pb-2 bg-gradient-to-b from-black/60 to-transparent"
+        className="fixed top-0 left-0 right-0 z-30 flex items-center px-2 pt-3 pb-2 bg-gradient-to-b from-black/60 to-transparent pointer-events-none"
         style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}
       >
         {postId ? (
           <button
             onClick={() => navigate(-1)}
             aria-label="Retour"
-            className="w-9 h-9 flex items-center justify-center text-white"
+            className="w-9 h-9 flex items-center justify-center text-white pointer-events-auto"
           >
             <ArrowLeft size={22} />
           </button>
@@ -132,7 +140,7 @@ export default function ReelsViewer() {
           <button
             onClick={() => navigate('/publier')}
             aria-label="Importer un réel"
-            className="w-9 h-9 flex items-center justify-center text-white"
+            className="w-9 h-9 flex items-center justify-center text-white pointer-events-auto"
           >
             <Plus size={22} />
           </button>
@@ -145,13 +153,15 @@ export default function ReelsViewer() {
           reel={reel}
           index={i}
           setVideoRef={(el) => (videoRefs.current[i] = el)}
+          muted={muted}
+          onToggleMute={() => setMuted((m) => !m)}
         />
       ))}
     </div>
   )
 }
 
-function ReelSlide({ reel, index, setVideoRef }) {
+function ReelSlide({ reel, index, setVideoRef, muted, onToggleMute }) {
   const { user } = useAuth()
   const [liked, setLiked] = useState(reel.liked_by_me)
   const [likeCount, setLikeCount] = useState(reel.like_count || 0)
@@ -193,18 +203,19 @@ function ReelSlide({ reel, index, setVideoRef }) {
         src={mediaUrl}
         className="absolute inset-0 w-full h-full object-cover"
         loop
+        muted={muted}
         playsInline
         preload="metadata"
       />
 
       {/* dégradés pour lisibilité de l'UI */}
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
-      <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
 
       {/* colonne d'actions à droite */}
       <div
         className="absolute right-3 flex flex-col items-center gap-5 z-10 text-white"
-        style={{ bottom: 'max(90px, calc(env(safe-area-inset-bottom) + 90px))' }}
+        style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) + 16px)' }}
       >
         <button onClick={toggleLike} className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
           <Heart size={27} className={liked ? 'fill-red-500 text-red-500' : ''} strokeWidth={2} />
@@ -223,12 +234,19 @@ function ReelSlide({ reel, index, setVideoRef }) {
         <button className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
           <MoreVertical size={24} strokeWidth={2} />
         </button>
+        <button
+          onClick={onToggleMute}
+          aria-label={muted ? 'Activer le son' : 'Couper le son'}
+          className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200"
+        >
+          {muted ? <VolumeX size={24} strokeWidth={2} /> : <Volume2 size={24} strokeWidth={2} />}
+        </button>
       </div>
 
       {/* bas : profil, nom, légende */}
       <div
         className="absolute left-3 right-16 z-10"
-        style={{ bottom: 'max(24px, env(safe-area-inset-bottom))' }}
+        style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) + 12px)' }}
       >
         <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2.5 mb-2">
           <img
