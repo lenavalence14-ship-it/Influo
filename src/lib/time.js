@@ -33,6 +33,23 @@ export function timeAgo(dateInput) {
 }
 
 /**
+ * Retourne le nom de la section temporelle à laquelle appartient une date,
+ * façon Instagram ("Aujourd'hui", "Hier", "7 derniers jours", "30 derniers jours", "Plus ancien").
+ */
+export function dateSection(dateInput) {
+  const date = new Date(dateInput)
+  const now = new Date()
+  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const diffDays = Math.floor((startOfDay(now) - startOfDay(date)) / (1000 * 60 * 60 * 24))
+
+  if (diffDays <= 0) return "Aujourd'hui"
+  if (diffDays === 1) return 'Hier'
+  if (diffDays <= 7) return '7 derniers jours'
+  if (diffDays <= 30) return '30 derniers jours'
+  return 'Plus ancien'
+}
+
+/**
  * Version courte pour les messages/discussions (ex: heure si aujourd'hui, sinon date).
  */
 export function timeShort(dateInput) {
