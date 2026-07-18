@@ -19,11 +19,11 @@ export default function ConversationsList() {
       let query = supabase
         .from('conversations')
         .select(`
-          id, updated_at,
+          id, updated_at, client_last_read_at, influenceur_last_read_at,
           client:client_id(nom_complet, photo_url),
           profils_influenceur(id, verifie, users(nom_complet, photo_url)),
           offres(titre),
-          messages(contenu, created_at, is_system)
+          messages(contenu, created_at, is_system, sender_id)
         `)
         .order('updated_at', { ascending: false })
 
@@ -85,6 +85,11 @@ export default function ConversationsList() {
             const other = isInfluencer ? c.client : c.profils_influenceur?.users
             const lastMsg = c.messages?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
 
+            // "vu" façon Messenger : petit avatar de l'autre, si mon dernier message a été lu
+            const otherReadAt = isInfluencer ? c.client_last_read_at : c.influenceur_last_read_at
+            const lastMsgIsMine = lastMsg?.sender_id === user.id
+            const seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
+
             return (
               <div
                 key={c.id}
@@ -105,11 +110,20 @@ export default function ConversationsList() {
                     {lastMsg?.contenu || (c.offres?.titre && `Offre : ${c.offres.titre}`) || 'Nouvelle conversation'}
                   </p>
                 </div>
-                {lastMsg?.created_at && (
-                  <span className="text-[11px] shrink-0" style={{ color: 'var(--text-secondary)' }}>
-                    {timeShort(lastMsg.created_at)}
-                  </span>
-                )}
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  {lastMsg?.created_at && (
+                    <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                      {timeShort(lastMsg.created_at)}
+                    </span>
+                  )}
+                  {seenByOther && (
+                    <img
+                      src={other?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${c.id}`}
+                      alt="Vu"
+                      className="w-4 h-4 rounded-full object-cover"
+                    />
+                  )}
+                </div>
               </div>
             )
           })}
