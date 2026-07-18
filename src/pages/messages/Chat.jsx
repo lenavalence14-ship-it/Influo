@@ -3,10 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import {
-  Flèche gauche, Envoyer, Appareil photo, Image sous forme d'icône d'image,
-  Télécharger, Vérifier, Billet de banque, Pouce levé, Vérification de colis, Vérification de bouclier,
-  Téléphone, Vidéo, Plus, Micro,
-} de 'lucide-react'
+  ArrowLeft, Send, Camera, Image as ImageIcon,
+  Download, Check, Banknote, ThumbsUp, PackageCheck, ShieldCheck,
+  Phone, Video, Plus, Mic,
+} from 'lucide-react'
 import Button from '../../components/ui/Button'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import BottomSheet from '../../components/ui/BottomSheet'
@@ -14,10 +14,10 @@ import { generateReceipt } from '../../lib/receipt'
 import { timeShort } from '../../lib/time'
 
 const FORMATS = [
-  { valeur: 'carré', étiquette: '1:1' },
-  { valeur: 'horizontal', étiquette: '4:3' },
-  { valeur: 'vertical', étiquette: '2:3' },
-  { valeur: 'vertical_45', étiquette: '4:5' },
+  { value: 'carre', label: '1:1' },
+  { value: 'horizontal', label: '4:3' },
+  { value: 'vertical', label: '2:3' },
+  { value: 'vertical_45', label: '4:5' },
 ]
 
 export default function Chat() {
@@ -25,7 +25,7 @@ export default function Chat() {
   const [conversation, setConversation] = useState(null)
   const [commande, setCommande] = useState(null)
   const [messages, setMessages] = useState([])
-  const [texte, setTexte] = useState('')
+  const [text, setText] = useState('')
   const [showPaymentAsk, setShowPaymentAsk] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
 
@@ -39,9 +39,9 @@ export default function Chat() {
   const [deliverLoading, setDeliverLoading] = useState(false)
   const deliverFileInputRef = useRef(null)
 
-  const { utilisateur, profil, profil d'influenceur } = utiliserAuth()
+  const { user, profile, influencerProfile } = useAuth()
   const navigate = useNavigate()
-  const fileInputRef = useRef (null)
+  const fileInputRef = useRef(null)
   const cameraInputRef = useRef(null)
   const galleryInputRef = useRef(null)
   const bottomRef = useRef(null)
@@ -53,248 +53,243 @@ export default function Chat() {
       .from('conversations')
       .select('*, client:client_id(nom_complet, photo_url), profils_influenceur(id, verifie, users(nom_complet, photo_url)), offres(*)')
       .eq('id', id)
-      .peut-êtreCélibataire()
-    définirConversation(conv)
+      .maybeSingle()
+    setConversation(conv)
 
     const { data: cmd } = await supabase
       .from('commandes')
-      .sélectionner('*')
+      .select('*')
       .eq('conversation_id', id)
       .order('created_at', { ascending: false })
       .limit(1)
-      .peut-êtreCélibataire()
-    définirCommande(cmd)
+      .maybeSingle()
+    setCommande(cmd)
 
     const { data: msgs } = await supabase
       .from('messages')
-      .sélectionner('*')
+      .select('*')
       .eq('conversation_id', id)
       .order('created_at', { ascending: true })
-    définirMessages(msgs || [])
+    setMessages(msgs || [])
 
     const readField = isInfluencer ? 'influenceur_last_read_at' : 'client_last_read_at'
     await supabase.from('conversations').update({ [readField]: new Date().toISOString() }).eq('id', id)
   }
 
-  utiliserEffect(() => {
-    chargerTout()
+  useEffect(() => {
+    loadAll()
 
     const channel = supabase
       .channel(`chat-${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
         setMessages((prev) => [...prev, payload.new])
       })
-      .s'abonner()
+      .subscribe()
 
     return () => supabase.removeChannel(channel)
-  }, [identifiant])
+  }, [id])
 
-  utiliserEffect(() => {
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   const sendMessage = async (content, fichierUrl = null, fichierType = null) => {
-    attendre supabase.from('messages').insert({
-      conversation_id : id,
-      expéditeur_id : utilisateur.id,
-      contenu : contenu,
+    await supabase.from('messages').insert({
+      conversation_id: id,
+      sender_id: user.id,
+      contenu: content,
       fichier_url: fichierUrl,
-      type_de_fichier : type_de_fichier,
-      est_système : faux,
+      fichier_type: fichierType,
+      is_system: false,
     })
     await supabase.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', id)
   }
 
   const sendSystemMessage = async (content, fichierUrl = null) => {
-    attendre supabase.from('messages').insert({
-      conversation_id : id,
-      expéditeur_id : null,
-      contenu : contenu,
+    await supabase.from('messages').insert({
+      conversation_id: id,
+      sender_id: null,
+      contenu: content,
       fichier_url: fichierUrl,
-      est_système : vrai,
+      is_system: true,
     })
     await supabase.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', id)
   }
 
   const handleSend = async () => {
-    si (!text.trim()) retourner
-    const content = texte
-    définirTexte('')
-    attendre sendMessage(content)
+    if (!text.trim()) return
+    const content = text
+    setText('')
+    await sendMessage(content)
   }
 
   const handleFileUpload = async (e) => {
-    const fichier = e.target.files?.[0]
-    si (!fichier) retourner
+    const file = e.target.files?.[0]
+    if (!file) return
     const fileName = `${id}/${Date.now()}-${file.name}`
-    const { erreur } = await supabase.storage.from('messagerie').upload(fileName, fichier)
-    si (erreur) retourner
+    const { error } = await supabase.storage.from('messagerie').upload(fileName, file)
+    if (error) return
     const { data: signedUrl } = await supabase.storage.from('messagerie').createSignedUrl(fileName, 60 * 60 * 24 * 7)
     await sendMessage(null, signedUrl?.signedUrl, file.type.startsWith('image/') ? 'image' : 'fichier')
   }
 
   const handleRequestPayment = async () => {
-    si (!paymentAmount) retourner
+    if (!paymentAmount) return
     const montant = parseFloat(paymentAmount)
     const commission = +(montant * 0.1).toFixed(2)
     const montantNet = +(montant - commission).toFixed(2)
 
     const { data: newCommande } = await supabase
       .from('commandes')
-      .insérer({
-        conversation_id : id,
-        client_id : conversation.client_id,
-        influenceur_id : conversation.influenceur_id,
-        offre_id : conversation.offre_id,
+      .insert({
+        conversation_id: id,
+        client_id: conversation.client_id,
+        influenceur_id: conversation.influenceur_id,
+        offre_id: conversation.offre_id,
         montant,
         commission,
-        montant_net : montantNet,
-        statut : 'paiement_demande',
+        montant_net: montantNet,
+        status: 'paiement_demande',
       })
-      .sélectionner()
-      .célibataire()
+      .select()
+      .single()
 
-    définirCommande(nouvelleCommande)
-    attendre envoyerMessageSystème(
-      `ðŸ'° L'influenceur demande le paiement de ${montant} â‚¬ pour cette prestation.`
+    setCommande(newCommande)
+    await sendSystemMessage(
+      `💰 L'influenceur demande le paiement de ${montant} € pour cette prestation.`
     )
-    définirAfficherDemandeDePaiement(faux)
-    définirMontantPayement('')
+    setShowPaymentAsk(false)
+    setPaymentAmount('')
   }
 
   const handlePay = async () => {
-    si (!commande) retourner
+    if (!commande) return
 
-    const { data: paiement } = wait supabase.from('paiements').insert({
+    const { data: paiement } = await supabase.from('paiements').insert({
       commande_id: commande.id,
       montant: commande.montant,
-      commission : commande.commission,
-      fournisseur_simule : 'simulation',
-      reussi : vrai,
+      commission: commande.commission,
+      provider_simule: 'mock',
+      reussi: true,
     }).select().single()
 
-    wait supabase.from('commandes').update({ status: 'paiement_effectue' }).eq('id', commande.id)
+    await supabase.from('commandes').update({ status: 'paiement_effectue' }).eq('id', commande.id)
 
-    // créditer le wallet en verrouillé
     const { data: wallet } = await supabase
       .from('wallets')
-      .sélectionner('*')
+      .select('*')
       .eq('influenceur_id', commande.influenceur_id)
-      .peut-êtreCélibataire()
+      .maybeSingle()
 
-    si (portefeuille) {
-      attendre supabase.from('wallets').update({
+    if (wallet) {
+      await supabase.from('wallets').update({
         solde_verrouille: +(wallet.solde_verrouille + commande.montant_net).toFixed(2),
-        revenus_totaux : +(wallet.revenus_totaux + commande.montant_net).toFixed(2),
+        revenus_totaux: +(wallet.revenus_totaux + commande.montant_net).toFixed(2),
       }).eq('id', wallet.id)
 
-      attendre supabase.from('wallet_transactions').insert({
+      await supabase.from('wallet_transactions').insert({
         wallet_id: wallet.id,
         commande_id: commande.id,
         type: 'paiement_verrouille',
-        montant : commande.montant_net,
+        montant: commande.montant_net,
       })
     }
 
-    wait sendSystemMessage('âœ… Paiement effectué. Les fonds sont verrouillés jusqu\'à validation de la prestation.')
+    await sendSystemMessage('✅ Paiement effectué. Les fonds sont verrouillés jusqu\'à validation de la prestation.')
     setCommande((c) => ({ ...c, status: 'paiement_effectue', paiement_reference: paiement?.reference || paiement?.id }))
   }
 
   const handleDownloadReceipt = () => {
-    si (!commande) retourner
-    générerReçu({
-      référence : commande.paiement_reference || commande.id,
+    if (!commande) return
+    generateReceipt({
+      reference: commande.paiement_reference || commande.id,
       montant: commande.montant,
-      commission : commande.commission,
-      montantNet : commande.montant_net,
-      offreTitre: conversation?.offres?.titre,
-      influenceurNom : conversation?.profils_influenceur?.users?.nom_complet,
-      clientNom : conversation?.client?.nom_complet,
+      commission: commande.commission,
+      montantNet: commande.montant_net,
+      offreTitle: conversation?.offres?.titre,
+      influenceurNom: conversation?.profils_influenceur?.users?.nom_complet,
+      clientNom: conversation?.client?.nom_complet,
       date: new Date().toLocaleDateString('fr-FR'),
     })
   }
 
-  // --- Livraison : formulaire (liens + média de la vraie publication) ---
   const handleDeliverFileChange = (e) => {
-    const fichier = e.target.files?.[0]
-    si (!fichier) retourner
-    définirDeliverFichier(fichier)
-    définirDeliverPreview(URL.createObjectURL(fichier))
+    const file = e.target.files?.[0]
+    if (!file) return
+    setDeliverFile(file)
+    setDeliverPreview(URL.createObjectURL(file))
   }
 
   const handleDeliverSubmit = async () => {
-    si (!deliverLienInstagram && !deliverLienTiktok) retourner
-    si (!deliverFile) retourner
-    définirDépartChargement(true)
+    if (!deliverLienInstagram && !deliverLienTiktok) return
+    if (!deliverFile) return
+    setDeliverLoading(true)
 
-    // upload du média dans le bucket "posts" (lecture publique, nécessaire pour le flux)
     const fileName = `${influencerProfile.id}/livraisons/${commande.id}-${Date.now()}-${deliverFile.name}`
     const { error: uploadError } = await supabase.storage.from('posts').upload(fileName, deliverFile)
-    si (erreur de téléchargement) {
-      définirChargementLivraison(false)
-      retour
+    if (uploadError) {
+      setDeliverLoading(false)
+      return
     }
     const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
     const mediaUrl = urlData.publicUrl
 
-    attendre la supabase
+    await supabase
       .from('commandes')
-      .mise à jour({
-        statut : 'en_attente_validation',
-        lien_livraison: livrerLienInstagram || livrerLienTiktok,
-        lien_instagram : livrerLienInstagram || null,
-        lien_tiktok : livrerLienTiktok || null,
-        media_livraison_url : mediaUrl,
+      .update({
+        status: 'en_attente_validation',
+        lien_livraison: deliverLienInstagram || deliverLienTiktok,
+        lien_instagram: deliverLienInstagram || null,
+        lien_tiktok: deliverLienTiktok || null,
+        media_livraison_url: mediaUrl,
         media_crop_format: deliverFormat,
       })
       .eq('id', commande.id)
 
-    attendre envoyerMessageSystème(
-      `ðŸ“Ž Prestation livrée${deliverLienInstagram ? ` — Instagram : ${deliverLienInstagram}` : ''}${deliverLienTiktok ? ` — TikTok : ${deliverLienTiktok}` : ''}`,
+    await sendSystemMessage(
+      `📎 Prestation livrée${deliverLienInstagram ? ` — Instagram : ${deliverLienInstagram}` : ''}${deliverLienTiktok ? ` — TikTok : ${deliverLienTiktok}` : ''}`,
       mediaUrl
     )
 
     setCommande((c) => ({
       ...c,
-      statut : 'en_attente_validation',
-      lien_livraison: livrerLienInstagram || livrerLienTiktok,
-      lien_instagram : livrerLienInstagram || null,
-      lien_tiktok : livrerLienTiktok || null,
-      media_livraison_url : mediaUrl,
+      status: 'en_attente_validation',
+      lien_livraison: deliverLienInstagram || deliverLienTiktok,
+      lien_instagram: deliverLienInstagram || null,
+      lien_tiktok: deliverLienTiktok || null,
+      media_livraison_url: mediaUrl,
       media_crop_format: deliverFormat,
     }))
 
-    définirChargementLivraison(false)
-    afficherFormulaireDelivraison(false)
+    setDeliverLoading(false)
+    setShowDeliverForm(false)
     setDeliverLienInstagram('')
     setDeliverLienTiktok('')
-    définirFichierDelivraison(null)
-    définirDeliverPreview(null)
+    setDeliverFile(null)
+    setDeliverPreview(null)
   }
 
-  // --- Client de validation : créé automatiquement le post "collaboration vérifiée" dans le flux ---
   const handleConfirmReception = async () => {
     await supabase.from('commandes').update({ status: 'terminee' }).eq('id', commande.id)
 
-    // création automatique du post de collaboration vérifiée dans le flux
     if (commande.media_livraison_url) {
       const { data: newPost } = await supabase
         .from('posts')
-        .insérer({
-          influenceur_id : commande.influenceur_id,
+        .insert({
+          influenceur_id: commande.influenceur_id,
           type: 'photo',
-          crop_format : commande.media_crop_format || 'carré',
+          crop_format: commande.media_crop_format || 'carre',
           commande_id: commande.id,
-          client_id : commande.client_id,
+          client_id: commande.client_id,
         })
-        .sélectionner()
-        .célibataire()
+        .select()
+        .single()
 
-      si (newPost) {
-        attendre supabase.from('post_medias').insert({
+      if (newPost) {
+        await supabase.from('post_medias').insert({
           post_id: newPost.id,
-          media_url : commande.media_livraison_url,
-          position : 0,
+          media_url: commande.media_livraison_url,
+          position: 0,
         })
         await supabase.from('commandes').update({ post_id: newPost.id }).eq('id', commande.id)
       }
@@ -302,28 +297,27 @@ export default function Chat() {
 
     const { data: wallet } = await supabase
       .from('wallets')
-      .sélectionner('*')
+      .select('*')
       .eq('influenceur_id', commande.influenceur_id)
-      .peut-êtreCélibataire()
+      .maybeSingle()
 
-    si (portefeuille) {
-      attendre supabase.from('wallets').update({
+    if (wallet) {
+      await supabase.from('wallets').update({
         solde_verrouille: +(wallet.solde_verrouille - commande.montant_net).toFixed(2),
         solde_disponible: +(wallet.solde_disponible + commande.montant_net).toFixed(2),
       }).eq('id', wallet.id)
 
-      attendre supabase.from('wallet_transactions').insert({
+      await supabase.from('wallet_transactions').insert({
         wallet_id: wallet.id,
         commande_id: commande.id,
-        type : 'deverrouillage',
-        montant : commande.montant_net,
+        type: 'deverrouillage',
+        montant: commande.montant_net,
       })
     }
 
-    wait sendSystemMessage('ðŸŽ‰ Prestation validée. Les fonds sont maintenant disponibles pour l\'influenceur.')
+    await sendSystemMessage('🎉 Prestation validée. Les fonds sont maintenant disponibles pour l\'influenceur.')
     setCommande((c) => ({ ...c, status: 'terminee' }))
-  }
-  if (!conversation) {
+  }if (!conversation) {
     return (
       <div className="flex justify-center py-20">
         <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
@@ -333,24 +327,21 @@ export default function Chat() {
 
   const other = isInfluencer ? conversation.client : conversation.profils_influenceur?.users
 
-  // bouton d'action contextuel unique, affichÃ© discrÃ¨tement Ã  cÃ´tÃ© du champ de saisie
-  // (jamais plaquÃ© en dur dans le layout : il ouvre juste un BottomSheet)
   const contextAction = (() => {
     if (!isInfluencer && commande?.status === 'paiement_demande') {
-      return { icon: Banknote, label: `Payer ${commande.montant} â‚¬`, onClick: handlePay }
+      return { icon: Banknote, label: `Payer ${commande.montant} €`, onClick: handlePay }
     }
     if (isInfluencer && commande?.status === 'paiement_effectue') {
       return { icon: PackageCheck, label: 'Livrer la prestation', onClick: () => setShowDeliverForm(true) }
     }
     if (!isInfluencer && commande?.status === 'en_attente_validation') {
-      return { icon: ShieldCheck, label: 'Confirmer la rÃ©ception', onClick: handleConfirmReception }
+      return { icon: ShieldCheck, label: 'Confirmer la réception', onClick: handleConfirmReception }
     }
     return null
   })()
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      {/* header : sobre, faÃ§on Messenger */}
       <header className="flex items-center gap-3 px-3 py-2.5 sticky top-0 bg-[var(--bg-primary)]/90 backdrop-blur-xl z-20 border-b border-[var(--border)] shrink-0">
         <button onClick={() => navigate('/messages')} className="w-9 h-9 -ml-1 flex items-center justify-center shrink-0">
           <ArrowLeft size={20} />
@@ -365,7 +356,6 @@ export default function Chat() {
           {!isInfluencer && conversation.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
         </p>
 
-        {/* icÃ´ne cash + tooltip permanent, influenceur uniquement, tant qu'aucune commande n'est en cours */}
         {isInfluencer && (!commande || commande.status === 'en_discussion') && (
           <div className="relative shrink-0">
             <button
@@ -392,12 +382,11 @@ export default function Chat() {
         <button className="w-9 h-9 flex items-center justify-center shrink-0" style={{ color: 'var(--accent)' }} aria-label="Appeler">
           <Phone size={20} />
         </button>
-        <button className="w-9 h-9 flex items-center justify-center shrink-0" style={{ color: 'var(--accent)' }} aria-label="Appel vidÃ©o">
+        <button className="w-9 h-9 flex items-center justify-center shrink-0" style={{ color: 'var(--accent)' }} aria-label="Appel vidéo">
           <Video size={20} />
         </button>
       </header>
 
-      {/* fil de messages : prend tout l'espace restant, jamais de formulaire plaquÃ© ici */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 min-h-0">
         {messages.map((m) => {
           const isMe = m.sender_id === user.id
@@ -436,7 +425,7 @@ export default function Chat() {
               className="flex items-center justify-center gap-2 text-caption py-2 px-3"
               style={{ color: 'var(--text-secondary)' }}
             >
-              <Download size={14} /> TÃ©lÃ©charger le reÃ§u
+              <Download size={14} /> Télécharger le reçu
             </button>
           </div>
         )}
@@ -444,14 +433,13 @@ export default function Chat() {
         <div ref={bottomRef} />
       </div>
 
-      {/* barre de saisie : exactement comme la capture Messenger â€” +, camÃ©ra, galerie, micro, champ, pouce/envoi */}
       <div className="px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-1.5 flex items-center gap-1 shrink-0">
         <button onClick={() => fileInputRef.current?.click()} className="w-9 h-9 flex items-center justify-center shrink-0" style={{ color: 'var(--accent)' }} aria-label="Joindre">
           <Plus size={22} />
         </button>
         <input ref={fileInputRef} type="file" onChange={handleFileUpload} className="hidden" />
 
-        <button onClick={() => cameraInputRef.current?.click()} className="w-9 h-9 flex items-center justify-center shrink-0" style={{ color: 'var(--accent)' }} aria-label="CamÃ©ra">
+        <button onClick={() => cameraInputRef.current?.click()} className="w-9 h-9 flex items-center justify-center shrink-0" style={{ color: 'var(--accent)' }} aria-label="Caméra">
           <Camera size={20} />
         </button>
         <input
@@ -478,7 +466,6 @@ export default function Chat() {
           <Mic size={20} />
         </button>
 
-        {/* action contextuelle (payer / livrer / confirmer) : icÃ´ne discrÃ¨te, ouvre un popup, ne prend jamais de place fixe */}
         {contextAction && (
           <button
             onClick={contextAction.onClick}
@@ -509,7 +496,6 @@ export default function Chat() {
         </button>
       </div>
 
-      {/* popup : demande de paiement (dÃ©clenchÃ© depuis l'icÃ´ne cash du header) */}
       {showPaymentAsk && (
         <BottomSheet onClose={() => setShowPaymentAsk(false)} title="Recevoir le paiement">
           <div className="px-4 pb-4 pt-1 flex gap-2">
@@ -517,7 +503,7 @@ export default function Chat() {
               type="number"
               value={paymentAmount}
               onChange={(e) => setPaymentAmount(e.target.value)}
-              placeholder="Montant en â‚¬"
+              placeholder="Montant en €"
               autoFocus
               className="flex-1 glass rounded-2xl outline-none text-body px-4 py-3"
             />
@@ -526,12 +512,11 @@ export default function Chat() {
         </BottomSheet>
       )}
 
-      {/* popup : livraison de la prestation */}
       {showDeliverForm && (
         <BottomSheet onClose={() => setShowDeliverForm(false)} title="Livrer la prestation" height="tall">
           <div className="px-4 pb-4 space-y-3">
             <p className="text-caption text-[var(--text-secondary)]">
-              Envoie le mÃ©dia de ta publication rÃ©elle + le(s) lien(s). Elle apparaÃ®tra comme collaboration vÃ©rifiÃ©e dans le feed.
+              Envoie le média de ta publication réelle + le(s) lien(s). Elle apparaîtra comme collaboration vérifiée dans le feed.
             </p>
 
             <label className="block cursor-pointer">
@@ -547,7 +532,7 @@ export default function Chat() {
               ) : (
                 <div className="w-full aspect-square rounded-2xl glass flex flex-col items-center justify-center gap-2 text-[var(--text-secondary)]">
                   <ImageIcon size={24} />
-                  <span className="text-caption">Choisir le mÃ©dia de la publication</span>
+                  <span className="text-caption">Choisir le média de la publication</span>
                 </div>
               )}
               <input
