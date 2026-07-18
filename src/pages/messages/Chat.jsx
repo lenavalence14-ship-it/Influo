@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-importer {
+import {.
   Flèche gauche, Envoyer, Appareil photo, Image sous forme d'icône d'image,
   Télécharger, Vérifier, Billet de banque, Pouce levé, Vérification de colis, Vérification de bouclier,
   Téléphone, Vidéo, Plus, Micro,
