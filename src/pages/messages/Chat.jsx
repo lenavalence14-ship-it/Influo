@@ -511,3 +511,119 @@ export default function Chat() {
         <input
           value={text}
           onChange={(e) => set
+onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+          placeholder="Message"
+          className="flex-1 glass rounded-full px-4 h-10 outline-none text-body min-w-0"
+        />
+
+        <button
+          onClick={handleSend}
+          disabled={!text.trim()}
+          className="w-9 h-9 flex items-center justify-center shrink-0 disabled:opacity-40"
+          style={{ color: 'var(--accent)' }}
+          aria-label={text.trim() ? 'Envoyer' : 'Aimer'}
+        >
+          {text.trim() ? <Send size={20} /> : <ThumbsUp size={20} />}
+        </button>
+      </div>
+
+      {showPaymentAsk && (
+        <BottomSheet onClose={() => setShowPaymentAsk(false)} title="Recevoir le paiement">
+          <div className="px-4 pb-4 pt-1 flex gap-2">
+            <input
+              type="number"
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
+              placeholder="Montant en €"
+              autoFocus
+              className="flex-1 glass rounded-2xl outline-none text-body px-4 py-3"
+            />
+            <Button onClick={handleRequestPayment} disabled={!paymentAmount}>Demander</Button>
+          </div>
+        </BottomSheet>
+      )}
+
+      {showDeliverForm && (
+        <BottomSheet onClose={() => setShowDeliverForm(false)} title="Livrer la prestation" height="tall">
+          <div className="px-4 pb-4 space-y-3">
+            <p className="text-caption text-[var(--text-secondary)]">
+              Envoie le média de ta publication réelle + le(s) lien(s). Elle apparaîtra comme collaboration vérifiée dans le feed.
+            </p>
+
+            <label className="block cursor-pointer">
+              {deliverPreview ? (
+                <div className={`w-full ${
+                  deliverFormat === 'carre' ? 'aspect-square'
+                  : deliverFormat === 'horizontal' ? 'aspect-[4/3]'
+                  : deliverFormat === 'vertical_45' ? 'aspect-[4/5]'
+                  : 'aspect-[2/3]'
+                } rounded-2xl overflow-hidden bg-black/20`}>
+                  <img src={deliverPreview} alt="" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="w-full aspect-square rounded-2xl glass flex flex-col items-center justify-center gap-2 text-[var(--text-secondary)]">
+                  <ImageIcon size={24} />
+                  <span className="text-caption">Choisir le média de la publication</span>
+                </div>
+              )}
+              <input
+                ref={deliverFileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleDeliverFileChange}
+                className="hidden"
+              />
+            </label>
+
+            <div className="flex gap-2">
+              {FORMATS.map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => setDeliverFormat(f.value)}
+                  className={`flex-1 rounded-2xl py-2 text-caption-medium transition-colors ${
+                    deliverFormat === f.value ? 'bg-[var(--text-primary)] text-[var(--bg-primary)]' : 'glass'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <input
+              type="url"
+              value={deliverLienInstagram}
+              onChange={(e) => setDeliverLienInstagram(e.target.value)}
+              placeholder="Lien Instagram (optionnel)"
+              className="w-full glass rounded-2xl px-4 py-3 outline-none text-body"
+            />
+            <input
+              type="url"
+              value={deliverLienTiktok}
+              onChange={(e) => setDeliverLienTiktok(e.target.value)}
+              placeholder="Lien TikTok (optionnel)"
+              className="w-full glass rounded-2xl px-4 py-3 outline-none text-body"
+            />
+            <p className="text-caption text-[var(--text-secondary)]">Au moins un lien est requis.</p>
+
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setShowDeliverForm(false)} className="flex-1">
+                Annuler
+              </Button>
+              <Button
+                onClick={handleDeliverSubmit}
+                disabled={deliverLoading || (!deliverLienInstagram && !deliverLienTiktok) || !deliverFile}
+                className="flex-1"
+              >
+                {deliverLoading ? 'Envoi...' : (
+                  <span className="flex items-center justify-center gap-2">
+                    <Check size={16} /> Livrer
+                  </span>
+                )}
+              </Button>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
+    </div>
+  )
+}
