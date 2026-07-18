@@ -69,7 +69,7 @@ export default function PostCard({ post, onDeleted }) {
             <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2 shrink-0">
               <Avatar src={influencer?.users?.photo_url} seed={influencer?.id} size="sm" ring={activeStoryIds.has(influencer?.id)} />
               <div className="flex items-center gap-1">
-                <span className="text-[13px] leading-[16px] font-semibold">{influencer?.users?.nom_complet}</span>
+                <span className="text-[13px] leading-[16px] font-medium">{influencer?.users?.nom_complet}</span>
                 {influencer?.verifie && <VerifiedBadge size={12} />}
               </div>
             </Link>
@@ -79,7 +79,7 @@ export default function PostCard({ post, onDeleted }) {
                 <span className="text-[var(--text-secondary)] opacity-40 shrink-0">|</span>
                 <div className="flex items-center gap-1 min-w-0">
                   <Avatar src={client.photo_url} seed={client.nom_complet} size="sm" />
-                  <span className="text-[13px] leading-[16px] font-semibold truncate">{client.nom_complet}</span>
+                  <span className="text-[13px] leading-[16px] font-medium truncate">{client.nom_complet}</span>
                 </div>
               </>
             )}
@@ -144,7 +144,7 @@ export default function PostCard({ post, onDeleted }) {
         {/* caption */}
         {post.legende && (
           <p className="px-3 pt-1 pb-2 text-[13px] leading-[16px]" style={{ color: 'var(--text-primary)' }}>
-            <span className="font-semibold mr-1">{influencer?.users?.nom_complet}</span>
+            <span className="font-medium mr-1">{influencer?.users?.nom_complet}</span>
             <span style={{ color: 'var(--text-secondary)' }}>{post.legende}</span>
           </p>
         )}
