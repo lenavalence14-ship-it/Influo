@@ -1,8 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Lily+Script+One&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lily+Script+One&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-logo: 'Lily Script One', cursive;
 }
 
@@ -76,6 +76,25 @@ body {
 }
 * {
   scrollbar-width: none;
+}
+
+/* --- Style "feed Instagram-like" — surfaces opaques scopées uniquement --- */
+/* --- aux posts/stories du feed (glass reste partout ailleurs dans l'app). --- */
+.feed-native {
+  /* la police système est désormais globale ; cette classe ne gère plus que la police, */
+  /* conservée pour compat si jamais on doit la re-scoper plus tard */
+}
+.feed-surface {
+  background: var(--surface-primary);
+  border: 1px solid var(--border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.feed-pill {
+  background: var(--surface-secondary);
+  border: 1px solid var(--border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* --- Échelle typographique unique --- */
