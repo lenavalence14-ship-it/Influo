@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Search } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
@@ -8,6 +9,7 @@ import { timeShort } from '../../lib/time'
 export default function ConversationsList() {
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
   const { user, profile, influencerProfile } = useAuth()
   const navigate = useNavigate()
 
@@ -45,19 +47,37 @@ export default function ConversationsList() {
     )
   }
 
+  const filtered = conversations.filter((c) => {
+    if (!query.trim()) return true
+    const isInfluencer = profile?.role === 'influenceur'
+    const other = isInfluencer ? c.client : c.profils_influenceur?.users
+    return other?.nom_complet?.toLowerCase().includes(query.trim().toLowerCase())
+  })
+
   return (
     <div>
       <header className="px-5 pt-6 pb-4">
-        <h1 className="text-h1">Messages</h1>
+        <h1 className="text-h1 mb-4">Discussion</h1>
+        <div className="glass rounded-full flex items-center gap-2 px-4 h-11">
+          <Search size={16} className="text-[var(--text-secondary)] shrink-0" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Rechercher"
+            className="flex-1 bg-transparent outline-none text-body placeholder:text-[var(--text-secondary)]"
+          />
+        </div>
       </header>
 
-      {conversations.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="glass rounded-2xl p-8 text-center mx-4">
-          <p className="text-[var(--text-secondary)]">Aucune conversation pour le moment.</p>
+          <p className="text-[var(--text-secondary)]">
+            {conversations.length === 0 ? 'Aucune conversation pour le moment.' : 'Aucun résultat.'}
+          </p>
         </div>
       ) : (
         <div className="px-2">
-          {conversations.map((c) => {
+          {filtered.map((c) => {
             const isInfluencer = profile?.role === 'influenceur'
             const other = isInfluencer ? c.client : c.profils_influenceur?.users
             const lastMsg = c.messages?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
