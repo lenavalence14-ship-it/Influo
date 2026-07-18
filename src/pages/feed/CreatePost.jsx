@@ -29,7 +29,7 @@ export default function CreatePost() {
   const [previews, setPreviews] = useState([]) // fichiers locaux à uploader (nouveau post)
   const [existingMediaUrls, setExistingMediaUrls] = useState([]) // médias déjà en ligne (mode édition)
   const [legende, setLegende] = useState('')
-  const [format, setFormat] = useState('carre')
+  const [format, setFormat] = useState(isStory ? 'vertical' : 'carre')
   const [loading, setLoading] = useState(false)
 
   // story text overlay
@@ -50,7 +50,7 @@ export default function CreatePost() {
       if (data) {
         setIsStory(data.type === 'story')
         setLegende(data.legende || '')
-        setFormat(data.crop_format || 'carre')
+        setFormat(data.crop_format || (data.type === 'story' ? 'vertical' : 'carre'))
         setTexteOverlay(data.texte_overlay || '')
         setTextePos({ x: data.texte_x ?? 50, y: data.texte_y ?? 50 })
         setTexteCouleur(data.texte_couleur || '#ffffff')
@@ -79,7 +79,7 @@ export default function CreatePost() {
         .from('posts')
         .update({
           legende: isStory ? null : legende,
-          crop_format: isStory ? 'vertical' : format,
+          crop_format: format,
           texte_overlay: isStory && texteOverlay ? texteOverlay : null,
           texte_x: isStory ? textePos.x : null,
           texte_y: isStory ? textePos.y : null,
@@ -98,7 +98,7 @@ export default function CreatePost() {
         influenceur_id: influencerProfile.id,
         type: isStory ? 'story' : files.length > 1 ? 'carrousel' : 'photo',
         legende: isStory ? null : legende,
-        crop_format: isStory ? 'vertical' : format,
+        crop_format: format,
         expire_at: isStory ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null,
         texte_overlay: isStory && texteOverlay ? texteOverlay : null,
         texte_x: isStory ? textePos.x : null,
@@ -206,7 +206,18 @@ export default function CreatePost() {
             className="relative w-full max-w-[380px] aspect-[9/16] rounded-2xl overflow-hidden bg-neutral-900"
             onClick={handleMediaTap}
           >
-            <img src={mainPreview} alt="" className="w-full h-full object-cover select-none" draggable={false} />
+            {format !== 'vertical' && (
+              <div
+                className="absolute inset-0 scale-125 blur-2xl brightness-50"
+                style={{ backgroundImage: `url(${mainPreview})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+              />
+            )}
+            <img
+              src={mainPreview}
+              alt=""
+              className={`relative w-full h-full select-none ${format === 'vertical' ? 'object-cover' : 'object-contain'}`}
+              draggable={false}
+            />
             {texteOverlay && (
               <div
                 className="absolute -translate-x-1/2 -translate-y-1/2 text-center font-semibold px-4 max-w-[90%] whitespace-pre-wrap pointer-events-none"
@@ -273,6 +284,22 @@ export default function CreatePost() {
 
       {/* bottom controls */}
       <div className="shrink-0 px-4 pb-6 pt-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+        {isStory && (
+          <div className="flex gap-2 mb-3">
+            {FORMATS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setFormat(f.value)}
+                className={`flex-1 rounded-2xl py-3 text-caption-medium transition-colors ${
+                  format === f.value ? 'bg-white text-black' : 'bg-white/10 text-white'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {!isStory && (
           <>
             <div className="flex gap-2 mb-3">
