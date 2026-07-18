@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Heart, MessageCircle, Send, MoreHorizontal, X, Trash2, Pencil, Play } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Heart, MessageCircle, Send, MoreHorizontal, X, Trash2, Pencil, Volume2, VolumeX } from 'lucide-react'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { InstagramIcon, TikTokIcon } from '../../components/ui/SocialIcons'
 import Avatar from '../../components/ui/Avatar'
@@ -28,6 +28,8 @@ export default function PostCard({ post, onDeleted }) {
   const [showComments, setShowComments] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [deleted, setDeleted] = useState(false)
+  const [muted, setMuted] = useState(true)
+  const videoRef = useRef(null)
 
   const influencer = post.profils_influenceur
   const isOwner = influencer?.user_id === user?.id
@@ -60,6 +62,26 @@ export default function PostCard({ post, onDeleted }) {
 
   const mediaUrl = post.post_medias?.[0]?.media_url
   const isVideo = post.type === 'video' || post.post_medias?.[0]?.media_type === 'video'
+
+  // autoplay muet quand la vidéo est bien visible à l'écran, pause sinon (comme Instagram)
+  useEffect(() => {
+    if (!isVideo) return
+    const video = videoRef.current
+    if (!video) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+          video.play().catch(() => {})
+        } else {
+          video.pause()
+        }
+      },
+      { threshold: [0, 0.6, 1] }
+    )
+    observer.observe(video)
+    return () => observer.disconnect()
+  }, [isVideo])
 
   if (deleted) return null
 
@@ -101,20 +123,32 @@ export default function PostCard({ post, onDeleted }) {
 
         {/* media */}
         {mediaUrl && (
-          <div className={`w-full ${cropClasses[post.crop_format] || 'aspect-square'} bg-black/20 overflow-hidden`}>
+          <div className={`w-full ${cropClasses[post.crop_format] || 'aspect-square'} bg-black/20 overflow-hidden relative`}>
             {isVideo ? (
-              <button
-                onClick={() => navigate(`/video/${post.id}`)}
-                className="relative w-full h-full block"
-                aria-label="Voir le réel"
-              >
-                <video src={mediaUrl} className="w-full h-full object-cover" muted playsInline preload="metadata" />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                  <div className="w-14 h-14 rounded-full bg-black/40 flex items-center justify-center">
-                    <Play size={26} className="text-white fill-white ml-0.5" />
-                  </div>
-                </div>
-              </button>
+              <>
+                <button
+                  onClick={() => navigate(`/video/${post.id}`)}
+                  className="absolute inset-0 w-full h-full block"
+                  aria-label="Voir le réel"
+                >
+                  <video
+                    ref={videoRef}
+                    src={mediaUrl}
+                    className="w-full h-full object-cover"
+                    muted={muted}
+                    loop
+                    playsInline
+                    preload="metadata"
+                  />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMuted((m) => !m) }}
+                  aria-label={muted ? 'Activer le son' : 'Couper le son'}
+                  className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white"
+                >
+                  {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                </button>
+              </>
             ) : (
               <img src={mediaUrl} alt="" className="w-full h-full object-cover" />
             )}
