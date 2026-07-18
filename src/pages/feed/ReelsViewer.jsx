@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft } from 'lucide-react'
+import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft, Plus } from 'lucide-react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -116,16 +116,29 @@ export default function ReelsViewer() {
       className="fixed inset-0 z-30 bg-black overflow-y-scroll snap-y snap-mandatory"
       style={{ scrollSnapType: 'y mandatory' }}
     >
-      {postId && (
-        <button
-          onClick={() => navigate(-1)}
-          aria-label="Retour"
-          className="fixed top-3 left-3 z-40 w-10 h-10 rounded-full bg-black/40 flex items-center justify-center text-white"
-          style={{ marginTop: 'env(safe-area-inset-top)' }}
-        >
-          <ArrowLeft size={20} />
-        </button>
-      )}
+      <div
+        className="fixed top-0 left-0 right-0 z-40 flex items-center px-2 pt-3 pb-2 bg-gradient-to-b from-black/60 to-transparent"
+        style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}
+      >
+        {postId ? (
+          <button
+            onClick={() => navigate(-1)}
+            aria-label="Retour"
+            className="w-9 h-9 flex items-center justify-center text-white"
+          >
+            <ArrowLeft size={22} />
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate('/publier')}
+            aria-label="Importer un réel"
+            className="w-9 h-9 flex items-center justify-center text-white"
+          >
+            <Plus size={22} />
+          </button>
+        )}
+        <p className="absolute left-1/2 -translate-x-1/2 text-white text-body-medium">Réel collab</p>
+      </div>
       {reels.map((reel, i) => (
         <ReelSlide
           key={reel.id}
@@ -189,7 +202,10 @@ function ReelSlide({ reel, index, setVideoRef }) {
       <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
 
       {/* colonne d'actions à droite */}
-      <div className="absolute right-3 bottom-24 flex flex-col items-center gap-5 z-10 text-white">
+      <div
+        className="absolute right-3 flex flex-col items-center gap-5 z-10 text-white"
+        style={{ bottom: 'max(90px, calc(env(safe-area-inset-bottom) + 90px))' }}
+      >
         <button onClick={toggleLike} className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
           <Heart size={27} className={liked ? 'fill-red-500 text-red-500' : ''} strokeWidth={2} />
           {likeCount > 0 && <span className="text-[11px] font-medium">{likeCount}</span>}
@@ -210,7 +226,10 @@ function ReelSlide({ reel, index, setVideoRef }) {
       </div>
 
       {/* bas : profil, nom, légende */}
-      <div className="absolute left-3 bottom-6 right-16 z-10">
+      <div
+        className="absolute left-3 right-16 z-10"
+        style={{ bottom: 'max(24px, env(safe-area-inset-bottom))' }}
+      >
         <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2.5 mb-2">
           <img
             src={influencer?.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${influencer?.id}`}
