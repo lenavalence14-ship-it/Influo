@@ -64,22 +64,22 @@ export default function PostCard({ post, onDeleted }) {
     <article className="mb-3 animate-fade-in feed-native">
       <div className="feed-surface overflow-hidden">
         {/* header */}
-        <div className="flex items-center justify-between px-3 py-2.5">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center justify-between px-3 py-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2 shrink-0">
               <Avatar src={influencer?.users?.photo_url} seed={influencer?.id} size="sm" ring={activeStoryIds.has(influencer?.id)} />
-              <div className="flex items-center gap-1.5">
-                <span className="text-[14px] leading-[18px] font-semibold">{influencer?.users?.nom_complet}</span>
-                {influencer?.verifie && <VerifiedBadge size={13} />}
+              <div className="flex items-center gap-1">
+                <span className="text-[13px] leading-[16px] font-semibold">{influencer?.users?.nom_complet}</span>
+                {influencer?.verifie && <VerifiedBadge size={12} />}
               </div>
             </Link>
 
             {isCollabVerifiee && client && (
               <>
                 <span className="text-[var(--text-secondary)] opacity-40 shrink-0">|</span>
-                <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1 min-w-0">
                   <Avatar src={client.photo_url} seed={client.nom_complet} size="sm" />
-                  <span className="text-[14px] leading-[18px] font-semibold truncate">{client.nom_complet}</span>
+                  <span className="text-[13px] leading-[16px] font-semibold truncate">{client.nom_complet}</span>
                 </div>
               </>
             )}
@@ -113,7 +113,7 @@ export default function PostCard({ post, onDeleted }) {
             className="flex items-center gap-1.5 active:scale-90 transition-transform duration-200"
           >
             <MessageCircle size={23} strokeWidth={1.75} />
-            {commentCount > 0 && <span className="text-[13px] leading-[16px] font-medium">{commentCount}</span>}
+            {commentCount > 0 && <span className="text-[12px] leading-[15px] font-medium">{commentCount}</span>}
           </button>
           <button className="active:scale-90 transition-transform duration-200">
             <Send size={21} strokeWidth={1.75} />
@@ -124,9 +124,9 @@ export default function PostCard({ post, onDeleted }) {
               href={lienInstagram}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 feed-pill rounded-full pl-2.5 pr-3 py-1 text-[13px] leading-[16px] font-medium active:scale-95 transition-transform duration-200"
+              className="flex items-center gap-1.5 feed-pill rounded-full pl-2.5 pr-3 py-1 text-[12px] leading-[15px] font-medium active:scale-95 transition-transform duration-200"
             >
-              Voir sur <InstagramIcon size={13} />
+              Voir sur <InstagramIcon size={12} />
             </a>
           )}
           {lienTiktok && (
@@ -134,17 +134,17 @@ export default function PostCard({ post, onDeleted }) {
               href={lienTiktok}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 feed-pill rounded-full pl-2.5 pr-3 py-1 text-[13px] leading-[16px] font-medium active:scale-95 transition-transform duration-200"
+              className="flex items-center gap-1.5 feed-pill rounded-full pl-2.5 pr-3 py-1 text-[12px] leading-[15px] font-medium active:scale-95 transition-transform duration-200"
             >
-              Voir sur <TikTokIcon size={13} />
+              Voir sur <TikTokIcon size={12} />
             </a>
           )}
         </div>
 
         {/* caption */}
         {post.legende && (
-          <p className="px-3 pt-1 pb-2.5 text-[14px] leading-[18px]" style={{ color: 'var(--text-primary)' }}>
-            <span className="font-semibold mr-1.5">{influencer?.users?.nom_complet}</span>
+          <p className="px-3 pt-1 pb-2 text-[13px] leading-[16px]" style={{ color: 'var(--text-primary)' }}>
+            <span className="font-semibold mr-1">{influencer?.users?.nom_complet}</span>
             <span style={{ color: 'var(--text-secondary)' }}>{post.legende}</span>
           </p>
         )}
