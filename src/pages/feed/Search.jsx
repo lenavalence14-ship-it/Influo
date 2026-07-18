@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { Search as SearchIcon } from 'lucide-react'
+import { useActiveStories } from '../../hooks/useActiveStories'
 
 export default function Search() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const activeStoryIds = useActiveStories()
 
   useEffect(() => {
     const load = async () => {
@@ -56,11 +58,23 @@ export default function Search() {
                 onClick={() => navigate(`/influenceur/${inf.id}`)}
                 className="glass-strong rounded-2xl p-4 cursor-pointer"
               >
-                <img
-                  src={inf.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${inf.id}`}
-                  alt=""
-                  className="w-14 h-14 rounded-full object-cover mb-3"
-                />
+                {activeStoryIds.has(inf.id) ? (
+                  <div className="w-14 h-14 rounded-full p-[2.5px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400 mb-3">
+                    <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
+                      <img
+                        src={inf.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${inf.id}`}
+                        alt=""
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <img
+                    src={inf.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${inf.id}`}
+                    alt=""
+                    className="w-14 h-14 rounded-full object-cover mb-3"
+                  />
+                )}
                 <div className="flex items-center gap-2">
                   <p className="text-body-medium truncate">{inf.users?.nom_complet}</p>
                   {inf.verifie && <VerifiedBadge size={14} />}
