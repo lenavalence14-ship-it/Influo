@@ -15,6 +15,22 @@ export function ThemeProvider({ children }) {
       root.classList.remove('light')
     }
     localStorage.setItem('influo-theme', theme)
+
+    // synchronise la couleur de la barre système (statut) avec le thème actif
+    const color = theme === 'light' ? '#f5f5f5' : '#0a0a0a'
+    let meta = document.querySelector('meta[name="theme-color"]')
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.name = 'theme-color'
+      document.head.appendChild(meta)
+    }
+    meta.setAttribute('content', color)
+
+    // iOS : la barre de statut ne peut être que claire/sombre/translucide, pas une couleur précise
+    let appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+    if (appleMeta) {
+      appleMeta.setAttribute('content', theme === 'light' ? 'default' : 'black-translucent')
+    }
   }, [theme])
 
   const toggleTheme = () => {
