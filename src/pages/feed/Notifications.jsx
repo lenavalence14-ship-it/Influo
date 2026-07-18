@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Heart, MessageCircle, ShoppingBag, Wallet, ArrowLeft } from 'lucide-react'
 import Avatar from '../../components/ui/Avatar'
+import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { timeAgo, dateSection } from '../../lib/time'
 import { useActiveStories } from '../../hooks/useActiveStories'
 
@@ -12,6 +13,12 @@ const TYPE_ICON = {
   comment: MessageCircle,
   commande: ShoppingBag,
   retrait: Wallet,
+}
+
+const TYPE_SUFFIX = {
+  like: 'a aimé votre publication',
+  comment: 'a commenté votre publication',
+  commande: 'a passé une nouvelle commande',
 }
 
 const TABS = [
@@ -33,10 +40,33 @@ export default function Notifications() {
     const load = async () => {
       const { data } = await supabase
         .from('notifications')
-        .select('*, from_user:from_user_id(nom_complet, photo_url, profils_influenceur(id))')
+        .select('*, from_user:from_user_id(nom_complet, photo_url, profils_influenceur(id, verifie))')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-      setNotifications(data || [])
+
+      const postIds = (data || [])
+        .filter((n) => (n.type === 'like' || n.type === 'comment') && n.lien_ref_id)
+        .map((n) => n.lien_ref_id)
+
+      let mediaByPostId = {}
+      if (postIds.length > 0) {
+        const { data: medias } = await supabase
+          .from('post_medias')
+          .select('post_id, media_url, position')
+          .in('post_id', postIds)
+          .order('position', { ascending: true })
+        mediaByPostId = (medias || []).reduce((acc, m) => {
+          if (!acc[m.post_id]) acc[m.post_id] = m.media_url
+          return acc
+        }, {})
+      }
+
+      const enriched = (data || []).map((n) => ({
+        ...n,
+        post_thumbnail: (n.type === 'like' || n.type === 'comment') ? mediaByPostId[n.lien_ref_id] : null,
+      }))
+
+      setNotifications(enriched)
       setLoading(false)
 
       await supabase.from('notifications').update({ lu: true }).eq('user_id', user.id).eq('lu', false)
@@ -108,9 +138,7 @@ export default function Notifications() {
                   <button
                     key={n.id}
                     onClick={() => handleClick(n)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 ${
-                      !n.lu ? '' : ''
-                    }`}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150"
                     style={{ backgroundColor: !n.lu ? 'var(--surface-secondary)' : 'transparent' }}
                   >
                     {actor ? (
@@ -130,10 +158,28 @@ export default function Notifications() {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-small leading-snug">
-                        {n.contenu} <span style={{ color: 'var(--text-secondary)' }}>{timeAgo(n.created_at)}</span>
+                        {actor && TYPE_SUFFIX[n.type] ? (
+                          <>
+                            <span className="text-small-medium">{actor.nom_complet}</span>
+                            {actor.profils_influenceur?.verifie && (
+                              <span className="inline-block align-text-bottom mx-0.5">
+                                <VerifiedBadge size={12} />
+                              </span>
+                            )}
+                            {' '}{TYPE_SUFFIX[n.type]}
+                          </>
+                        ) : (
+                          n.contenu
+                        )}{' '}
+                        <span style={{ color: 'var(--text-secondary)' }}>{timeAgo(n.created_at)}</span>
                       </p>
                     </div>
-                    {!n.lu && <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent)] shrink-0" />}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!n.lu && <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent)]" />}
+                      {n.post_thumbnail && (
+                        <img src={n.post_thumbnail} alt="" className="w-11 h-11 rounded-md object-cover" />
+                      )}
+                    </div>
                   </button>
                 )
               })}
