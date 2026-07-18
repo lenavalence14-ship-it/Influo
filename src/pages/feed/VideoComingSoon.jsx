@@ -8,7 +8,7 @@ export default function VideoComingSoon() {
   return (
     <div className="fixed inset-0 z-30 bg-black flex flex-col text-white">
       {/* header : + à gauche (importera un réel au lancement), "Réel collab" centré */}
-      <div className="flex items-center px-4 pt-4 pb-2 relative shrink-0 z-10">
+      <div className="flex items-center px-4 pt-3 pb-2 relative shrink-0 z-10">
         <button
           aria-label="Importer un réel"
           className="w-9 h-9 flex items-center justify-center"
@@ -26,7 +26,7 @@ export default function VideoComingSoon() {
         </div>
 
         {/* colonne d'actions à droite, façon Reels */}
-        <div className="absolute right-3 bottom-24 flex flex-col items-center gap-5">
+        <div className="absolute right-3 bottom-32 flex flex-col items-center gap-5">
           <button className="flex flex-col items-center gap-1" aria-label="J'aime">
             <Heart size={26} />
           </button>
@@ -41,8 +41,8 @@ export default function VideoComingSoon() {
           </button>
         </div>
 
-        {/* bas : profil, nom, badge vérifié Influo */}
-        <div className="absolute left-3 bottom-6 right-16 flex items-center gap-2.5">
+        {/* bas : profil, nom, badge vérifié Influo — remonté au-dessus de la bottom nav */}
+        <div className="absolute left-3 bottom-24 right-16 flex items-center gap-2.5">
           <img
             src={profile?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${profile?.id}`}
             alt=""
