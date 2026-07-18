@@ -238,7 +238,7 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
             left: `${story.texte_x ?? 50}%`,
             top: `${story.texte_y ?? 50}%`,
             color: story.texte_couleur || '#ffffff',
-            fontFamily: story.texte_police || 'DM Sans',
+            fontFamily: story.texte_police || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
             fontSize: `${story.texte_taille || 28}px`,
             textShadow: '0 1px 6px rgba(0,0,0,0.5)',
           }}
