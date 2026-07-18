@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import Avatar from '../../components/ui/Avatar'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { useActiveStories } from '../../hooks/useActiveStories'
+import { timeAgo } from '../../lib/time'
 
 export default function CommentsSheet({ postId, onClose, onCommentAdded }) {
   const [comments, setComments] = useState([])
@@ -78,6 +79,11 @@ export default function CommentsSheet({ postId, onClose, onCommentAdded }) {
                     {c.users?.profils_influenceur?.verifie && <VerifiedBadge size={13} />}
                   </p>
                   <p className="text-small mt-0.5" style={{ color: 'var(--text-secondary)' }}>{c.contenu}</p>
+                  {c.created_at && (
+                    <p className="text-[11px] mt-1" style={{ color: 'var(--text-secondary)' }}>
+                      {timeAgo(c.created_at)}
+                    </p>
+                  )}
                 </div>
               </div>
             ))
