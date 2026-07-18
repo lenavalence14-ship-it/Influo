@@ -83,6 +83,8 @@ export default function Chat() {
       .channel(`chat-${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
         setMessages((prev) => [...prev, payload.new])
+        const readField = isInfluencer ? 'influenceur_last_read_at' : 'client_last_read_at'
+        supabase.from('conversations').update({ [readField]: new Date().toISOString() }).eq('id', id)
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `id=eq.${id}` }, (payload) => {
         setConversation((c) => (c ? { ...c, ...payload.new } : c))
