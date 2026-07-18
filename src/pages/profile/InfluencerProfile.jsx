@@ -289,7 +289,7 @@ export default function InfluencerProfile() {
               <button
                 key={p.id}
                 onClick={() => setSelectedPost(p)}
-                className="aspect-square bg-black/20"
+                className="aspect-[4/5] bg-black/20"
               >
                 {p.post_medias?.[0]?.media_url && (
                   <img src={p.post_medias[0].media_url} alt="" className="w-full h-full object-cover" />
