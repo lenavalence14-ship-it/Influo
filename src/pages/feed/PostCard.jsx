@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Heart, MessageCircle, Send, MoreHorizontal, X, Trash2, Pencil } from 'lucide-react'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { InstagramIcon, TikTokIcon } from '../../components/ui/SocialIcons'
-import Card from '../../components/ui/Card'
 import Avatar from '../../components/ui/Avatar'
 import BottomSheet from '../../components/ui/BottomSheet'
 import { supabase } from '../../lib/supabase'
@@ -62,25 +61,25 @@ export default function PostCard({ post, onDeleted }) {
   if (deleted) return null
 
   return (
-    <article className="mb-4 animate-fade-in">
-      <Card variant="strong">
+    <article className="mb-3 animate-fade-in feed-native">
+      <div className="feed-surface rounded-none sm:rounded-xl overflow-hidden">
         {/* header */}
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-3 shrink-0">
-              <Avatar src={influencer?.users?.photo_url} seed={influencer?.id} size="md" ring={activeStoryIds.has(influencer?.id)} />
-              <div className="flex items-center gap-2">
-                <span className="text-small-medium">{influencer?.users?.nom_complet}</span>
-                {influencer?.verifie && <VerifiedBadge size={15} />}
+        <div className="flex items-center justify-between px-3 py-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2.5 shrink-0">
+              <Avatar src={influencer?.users?.photo_url} seed={influencer?.id} size="sm" ring={activeStoryIds.has(influencer?.id)} />
+              <div className="flex items-center gap-1.5">
+                <span className="text-[14px] leading-[18px] font-semibold">{influencer?.users?.nom_complet}</span>
+                {influencer?.verifie && <VerifiedBadge size={13} />}
               </div>
             </Link>
 
             {isCollabVerifiee && client && (
               <>
                 <span className="text-[var(--text-secondary)] opacity-40 shrink-0">|</span>
-                <div className="flex items-center gap-2 min-w-0">
-                  <Avatar src={client.photo_url} seed={client.nom_complet} size="md" />
-                  <span className="text-small-medium truncate">{client.nom_complet}</span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Avatar src={client.photo_url} seed={client.nom_complet} size="sm" />
+                  <span className="text-[14px] leading-[18px] font-semibold truncate">{client.nom_complet}</span>
                 </div>
               </>
             )}
@@ -90,9 +89,9 @@ export default function PostCard({ post, onDeleted }) {
             <button
               onClick={() => setShowMenu(true)}
               aria-label="Options"
-              className="w-11 h-11 -mr-2 flex items-center justify-center text-[var(--text-secondary)] shrink-0"
+              className="w-9 h-9 -mr-1.5 flex items-center justify-center text-[var(--text-secondary)] shrink-0"
             >
-              <MoreHorizontal size={20} />
+              <MoreHorizontal size={19} />
             </button>
           )}
         </div>
@@ -105,19 +104,19 @@ export default function PostCard({ post, onDeleted }) {
         )}
 
         {/* actions */}
-        <div className="flex items-center gap-4 px-4 pt-3 flex-wrap">
+        <div className="flex items-center gap-3.5 px-3 pt-2 flex-wrap">
           <button onClick={toggleLike} className="active:scale-90 transition-transform duration-200">
-            <Heart size={24} className={liked ? 'fill-red-500 text-red-500' : ''} strokeWidth={2} />
+            <Heart size={23} className={liked ? 'fill-red-500 text-red-500' : ''} strokeWidth={1.75} />
           </button>
           <button
             onClick={() => setShowComments((s) => !s)}
             className="flex items-center gap-1.5 active:scale-90 transition-transform duration-200"
           >
-            <MessageCircle size={24} strokeWidth={2} />
-            {commentCount > 0 && <span className="text-small-medium">{commentCount}</span>}
+            <MessageCircle size={23} strokeWidth={1.75} />
+            {commentCount > 0 && <span className="text-[13px] leading-[16px] font-medium">{commentCount}</span>}
           </button>
           <button className="active:scale-90 transition-transform duration-200">
-            <Send size={22} strokeWidth={2} />
+            <Send size={21} strokeWidth={1.75} />
           </button>
 
           {lienInstagram && (
@@ -125,9 +124,9 @@ export default function PostCard({ post, onDeleted }) {
               href={lienInstagram}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 glass rounded-full pl-3 pr-3.5 py-1.5 text-caption-medium active:scale-95 transition-transform duration-200"
+              className="flex items-center gap-1.5 feed-pill rounded-full pl-2.5 pr-3 py-1 text-[13px] leading-[16px] font-medium active:scale-95 transition-transform duration-200"
             >
-              Voir sur <InstagramIcon size={14} />
+              Voir sur <InstagramIcon size={13} />
             </a>
           )}
           {lienTiktok && (
@@ -135,21 +134,21 @@ export default function PostCard({ post, onDeleted }) {
               href={lienTiktok}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 glass rounded-full pl-3 pr-3.5 py-1.5 text-caption-medium active:scale-95 transition-transform duration-200"
+              className="flex items-center gap-1.5 feed-pill rounded-full pl-2.5 pr-3 py-1 text-[13px] leading-[16px] font-medium active:scale-95 transition-transform duration-200"
             >
-              Voir sur <TikTokIcon size={14} />
+              Voir sur <TikTokIcon size={13} />
             </a>
           )}
         </div>
 
         {/* caption */}
         {post.legende && (
-          <p className="px-4 pt-1 pb-4 text-small" style={{ color: 'var(--text-secondary)' }}>
-            <span className="text-small-medium mr-1.5" style={{ color: 'var(--text-primary)' }}>{influencer?.users?.nom_complet}</span>
-            {post.legende}
+          <p className="px-3 pt-1 pb-2.5 text-[14px] leading-[18px]" style={{ color: 'var(--text-primary)' }}>
+            <span className="font-semibold mr-1.5">{influencer?.users?.nom_complet}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{post.legende}</span>
           </p>
         )}
-      </Card>
+      </div>
 
       {showComments && (
         <CommentsSheet
