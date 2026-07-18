@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import CommentsSheet from './CommentsSheet'
+import { timeAgo } from '../../lib/time'
 
 const STORY_DURATION_MS = 5000
 
@@ -283,6 +284,9 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
           <span className="text-white text-body-medium flex items-center gap-1.5">
             {group.nom}
             {group.verifie && <VerifiedBadge size={14} />}
+            {story.created_at && (
+              <span className="text-white/60 text-small font-normal">· {timeAgo(story.created_at)}</span>
+            )}
           </span>
         </Link>
         <div className="flex items-center">
