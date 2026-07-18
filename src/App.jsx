@@ -60,6 +60,24 @@ function AppRoutes() {
         }
       />
 
+      {/* Réels (séparé, pas de bottom nav — plein écran comme Instagram) */}
+      <Route
+        path="/video"
+        element={
+          <ProtectedRoute>
+            <ReelsViewer />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/video/:postId"
+        element={
+          <ProtectedRoute>
+            <ReelsViewer />
+          </ProtectedRoute>
+        }
+      />
+
       {/* App principale avec bottom nav */}
       <Route
         element={
@@ -73,8 +91,6 @@ function AppRoutes() {
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/publier" element={<CreatePost />} />
         <Route path="/publier/:postId/modifier" element={<CreatePost />} />
-        <Route path="/video" element={<ReelsViewer />} />
-        <Route path="/video/:postId" element={<ReelsViewer />} />
         <Route path="/profil" element={<MyProfileRouter />} />
         <Route path="/profil/modifier" element={<EditProfile />} />
         <Route path="/influenceur/:id" element={<InfluencerProfile />} />
