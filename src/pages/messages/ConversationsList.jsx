@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { timeShort } from '../../lib/time'
+import StoryBar from '../feed/StoryBar'
 
 export default function ConversationsList() {
   const [conversations, setConversations] = useState([])
@@ -68,6 +69,8 @@ export default function ConversationsList() {
           />
         </div>
       </header>
+
+      <StoryBar />
 
       {filtered.length === 0 ? (
         <div className="glass rounded-2xl p-8 text-center mx-4">
