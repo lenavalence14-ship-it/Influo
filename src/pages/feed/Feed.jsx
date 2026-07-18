@@ -101,7 +101,7 @@ export default function Feed() {
           </Card>
         </div>
       ) : (
-        <div className="pt-2">
+        <div className="pt-0">
           {posts.map((post) => (
             <PostCard
               key={post.id}
