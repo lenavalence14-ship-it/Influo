@@ -5,14 +5,14 @@ import { useTheme } from '../../contexts/ThemeContext'
 import StoryBar from './StoryBar'
 import PostCard from './PostCard'
 import Card from '../../components/ui/Card'
-import { Sun, Moon, MessageCircle } from 'lucide-react'
+import { Sun, Moon, MessageCircle, Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useUnreadCounts } from '../../hooks/useUnreadCounts'
 
 export default function Feed() {
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(true)
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const { hasUnreadMessages } = useUnreadCounts()
@@ -64,12 +64,25 @@ export default function Feed() {
   return (
     <div>
       <header className="flex items-center justify-between px-4 pt-6 pb-2 sticky top-0 z-30 bg-[var(--bg-primary)]/80 backdrop-blur-xl">
+        {profile?.role === 'influenceur' ? (
+          <button
+            onClick={() => navigate('/publier')}
+            aria-label="Publier"
+            className="w-9 h-9 flex items-center justify-center"
+          >
+            <Plus size={24} />
+          </button>
+        ) : (
+          <div className="w-9 h-9" />
+        )}
+
         <h1
-  className="text-3xl"
-  style={{ fontFamily: 'var(--font-logo)', color: '#a855f7' }}
->
-  Influo
-</h1>
+          className="text-3xl"
+          style={{ fontFamily: 'var(--font-logo)', color: '#a855f7' }}
+        >
+          Influo
+        </h1>
+
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate('/messages')}
