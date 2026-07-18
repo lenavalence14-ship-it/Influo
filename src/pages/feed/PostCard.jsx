@@ -62,7 +62,7 @@ export default function PostCard({ post, onDeleted }) {
 
   return (
     <article className="mb-3 animate-fade-in feed-native">
-      <div className="feed-surface rounded-none sm:rounded-xl overflow-hidden">
+      <div className="feed-surface overflow-hidden">
         {/* header */}
         <div className="flex items-center justify-between px-3 py-2.5">
           <div className="flex items-center gap-2.5 min-w-0">
