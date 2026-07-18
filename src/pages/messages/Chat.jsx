@@ -84,6 +84,9 @@ export default function Chat() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
         setMessages((prev) => [...prev, payload.new])
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `id=eq.${id}` }, (payload) => {
+        setConversation((c) => (c ? { ...c, ...payload.new } : c))
+      })
       .subscribe()
 
     return () => supabase.removeChannel(channel)
@@ -175,6 +178,7 @@ export default function Chat() {
 
     await supabase.from('commandes').update({ status: 'paiement_effectue' }).eq('id', commande.id)
 
+    // créditer le wallet en verrouillé
     const { data: wallet } = await supabase
       .from('wallets')
       .select('*')
@@ -213,6 +217,7 @@ export default function Chat() {
     })
   }
 
+  // --- Livraison : formulaire (liens + média de la vraie publication) ---
   const handleDeliverFileChange = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -225,6 +230,7 @@ export default function Chat() {
     if (!deliverFile) return
     setDeliverLoading(true)
 
+    // upload du média dans le bucket "posts" (lecture publique, nécessaire pour le feed)
     const fileName = `${influencerProfile.id}/livraisons/${commande.id}-${Date.now()}-${deliverFile.name}`
     const { error: uploadError } = await supabase.storage.from('posts').upload(fileName, deliverFile)
     if (uploadError) {
@@ -269,9 +275,11 @@ export default function Chat() {
     setDeliverPreview(null)
   }
 
+  // --- Validation client : crée automatiquement le post "collaboration vérifiée" dans le feed ---
   const handleConfirmReception = async () => {
     await supabase.from('commandes').update({ status: 'terminee' }).eq('id', commande.id)
 
+    // création automatique du post de collaboration vérifiée dans le feed
     if (commande.media_livraison_url) {
       const { data: newPost } = await supabase
         .from('posts')
@@ -317,7 +325,7 @@ export default function Chat() {
 
     await sendSystemMessage('🎉 Prestation validée. Les fonds sont maintenant disponibles pour l\'influenceur.')
     setCommande((c) => ({ ...c, status: 'terminee' }))
-}
+  }
 
   if (!conversation) {
     return (
@@ -329,6 +337,8 @@ export default function Chat() {
 
   const other = isInfluencer ? conversation.client : conversation.profils_influenceur?.users
 
+  // bouton d'action contextuel unique, affiché discrètement à côté du champ de saisie
+  // (jamais plaqué en dur dans le layout : il ouvre juste un BottomSheet)
   const contextAction = (() => {
     if (!isInfluencer && commande?.status === 'paiement_demande') {
       return { icon: Banknote, label: `Payer ${commande.montant} €`, onClick: handlePay }
@@ -344,6 +354,7 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
+      {/* header : sobre, façon Messenger */}
       <header className="flex items-center gap-3 px-3 py-2.5 sticky top-0 bg-[var(--bg-primary)]/90 backdrop-blur-xl z-20 border-b border-[var(--border)] shrink-0">
         <button onClick={() => navigate('/messages')} className="w-9 h-9 -ml-1 flex items-center justify-center shrink-0">
           <ArrowLeft size={20} />
@@ -358,6 +369,7 @@ export default function Chat() {
           {!isInfluencer && conversation.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
         </p>
 
+        {/* icône cash + tooltip permanent, influenceur uniquement, tant qu'aucune commande n'est en cours */}
         {isInfluencer && (!commande || commande.status === 'en_discussion') && (
           <div className="relative shrink-0">
             <button
@@ -389,10 +401,18 @@ export default function Chat() {
         </button>
       </header>
 
+      {/* fil de messages : prend tout l'espace restant, jamais de formulaire plaqué ici */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 min-h-0">
-        {messages.map((m) => {
+        {messages.map((m, i) => {
           const isMe = m.sender_id === user.id
           const isSystem = !m.sender_id
+
+          // "vu" façon Messenger : petit avatar sous le dernier message que j'ai envoyé,
+          // affiché seulement si l'autre l'a lu après son envoi
+          const readAt = isInfluencer ? conversation.client_last_read_at : conversation.influenceur_last_read_at
+          const isLastMineMessage = isMe && !messages.slice(i + 1).some((mm) => mm.sender_id === user.id)
+          const seenByOther = isLastMineMessage && readAt && new Date(readAt) > new Date(m.created_at)
+
           return (
             <div key={m.id} className={`flex flex-col ${isSystem ? 'items-center' : isMe ? 'items-end' : 'items-start'}`}>
               {isSystem ? (
@@ -413,6 +433,13 @@ export default function Chat() {
                     <span className="text-[11px] mt-1 px-1" style={{ color: 'var(--text-secondary)' }}>
                       {timeShort(m.created_at)}
                     </span>
+                  )}
+                  {seenByOther && (
+                    <img
+                      src={other?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${id}`}
+                      alt="Vu"
+                      className="w-4 h-4 rounded-full object-cover mt-0.5"
+                    />
                   )}
                 </>
               )}
@@ -435,6 +462,7 @@ export default function Chat() {
         <div ref={bottomRef} />
       </div>
 
+      {/* barre de saisie : exactement comme la capture Messenger — +, caméra, galerie, micro, champ, pouce/envoi */}
       <div className="px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-1.5 flex items-center gap-1 shrink-0">
         <button onClick={() => fileInputRef.current?.click()} className="w-9 h-9 flex items-center justify-center shrink-0" style={{ color: 'var(--accent)' }} aria-label="Joindre">
           <Plus size={22} />
@@ -468,6 +496,7 @@ export default function Chat() {
           <Mic size={20} />
         </button>
 
+        {/* action contextuelle (payer / livrer / confirmer) : icône discrète, ouvre un popup, ne prend jamais de place fixe */}
         {contextAction && (
           <button
             onClick={contextAction.onClick}
@@ -481,120 +510,4 @@ export default function Chat() {
 
         <input
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="Message"
-          className="flex-1 glass rounded-full px-4 h-10 outline-none text-body min-w-0"
-        />
-
-        <button
-          onClick={handleSend}
-          disabled={!text.trim()}
-          className="w-9 h-9 flex items-center justify-center shrink-0 disabled:opacity-40"
-          style={{ color: 'var(--accent)' }}
-          aria-label={text.trim() ? 'Envoyer' : 'Aimer'}
-        >
-          {text.trim() ? <Send size={20} /> : <ThumbsUp size={20} />}
-        </button>
-      </div>
-
-      {showPaymentAsk && (
-        <BottomSheet onClose={() => setShowPaymentAsk(false)} title="Recevoir le paiement">
-          <div className="px-4 pb-4 pt-1 flex gap-2">
-            <input
-              type="number"
-              value={paymentAmount}
-              onChange={(e) => setPaymentAmount(e.target.value)}
-              placeholder="Montant en €"
-              autoFocus
-              className="flex-1 glass rounded-2xl outline-none text-body px-4 py-3"
-            />
-            <Button onClick={handleRequestPayment} disabled={!paymentAmount}>Demander</Button>
-          </div>
-        </BottomSheet>
-      )}
-
-      {showDeliverForm && (
-        <BottomSheet onClose={() => setShowDeliverForm(false)} title="Livrer la prestation" height="tall">
-          <div className="px-4 pb-4 space-y-3">
-            <p className="text-caption text-[var(--text-secondary)]">
-              Envoie le média de ta publication réelle + le(s) lien(s). Elle apparaîtra comme collaboration vérifiée dans le feed.
-            </p>
-
-            <label className="block cursor-pointer">
-              {deliverPreview ? (
-                <div className={`w-full ${
-                  deliverFormat === 'carre' ? 'aspect-square'
-                  : deliverFormat === 'horizontal' ? 'aspect-[4/3]'
-                  : deliverFormat === 'vertical_45' ? 'aspect-[4/5]'
-                  : 'aspect-[2/3]'
-                } rounded-2xl overflow-hidden bg-black/20`}>
-                  <img src={deliverPreview} alt="" className="w-full h-full object-cover" />
-                </div>
-              ) : (
-                <div className="w-full aspect-square rounded-2xl glass flex flex-col items-center justify-center gap-2 text-[var(--text-secondary)]">
-                  <ImageIcon size={24} />
-                  <span className="text-caption">Choisir le média de la publication</span>
-                </div>
-              )}
-              <input
-                ref={deliverFileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleDeliverFileChange}
-                className="hidden"
-              />
-            </label>
-
-            <div className="flex gap-2">
-              {FORMATS.map((f) => (
-                <button
-                  key={f.value}
-                  onClick={() => setDeliverFormat(f.value)}
-                  className={`flex-1 rounded-2xl py-2 text-caption-medium transition-colors ${
-                    deliverFormat === f.value ? 'bg-[var(--text-primary)] text-[var(--bg-primary)]' : 'glass'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-
-            <input
-              type="url"
-              value={deliverLienInstagram}
-              onChange={(e) => setDeliverLienInstagram(e.target.value)}
-              placeholder="Lien Instagram (optionnel)"
-              className="w-full glass rounded-2xl px-4 py-3 outline-none text-body"
-            />
-            <input
-              type="url"
-              value={deliverLienTiktok}
-              onChange={(e) => setDeliverLienTiktok(e.target.value)}
-              placeholder="Lien TikTok (optionnel)"
-              className="w-full glass rounded-2xl px-4 py-3 outline-none text-body"
-            />
-            <p className="text-caption text-[var(--text-secondary)]">Au moins un lien est requis.</p>
-
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setShowDeliverForm(false)} className="flex-1">
-                Annuler
-              </Button>
-              <Button
-                onClick={handleDeliverSubmit}
-                disabled={deliverLoading || (!deliverLienInstagram && !deliverLienTiktok) || !deliverFile}
-                className="flex-1"
-              >
-                {deliverLoading ? 'Envoi...' : (
-                  <span className="flex items-center justify-center gap-2">
-                    <Check size={16} /> Livrer
-                  </span>
-                )}
-              </Button>
-            </div>
-          </div>
-        </BottomSheet>
-      )}
-    </div>
-  )
-}
+          onChange={(e) => set
