@@ -11,7 +11,7 @@ export default function BottomNav() {
   const items = [
     { to: '/', icon: Home, label: 'Accueil' },
     { to: '/recherche', icon: Search, label: 'Recherche' },
-    ...(canPublish ? [{ to: '/publier', icon: Video, label: 'Vidéo' }] : []),
+    ...(canPublish ? [{ to: '/video', icon: Video, label: 'Vidéo' }] : []),
     { to: '/notifications', icon: Heart, label: 'Notifications', dot: hasUnreadNotifications },
     { to: '/profil', icon: User, label: 'Profil' },
   ]
