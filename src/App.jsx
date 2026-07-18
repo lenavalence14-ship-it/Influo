@@ -14,6 +14,7 @@ import Feed from './pages/feed/Feed'
 import Search from './pages/feed/Search'
 import Notifications from './pages/feed/Notifications'
 import CreatePost from './pages/feed/CreatePost'
+import VideoComingSoon from './pages/feed/VideoComingSoon'
 
 import InfluencerProfile from './pages/profile/InfluencerProfile'
 import EditProfile from './pages/profile/EditProfile'
@@ -72,6 +73,7 @@ function AppRoutes() {
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/publier" element={<CreatePost />} />
         <Route path="/publier/:postId/modifier" element={<CreatePost />} />
+        <Route path="/video" element={<VideoComingSoon />} />
         <Route path="/profil" element={<MyProfileRouter />} />
         <Route path="/profil/modifier" element={<EditProfile />} />
         <Route path="/influenceur/:id" element={<InfluencerProfile />} />
