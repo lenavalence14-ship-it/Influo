@@ -108,8 +108,16 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
 
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+      {/* fond flouté plein écran (uniquement si le média n'est pas déjà vertical plein écran) */}
+      {story.crop_format && story.crop_format !== 'vertical' && (
+        <div
+          className="absolute inset-0 scale-150 blur-3xl brightness-[0.35]"
+          style={{ backgroundImage: `url(${story.media_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+        />
+      )}
+
       {/* progress bars */}
-      <div className="flex gap-1 px-3 pt-3 shrink-0">
+      <div className="relative flex gap-1 px-3 pt-3 shrink-0">
         {group.stories.map((s, i) => (
           <div key={s.id} className="flex-1 h-[2.5px] rounded-full bg-white/30 overflow-hidden">
             <div
@@ -124,7 +132,7 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
       </div>
 
       {/* header */}
-      <div className="flex items-center justify-between px-4 py-3 shrink-0">
+      <div className="relative flex items-center justify-between px-4 py-3 shrink-0">
         <Link
           to={`/influenceur/${group.influenceurId}`}
           className="flex items-center gap-2"
@@ -167,12 +175,6 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
 
       {/* media */}
       <div className="relative flex-1 overflow-hidden" onClick={handleTap}>
-        {story.crop_format && story.crop_format !== 'vertical' && (
-          <div
-            className="absolute inset-0 scale-125 blur-2xl brightness-50"
-            style={{ backgroundImage: `url(${story.media_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-          />
-        )}
         <img
           src={story.media_url}
           alt=""
