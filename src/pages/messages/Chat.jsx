@@ -10,7 +10,7 @@ import { generateReceipt } from '../../lib/receipt'
 const FORMATS = [
   { value: 'carre', label: '1:1' },
   { value: 'horizontal', label: '4:3' },
-  { value: 'vertical', label: '4:5' },
+  { value: 'vertical', label: '3:4' },
 ]
 
 export default function Chat() {
@@ -416,7 +416,7 @@ export default function Chat() {
 
             <label className="block cursor-pointer">
               {deliverPreview ? (
-                <div className={`w-full ${deliverFormat === 'carre' ? 'aspect-square' : deliverFormat === 'horizontal' ? 'aspect-[4/3]' : 'aspect-[4/5]'} rounded-2xl overflow-hidden bg-black/20`}>
+                <div className={`w-full ${deliverFormat === 'carre' ? 'aspect-square' : deliverFormat === 'horizontal' ? 'aspect-[4/3]' : 'aspect-[3/4]'} rounded-2xl overflow-hidden bg-black/20`}>
                   <img src={deliverPreview} alt="" className="w-full h-full object-cover" />
                 </div>
               ) : (
