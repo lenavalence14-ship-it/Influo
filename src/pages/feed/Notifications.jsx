@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Heart, MessageCircle, ShoppingBag, Wallet } from 'lucide-react'
 import Card from '../../components/ui/Card'
+import { timeAgo } from '../../lib/time'
 
 const TYPE_ICON = {
   like: Heart,
@@ -71,6 +72,9 @@ export default function Notifications() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-small">{n.contenu}</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                    {timeAgo(n.created_at)}
+                  </p>
                 </div>
                 {!n.lu && <div className="w-2 h-2 rounded-full bg-[var(--accent)] shrink-0" />}
               </button>
