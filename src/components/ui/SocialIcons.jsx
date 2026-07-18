@@ -1,4 +1,4 @@
-// Icônes officielles Instagram et TikTok — issues de Simple Icons (https://simpleicons.org), licence CC0.
+// Icônes officielles des plateformes — issues de Simple Icons (https://simpleicons.org), licence CC0.
 // Réutilisées telles quelles pour rester fidèles aux logos réels des plateformes.
 
 export function InstagramIcon({ size = 16 }) {
@@ -16,6 +16,46 @@ export function TikTokIcon({ size = 16 }) {
     <span className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
       <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
         <path d="M19.589 6.686a4.793 4.793 0 0 1-3.77-4.245V2h-3.445v13.672a2.896 2.896 0 0 1-5.201 1.743l-.002-.001.002.001a2.895 2.895 0 0 1 3.183-4.51v-3.5a6.329 6.329 0 0 0-5.394 10.692 6.33 6.33 0 0 0 10.857-4.424V8.687a8.182 8.182 0 0 0 4.773 1.526V6.79a4.831 4.831 0 0 1-1.003-.104z" />
+      </svg>
+    </span>
+  )
+}
+
+export function FacebookIcon({ size = 16 }) {
+  return (
+    <span className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
+        <path d="M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 1.828-.287 1.839h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z" />
+      </svg>
+    </span>
+  )
+}
+
+export function YouTubeIcon({ size = 16 }) {
+  return (
+    <span className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
+        <path d="M23.499 6.203a3.008 3.008 0 0 0-2.089-2.089c-1.87-.501-9.4-.501-9.4-.501s-7.509-.01-9.399.501a3.008 3.008 0 0 0-2.088 2.09A31.258 31.258 0 0 0 0 12a31.258 31.258 0 0 0 .523 5.797 3.008 3.008 0 0 0 2.088 2.089c1.869.502 9.399.502 9.399.502s7.509 0 9.399-.502a3.008 3.008 0 0 0 2.09-2.089A31.258 31.258 0 0 0 24 12a31.258 31.258 0 0 0-.501-5.797ZM9.545 15.568V8.432L15.818 12l-6.273 3.568Z" />
+      </svg>
+    </span>
+  )
+}
+
+export function XIcon({ size = 16 }) {
+  return (
+    <span className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
+        <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" />
+      </svg>
+    </span>
+  )
+}
+
+export function SnapchatIcon({ size = 16 }) {
+  return (
+    <span className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
+        <path d="M12.166.008C8.885.008 6.937 2.35 6.822 5.234v.315c0 .552-.05 1.09-.14 1.616a6.5 6.5 0 0 1-1.264-.402.65.65 0 0 0-.264-.058c-.34 0-.66.243-.735.593-.09.42.15.8.53 1.02.038.02 2.79 1.62-.35 2.51-.53.15-.82.66-.68 1.17.15.53.66.82 1.17.68.09-.03.68-.19 1.35-.19.11 0 .21.01.29.02.4.44 1.9 1.9 4.03 1.9 1.35 0 2.47-.63 2.9-.92.15.13.4.28.75.28.53 0 1.01-.29 1.01-.29s2.13-.94 2.13-.94c.65-.28 1.1-.79.95-1.32-.15-.51-.65-.82-1.18-.68-.62.17-1.08.19-1.08.19-.14 0-.24-.04-.28-.06.13-.31.19-.65.19-1 0-.35-.09-.66-.24-.94l.6-1.68a11.1 11.1 0 0 0 3.35-2.19c.31-.28.44-.68.31-1.06-.13-.38-.5-.63-.9-.63-.09 0-.19.01-.28.04-.62.19-1.28.31-1.94.31-.19 0-.38-.01-.56-.03.13-.4.19-.83.19-1.26V5.55C17.5 2.3 15.35.008 12.166.008Z" />
       </svg>
     </span>
   )
