@@ -51,6 +51,7 @@ export default function StoryBar() {
       texte_couleur: s.texte_couleur,
       texte_police: s.texte_police,
       texte_taille: s.texte_taille,
+      created_at: s.created_at,
     })
   }
   const groups = Array.from(groupsMap.values())
