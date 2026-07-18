@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
 import CommentsSheet from './CommentsSheet'
 import { useActiveStories } from '../../hooks/useActiveStories'
+import { timeAgo } from '../../lib/time'
 
 const cropClasses = {
   carre: 'aspect-square',
@@ -144,9 +145,14 @@ export default function PostCard({ post, onDeleted }) {
 
         {/* caption */}
         {post.legende && (
-          <p className="px-3 pt-1 pb-2 text-[13px] leading-[16px]" style={{ color: 'var(--text-primary)' }}>
+          <p className="px-3 pt-1 text-[13px] leading-[16px]" style={{ color: 'var(--text-primary)' }}>
             <span className="font-medium mr-1">{influencer?.users?.nom_complet}</span>
             <span style={{ color: 'var(--text-secondary)' }}>{post.legende}</span>
+          </p>
+        )}
+        {post.created_at && (
+          <p className="px-3 pb-2 pt-1 text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
+            {timeAgo(post.created_at)}
           </p>
         )}
       </div>
