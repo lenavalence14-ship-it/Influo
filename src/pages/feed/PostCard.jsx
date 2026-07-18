@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Heart, MessageCircle, Send, MoreHorizontal, X, Trash2, Pencil } from 'lucide-react'
+import { Heart, MessageCircle, Send, MoreHorizontal, X, Trash2, Pencil, Play } from 'lucide-react'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { InstagramIcon, TikTokIcon } from '../../components/ui/SocialIcons'
 import Avatar from '../../components/ui/Avatar'
@@ -103,7 +103,18 @@ export default function PostCard({ post, onDeleted }) {
         {mediaUrl && (
           <div className={`w-full ${cropClasses[post.crop_format] || 'aspect-square'} bg-black/20 overflow-hidden`}>
             {isVideo ? (
-              <video src={mediaUrl} className="w-full h-full object-cover" controls playsInline preload="metadata" />
+              <button
+                onClick={() => navigate(`/video/${post.id}`)}
+                className="relative w-full h-full block"
+                aria-label="Voir le réel"
+              >
+                <video src={mediaUrl} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                  <div className="w-14 h-14 rounded-full bg-black/40 flex items-center justify-center">
+                    <Play size={26} className="text-white fill-white ml-0.5" />
+                  </div>
+                </div>
+              </button>
             ) : (
               <img src={mediaUrl} alt="" className="w-full h-full object-cover" />
             )}
