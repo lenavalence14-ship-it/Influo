@@ -1,19 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Trash2, Pencil } from 'lucide-react'
+import { X, Trash2, Pencil, Send, Heart, MessageCircle, Share } from 'lucide-react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
+import CommentsSheet from './CommentsSheet'
 
 const STORY_DURATION_MS = 5000
 
 // groups: array of { influenceurId, nom, photoUrl, verifie, stories: [{id, media_url, texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille}] }
 export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, onClose }) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [groupIndex, setGroupIndex] = useState(startGroupIndex)
   const [storyIndex, setStoryIndex] = useState(0)
   const [progress, setProgress] = useState(0)
   const [paused, setPaused] = useState(false)
   const [localGroups, setLocalGroups] = useState(groups)
+  const [messageText, setMessageText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [liked, setLiked] = useState(false)
+  const [showComments, setShowComments] = useState(false)
+  const [commentCount, setCommentCount] = useState(0)
   const timerRef = useRef(null)
   const rafRef = useRef(null)
   const startRef = useRef(null)
@@ -27,6 +37,29 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
   useEffect(() => {
     setLocalGroups(groups)
   }, [groups])
+
+  // vérifie si la story actuelle est déjà likée par l'utilisateur, et charge le nb de commentaires
+  useEffect(() => {
+    if (!story || !user) return
+    let cancelled = false
+    supabase
+      .from('post_likes')
+      .select('post_id')
+      .eq('post_id', story.id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setLiked(!!data)
+      })
+    supabase
+      .from('post_comments')
+      .select('id', { count: 'exact', head: true })
+      .eq('post_id', story.id)
+      .then(({ count }) => {
+        if (!cancelled) setCommentCount(count || 0)
+      })
+    return () => { cancelled = true }
+  }, [story?.id, user])
 
   const goNext = () => {
     if (!group) return onClose()
@@ -80,6 +113,74 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
     const width = window.innerWidth
     if (x < width * 0.35) goPrev()
     else goNext()
+  }
+
+  const handleToggleLike = async () => {
+    if (!user) return
+    if (liked) {
+      setLiked(false)
+      await supabase.from('post_likes').delete().match({ post_id: story.id, user_id: user.id })
+    } else {
+      setLiked(true)
+      await supabase.from('post_likes').insert({ post_id: story.id, user_id: user.id })
+    }
+  }
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/influenceur/${group.influenceurId}`
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `Story de ${group.nom}`, url })
+      } catch {
+        // partage annulé par l'utilisateur, on ignore
+      }
+    } else {
+      await navigator.clipboard.writeText(url)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    }
+  }
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || sending) return
+    setSending(true)
+    const contenu = messageText
+
+    const { data: existing } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('client_id', user.id)
+      .eq('influenceur_id', group.influenceurId)
+      .is('offre_id', null)
+      .maybeSingle()
+
+    let conversationId = existing?.id
+
+    if (!conversationId) {
+      const { data: conv, error } = await supabase
+        .from('conversations')
+        .insert({ client_id: user.id, influenceur_id: group.influenceurId, offre_id: null })
+        .select('id')
+        .single()
+
+      if (error) {
+        setSending(false)
+        return
+      }
+      conversationId = conv.id
+    }
+
+    await supabase.from('messages').insert({
+      conversation_id: conversationId,
+      sender_id: user.id,
+      contenu,
+    })
+    await supabase.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId)
+
+    setMessageText('')
+    setSending(false)
+    setSent(true)
+    setTimeout(() => setSent(false), 2000)
   }
 
   const handleDelete = async () => {
@@ -212,6 +313,82 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
           </button>
         </div>
       </div>
+
+      {/* barre de contact + actions en bas, uniquement si ce n'est pas ma propre story */}
+      {!isOwner && (
+        <div
+          className="absolute bottom-0 left-0 right-0 px-3 flex items-center gap-2"
+          style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))', paddingTop: '12px' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex-1 flex items-center h-11 rounded-full border border-white/40 px-4">
+            <input
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              onFocus={() => setPaused(true)}
+              onBlur={() => setPaused(false)}
+              placeholder="Entrer en contact..."
+              className="flex-1 bg-transparent outline-none text-white text-body placeholder:text-white/60"
+            />
+          </div>
+
+          {messageText.trim() ? (
+            <button
+              onClick={handleSendMessage}
+              disabled={sending}
+              aria-label="Envoyer"
+              className="w-11 h-11 flex items-center justify-center text-white disabled:opacity-40 active:scale-90 transition-transform duration-200 shrink-0"
+            >
+              <Send size={22} />
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={handleToggleLike}
+                aria-label="J'aime"
+                className="w-11 h-11 flex items-center justify-center active:scale-90 transition-transform duration-200 shrink-0"
+              >
+                <Heart size={24} className={liked ? 'fill-red-500 text-red-500' : 'text-white'} strokeWidth={2} />
+              </button>
+              <button
+                onClick={() => { setPaused(true); setShowComments(true) }}
+                aria-label="Commenter"
+                className="w-11 h-11 flex items-center justify-center active:scale-90 transition-transform duration-200 shrink-0"
+              >
+                <MessageCircle size={24} className="text-white" strokeWidth={2} />
+              </button>
+              <button
+                onClick={handleShare}
+                aria-label="Partager"
+                className="w-11 h-11 flex items-center justify-center active:scale-90 transition-transform duration-200 shrink-0"
+              >
+                <Share size={22} className="text-white" strokeWidth={2} />
+              </button>
+            </>
+          )}
+
+          {sent && (
+            <span className="absolute -top-8 left-4 text-white text-caption bg-black/60 rounded-full px-3 py-1">
+              Message envoyé
+            </span>
+          )}
+          {linkCopied && (
+            <span className="absolute -top-8 left-4 text-white text-caption bg-black/60 rounded-full px-3 py-1">
+              Lien copié
+            </span>
+          )}
+        </div>
+      )}
+
+      {showComments && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <CommentsSheet
+            postId={story.id}
+            onClose={() => { setShowComments(false); setPaused(false) }}
+            onCommentAdded={() => setCommentCount((c) => c + 1)}
+          />
+        </div>
+      )}
     </div>
   )
 }
