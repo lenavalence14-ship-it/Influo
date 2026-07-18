@@ -13,7 +13,7 @@ import { useActiveStories } from '../../hooks/useActiveStories'
 const cropClasses = {
   carre: 'aspect-square',
   horizontal: 'aspect-[4/3]',
-  vertical: 'aspect-[3/4]',
+  vertical: 'aspect-[2/3]',
   vertical_45: 'aspect-[4/5]',
 }
 
