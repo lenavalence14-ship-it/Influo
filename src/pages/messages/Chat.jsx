@@ -317,7 +317,9 @@ export default function Chat() {
 
     await sendSystemMessage('🎉 Prestation validée. Les fonds sont maintenant disponibles pour l\'influenceur.')
     setCommande((c) => ({ ...c, status: 'terminee' }))
-  }if (!conversation) {
+}
+
+  if (!conversation) {
     return (
       <div className="flex justify-center py-20">
         <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
