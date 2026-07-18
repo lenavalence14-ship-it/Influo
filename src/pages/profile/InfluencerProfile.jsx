@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import Button from '../../components/ui/Button'
-import { LogOut, Plus, X, Link2, Grid3x3, Video } from 'lucide-react'
+import { LogOut, Plus, X, Link2, Grid3x3, Video, ArrowLeft } from 'lucide-react'
 import { InstagramIcon, TikTokIcon, FacebookIcon, YouTubeIcon, XIcon, SnapchatIcon } from '../../components/ui/SocialIcons'
 
 const PLATFORM_ICONS = {
@@ -112,9 +112,22 @@ export default function InfluencerProfile() {
 
   return (
     <div>
-      {/* barre du haut : icône de déconnexion, façon "..." Instagram, uniquement sur mon propre profil */}
+      {/* barre du haut, façon Instagram : flèche retour, "Influo", icône de déconnexion */}
       {isMe && (
-        <div className="flex justify-end px-5 pt-4">
+        <div className="flex items-center justify-between px-3 pt-4 pb-1">
+          <button
+            onClick={() => navigate(-1)}
+            aria-label="Retour"
+            className="w-9 h-9 flex items-center justify-center"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1
+            className="text-xl"
+            style={{ fontFamily: 'var(--font-logo)', color: '#a855f7' }}
+          >
+            Influo
+          </h1>
           <button
             onClick={async () => { await signOut(); navigate('/connexion') }}
             aria-label="Se déconnecter"
