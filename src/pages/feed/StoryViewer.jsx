@@ -112,7 +112,7 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+    <div className="fixed inset-0 z-[100] bg-black overflow-hidden">
       {/* fond flouté plein écran (uniquement si le média n'est pas déjà vertical plein écran) */}
       {story.crop_format && story.crop_format !== 'vertical' && (
         <div
@@ -121,8 +121,39 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
         />
       )}
 
-      {/* progress bars */}
-      <div className="relative flex gap-1 px-3 pt-3 shrink-0">
+      {/* media : remplit littéralement tout l'écran, y compris derrière le header */}
+      <img
+        src={story.media_url}
+        alt=""
+        className={`absolute inset-0 w-full h-full select-none ${
+          !story.crop_format || story.crop_format === 'vertical' ? 'object-cover' : 'object-contain'
+        }`}
+        draggable={false}
+      />
+      {story.texte_overlay && (
+        <div
+          className="absolute -translate-x-1/2 -translate-y-1/2 text-center font-semibold px-4 max-w-[90%] whitespace-pre-wrap"
+          style={{
+            left: `${story.texte_x ?? 50}%`,
+            top: `${story.texte_y ?? 50}%`,
+            color: story.texte_couleur || '#ffffff',
+            fontFamily: story.texte_police || 'DM Sans',
+            fontSize: `${story.texte_taille || 28}px`,
+            textShadow: '0 1px 6px rgba(0,0,0,0.5)',
+          }}
+        >
+          {story.texte_overlay}
+        </div>
+      )}
+
+      {/* zone de tap plein écran pour naviguer (sous l'UI flottante, au-dessus du média) */}
+      <div className="absolute inset-0" onClick={handleTap} />
+
+      {/* dégradé pour garder l'UI lisible par-dessus n'importe quelle image */}
+      <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
+
+      {/* progress bars (flotte par-dessus) */}
+      <div className="relative flex gap-1 px-3 pt-3 shrink-0 pointer-events-none">
         {group.stories.map((s, i) => (
           <div key={s.id} className="flex-1 h-[2.5px] rounded-full bg-white/30 overflow-hidden">
             <div
@@ -136,7 +167,7 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
         ))}
       </div>
 
-      {/* header */}
+      {/* header (flotte par-dessus) */}
       <div className="relative flex items-center justify-between px-4 py-3 shrink-0">
         <Link
           to={`/influenceur/${group.influenceurId}`}
@@ -157,14 +188,14 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
           {isOwner && (
             <>
               <button
-                onClick={() => navigate(`/publier/${story.id}/modifier`)}
+                onClick={(e) => { e.stopPropagation(); navigate(`/publier/${story.id}/modifier`) }}
                 aria-label="Modifier"
                 className="text-white w-11 h-11 flex items-center justify-center"
               >
                 <Pencil size={19} />
               </button>
               <button
-                onClick={handleDelete}
+                onClick={(e) => { e.stopPropagation(); handleDelete() }}
                 aria-label="Supprimer"
                 className="text-white w-11 h-11 flex items-center justify-center"
               >
@@ -172,37 +203,14 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
               </button>
             </>
           )}
-          <button onClick={onClose} aria-label="Fermer" className="text-white w-11 h-11 flex items-center justify-center">
+          <button
+            onClick={(e) => { e.stopPropagation(); onClose() }}
+            aria-label="Fermer"
+            className="text-white w-11 h-11 flex items-center justify-center"
+          >
             <X size={24} />
           </button>
         </div>
-      </div>
-
-      {/* media */}
-      <div className="relative flex-1 overflow-hidden" onClick={handleTap}>
-        <img
-          src={story.media_url}
-          alt=""
-          className={`relative w-full h-full select-none ${
-            !story.crop_format || story.crop_format === 'vertical' ? 'object-cover' : 'object-contain'
-          }`}
-          draggable={false}
-        />
-        {story.texte_overlay && (
-          <div
-            className="absolute -translate-x-1/2 -translate-y-1/2 text-center font-semibold px-4 max-w-[90%] whitespace-pre-wrap"
-            style={{
-              left: `${story.texte_x ?? 50}%`,
-              top: `${story.texte_y ?? 50}%`,
-              color: story.texte_couleur || '#ffffff',
-              fontFamily: story.texte_police || 'DM Sans',
-              fontSize: `${story.texte_taille || 28}px`,
-              textShadow: '0 1px 6px rgba(0,0,0,0.5)',
-            }}
-          >
-            {story.texte_overlay}
-          </div>
-        )}
       </div>
     </div>
   )
