@@ -1,62 +1,393 @@
-// Icônes officielles des plateformes — issues de Simple Icons (https://simpleicons.org), licence CC0.
-// Réutilisées telles quelles pour rester fidèles aux logos réels des plateformes.
+import { useEffect, useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
+import VerifiedBadge from '../../components/ui/VerifiedBadge'
+import Button from '../../components/ui/Button'
+import { LogOut, Plus, X, Link2 } from 'lucide-react'
+import { InstagramIcon, TikTokIcon, FacebookIcon, YouTubeIcon, XIcon, SnapchatIcon } from '../../components/ui/SocialIcons'
 
-export function InstagramIcon({ size = 16 }) {
+const PLATFORM_ICONS = {
+  instagram: InstagramIcon,
+  tiktok: TikTokIcon,
+  facebook: FacebookIcon,
+  youtube: YouTubeIcon,
+  x: XIcon,
+  snapchat: SnapchatIcon,
+}
+import PostCard from '../feed/PostCard'
+import { useActiveStories } from '../../hooks/useActiveStories'
+
+export default function InfluencerProfile() {
+  const { id } = useParams() // id du profils_influenceur ; si absent, c'est "mon" profil
+  const { user, profile, influencerProfile, signOut } = useAuth()
+  const [target, setTarget] = useState(null)
+  const [tab, setTab] = useState('publications')
+  const [posts, setPosts] = useState([])
+  const [selectedPost, setSelectedPost] = useState(null)
+  const [offres, setOffres] = useState([])
+  const [reseaux, setReseaux] = useState([])
+  const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
+  const activeStoryIds = useActiveStories()
+
+  const targetId = id || influencerProfile?.id
+  const isMe = !id || id === influencerProfile?.id
+
+  const reloadOffres = async () => {
+    const offresQuery = supabase.from('offres').select('*').eq('influenceur_id', targetId).order('created_at', { ascending: false })
+    const { data } = isMe ? await offresQuery : await offresQuery.eq('actif', true)
+    setOffres(data || [])
+  }
+
+  const offresAffichees = isMe ? offres : offres.filter((o) => o.actif)
+
+  useEffect(() => {
+    if (!targetId) { setLoading(false); return }
+
+    const load = async () => {
+      const { data: prof } = await supabase
+        .from('profils_influenceur')
+        .select('*, users(nom_complet, photo_url, email)')
+        .eq('id', targetId)
+        .maybeSingle()
+      setTarget(prof)
+
+      const { data: postsData } = await supabase
+        .from('posts')
+        .select(`
+          id, legende, crop_format, created_at,
+          post_medias(media_url, position),
+          profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
+        `)
+        .eq('influenceur_id', targetId)
+        .in('type', ['photo', 'carrousel'])
+        .order('created_at', { ascending: false })
+
+      const postIds = (postsData || []).map((p) => p.id)
+      const { data: likes } = postIds.length
+        ? await supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds)
+        : { data: [] }
+
+      const enrichedPosts = (postsData || []).map((p) => ({
+        ...p,
+        like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
+        liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === user?.id) || false,
+      }))
+      setPosts(enrichedPosts)
+
+      const offresQuery = supabase.from('offres').select('*').eq('influenceur_id', targetId).order('created_at', { ascending: false })
+      const { data: offresData } = isMe ? await offresQuery : await offresQuery.eq('actif', true)
+      setOffres(offresData || [])
+
+      const { data: reseauxData } = await supabase
+        .from('reseaux_sociaux')
+        .select('*')
+        .eq('influenceur_id', targetId)
+      setReseaux(reseauxData || [])
+
+      setLoading(false)
+    }
+    load()
+  }, [targetId])
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-20">
+        <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+      </div>
+    )
+  }
+
+  if (!target) {
+    return (
+      <div className="p-6 text-center text-[var(--text-secondary)]">
+        Profil introuvable.
+      </div>
+    )
+  }
+
+  const totalAbonnes = reseaux.reduce((sum, r) => sum + (r.nombre_abonnes || 0), 0)
+
   return (
-    <span className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
-        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.98-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.98-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-      </svg>
-    </span>
+    <div>
+      {/* header profil */}
+      <div className="px-5 pt-6 pb-4">
+        <div className="flex items-center gap-5">
+          <div className="relative shrink-0">
+            {activeStoryIds.has(target.id) ? (
+              <div className="w-20 h-20 rounded-full p-[2.5px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400">
+                <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
+                  <img
+                    src={target.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${target.id}`}
+                    alt=""
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                </div>
+              </div>
+            ) : (
+              <img
+                src={target.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${target.id}`}
+                alt=""
+                className="w-20 h-20 rounded-full object-cover"
+              />
+            )}
+            {isMe && (
+              <button
+                onClick={() => navigate('/publier?type=story')}
+                className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[var(--accent)] border-2 border-[var(--bg-primary)] flex items-center justify-center"
+                aria-label="Ajouter une story"
+              >
+                <Plus size={15} className="text-white" strokeWidth={3} />
+              </button>
+            )}
+          </div>
+          <div className="flex-1 pt-1">
+            <div className="flex items-center gap-1.5 mb-2">
+              <h1 className="text-h2 font-bold">{target.users?.nom_complet}</h1>
+              {target.verifie && <VerifiedBadge size={16} />}
+            </div>
+            <div className="flex gap-4">
+              <span className="text-small">
+                <span className="font-bold">{posts.length}</span>{' '}
+                <span className="text-[var(--text-secondary)]">publications</span>
+              </span>
+              <span className="text-small">
+                <span className="font-bold">{totalAbonnes.toLocaleString()}</span>{' '}
+                <span className="text-[var(--text-secondary)]">abonnés</span>
+              </span>
+              <span className="text-small">
+                <span className="font-bold">{offres.length}</span>{' '}
+                <span className="text-[var(--text-secondary)]">offres</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {target.bio && <p className="text-small mt-4">{target.bio}</p>}
+        {(target.pays || target.ville) && (
+          <p className="text-caption mt-1">
+            {[target.ville, target.pays].filter(Boolean).join(', ')}
+          </p>
+        )}
+
+        {/* réseaux sociaux : icône + chiffre, à plat, accumulés à côté les uns des autres */}
+        {reseaux.length > 0 && (
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            {reseaux.map((r) => {
+              const Icon = PLATFORM_ICONS[r.plateforme?.toLowerCase()]
+              return (
+                <a
+                  key={r.id}
+                  href={r.lien_profil}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1 text-caption text-[var(--text-secondary)]"
+                >
+                  {Icon ? <Icon size={13} /> : <Link2 size={13} />}
+                  {r.nombre_abonnes?.toLocaleString()}
+                </a>
+              )
+            })}
+          </div>
+        )}
+
+        <div className="mt-4 flex gap-2">
+          {isMe ? (
+            <>
+              <Button variant="glass" shape="rect" fullWidth onClick={() => navigate('/profil/modifier')}>
+                Modifier le profil
+              </Button>
+              <Button variant="glass" shape="rect" onClick={() => navigate('/dashboard')}>
+                Dashboard
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button shape="rect" fullWidth>Suivre</Button>
+              <Button variant="glass" shape="rect" fullWidth onClick={() => navigate(`/messages/nouveau?influenceur=${target.id}`)}>
+                Contacter
+              </Button>
+            </>
+          )}
+        </div>
+
+        {isMe && (
+          <button
+            onClick={async () => { await signOut(); navigate('/connexion') }}
+            className="flex items-center gap-2 text-body text-red-400 mt-4"
+          >
+            <LogOut size={15} /> Se déconnecter
+          </button>
+        )}
+      </div>
+
+      {/* onglets */}
+      <div className="flex border-t border-[var(--border)] sticky top-0 bg-[var(--bg-primary)]/90 backdrop-blur-xl z-20">
+        <button
+          onClick={() => setTab('publications')}
+          className={`flex-1 py-3 text-body-medium border-b-2 transition-colors ${
+            tab === 'publications' ? 'border-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'
+          }`}
+        >
+          Publications
+        </button>
+        <button
+          onClick={() => setTab('offres')}
+          className={`flex-1 py-3 text-body-medium border-b-2 transition-colors ${
+            tab === 'offres' ? 'border-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'
+          }`}
+        >
+          Offres
+        </button>
+      </div>
+
+      {/* contenu onglet */}
+      {tab === 'publications' ? (
+        <div className="grid grid-cols-3 gap-0.5 p-0.5">
+          {posts.length === 0 ? (
+            <div className="col-span-3 py-16 text-center text-[var(--text-secondary)] text-body">
+              Aucune publication.
+            </div>
+          ) : (
+            posts.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setSelectedPost(p)}
+                className="aspect-square bg-black/20"
+              >
+                {p.post_medias?.[0]?.media_url && (
+                  <img src={p.post_medias[0].media_url} alt="" className="w-full h-full object-cover" />
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="p-4 space-y-4">
+          {isMe && (
+            <button
+              onClick={() => navigate('/offre/nouvelle')}
+              className="glass rounded-2xl px-4 py-3 text-body-medium w-full"
+            >
+              + Nouvelle offre
+            </button>
+          )}
+          {offresAffichees.length === 0 ? (
+            <div className="py-16 text-center text-[var(--text-secondary)] text-body">
+              Aucune offre disponible.
+            </div>
+          ) : (
+            offresAffichees.map((o) => (
+              <OfferCard key={o.id} offre={o} editable={isMe} onChange={reloadOffres} />
+            ))
+          )}
+        </div>
+      )}
+
+      {selectedPost && (
+        <div className="fixed inset-0 z-[100] bg-[var(--bg-primary)] overflow-y-auto">
+          <div className="flex items-center px-4 py-3 sticky top-0 bg-[var(--bg-primary)]/90 backdrop-blur-xl z-10">
+            <button
+              onClick={() => setSelectedPost(null)}
+              aria-label="Fermer"
+              className="w-11 h-11 -ml-2 flex items-center justify-center"
+            >
+              <X size={22} />
+            </button>
+          </div>
+          <div className="px-4 pb-6">
+            <PostCard
+              post={selectedPost}
+              onDeleted={(id) => {
+                setPosts((ps) => ps.filter((p) => p.id !== id))
+                setSelectedPost(null)
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
-export function TikTokIcon({ size = 16 }) {
-  return (
-    <span className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
-        <path d="M19.589 6.686a4.793 4.793 0 0 1-3.77-4.245V2h-3.445v13.672a2.896 2.896 0 0 1-5.201 1.743l-.002-.001.002.001a2.895 2.895 0 0 1 3.183-4.51v-3.5a6.329 6.329 0 0 0-5.394 10.692 6.33 6.33 0 0 0 10.857-4.424V8.687a8.182 8.182 0 0 0 4.773 1.526V6.79a4.831 4.831 0 0 1-1.003-.104z" />
-      </svg>
-    </span>
-  )
-}
+function OfferCard({ offre, editable, onChange }) {
+  const navigate = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
 
-export function FacebookIcon({ size = 16 }) {
-  return (
-    <span className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
-        <path d="M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 1.828-.287 1.839h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z" />
-      </svg>
-    </span>
-  )
-}
+  const handleToggleActive = async (e) => {
+    e.stopPropagation()
+    await supabase.from('offres').update({ actif: !offre.actif }).eq('id', offre.id)
+    setMenuOpen(false)
+    onChange?.()
+  }
 
-export function YouTubeIcon({ size = 16 }) {
-  return (
-    <span className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
-        <path d="M23.499 6.203a3.008 3.008 0 0 0-2.089-2.089c-1.87-.501-9.4-.501-9.4-.501s-7.509-.01-9.399.501a3.008 3.008 0 0 0-2.088 2.09A31.258 31.258 0 0 0 0 12a31.258 31.258 0 0 0 .523 5.797 3.008 3.008 0 0 0 2.088 2.089c1.869.502 9.399.502 9.399.502s7.509 0 9.399-.502a3.008 3.008 0 0 0 2.09-2.089A31.258 31.258 0 0 0 24 12a31.258 31.258 0 0 0-.501-5.797ZM9.545 15.568V8.432L15.818 12l-6.273 3.568Z" />
-      </svg>
-    </span>
-  )
-}
+  const handleDelete = async (e) => {
+    e.stopPropagation()
+    if (!window.confirm('Supprimer cette offre définitivement ?')) return
+    await supabase.from('offres').delete().eq('id', offre.id)
+    setMenuOpen(false)
+    onChange?.()
+  }
 
-export function XIcon({ size = 16 }) {
-  return (
-    <span className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
-        <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" />
-      </svg>
-    </span>
-  )
-}
+  const handleEdit = (e) => {
+    e.stopPropagation()
+    navigate(`/offre/${offre.id}/modifier`)
+  }
 
-export function SnapchatIcon({ size = 16 }) {
   return (
-    <span className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
-        <path d="M12.166.008C8.885.008 6.937 2.35 6.822 5.234v.315c0 .552-.05 1.09-.14 1.616a6.5 6.5 0 0 1-1.264-.402.65.65 0 0 0-.264-.058c-.34 0-.66.243-.735.593-.09.42.15.8.53 1.02.038.02 2.79 1.62-.35 2.51-.53.15-.82.66-.68 1.17.15.53.66.82 1.17.68.09-.03.68-.19 1.35-.19.11 0 .21.01.29.02.4.44 1.9 1.9 4.03 1.9 1.35 0 2.47-.63 2.9-.92.15.13.4.28.75.28.53 0 1.01-.29 1.01-.29s2.13-.94 2.13-.94c.65-.28 1.1-.79.95-1.32-.15-.51-.65-.82-1.18-.68-.62.17-1.08.19-1.08.19-.14 0-.24-.04-.28-.06.13-.31.19-.65.19-1 0-.35-.09-.66-.24-.94l.6-1.68a11.1 11.1 0 0 0 3.35-2.19c.31-.28.44-.68.31-1.06-.13-.38-.5-.63-.9-.63-.09 0-.19.01-.28.04-.62.19-1.28.31-1.94.31-.19 0-.38-.01-.56-.03.13-.4.19-.83.19-1.26V5.55C17.5 2.3 15.35.008 12.166.008Z" />
-      </svg>
-    </span>
+    <div
+      className="glass-strong rounded-2xl overflow-hidden cursor-pointer relative"
+      onClick={() => navigate(`/offre/${offre.id}`)}
+    >
+      <div className="relative aspect-[4/3] bg-gradient-to-br from-white/10 to-transparent">
+        {offre.photo_url ? (
+          <img src={offre.photo_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] text-body">
+            Aucune image
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+
+        {!offre.actif && (
+          <div className="absolute top-3 left-3 glass rounded-full px-3 py-1 text-caption text-white">
+            Désactivée
+          </div>
+        )}
+
+        {editable && (
+          <div className="absolute top-3 right-3">
+            <button
+              onClick={(e) => { e.stopPropagation(); setMenuOpen((m) => !m) }}
+              className="glass rounded-full p-2 text-white"
+            >
+              ⋯
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 mt-2 glass-strong rounded-2xl overflow-hidden w-40 z-10">
+                <button onClick={handleEdit} className="block w-full text-left px-4 py-3 text-body text-white hover:bg-white/10">
+                  Modifier
+                </button>
+                <button onClick={handleToggleActive} className="block w-full text-left px-4 py-3 text-body text-white hover:bg-white/10">
+                  {offre.actif ? 'Désactiver' : 'Activer'}
+                </button>
+                <button onClick={handleDelete} className="block w-full text-left px-4 py-3 text-body text-red-400 hover:bg-white/10">
+                  Supprimer
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="absolute bottom-0 left-0 right-0 p-4">
+          <p className="text-white text-h1">{offre.titre}</p>
+          <div className="flex items-center gap-3 mt-1">
+            <span className="text-white font-semibold">{offre.prix} €</span>
+            <span className="text-white/70 text-body">{offre.delai_jours}j de délai</span>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
