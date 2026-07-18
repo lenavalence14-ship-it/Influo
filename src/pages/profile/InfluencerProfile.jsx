@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import Button from '../../components/ui/Button'
 import { LogOut, Plus, X } from 'lucide-react'
+import SocialIcon from '../../components/ui/SocialIcon'
 import PostCard from '../feed/PostCard'
 import { useActiveStories } from '../../hooks/useActiveStories'
 
@@ -132,15 +133,24 @@ export default function InfluencerProfile() {
               </button>
             )}
           </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-h1">{target.users?.nom_complet}</h1>
-              {target.verifie && <VerifiedBadge size={17} />}
+          <div className="flex-1 pt-1">
+            <div className="flex items-center gap-1.5 mb-2">
+              <h1 className="text-h2 font-bold">{target.users?.nom_complet}</h1>
+              {target.verifie && <VerifiedBadge size={16} />}
             </div>
-            <div className="flex gap-4 text-small">
-              <span><strong>{posts.length}</strong> <span className="text-[var(--text-secondary)]">publications</span></span>
-              <span><strong>{totalAbonnes.toLocaleString()}</strong> <span className="text-[var(--text-secondary)]">abonnés</span></span>
-              <span><strong>{offres.length}</strong> <span className="text-[var(--text-secondary)]">offres</span></span>
+            <div className="flex gap-4">
+              <span className="text-small">
+                <span className="font-bold">{posts.length}</span>{' '}
+                <span className="text-[var(--text-secondary)]">publications</span>
+              </span>
+              <span className="text-small">
+                <span className="font-bold">{totalAbonnes.toLocaleString()}</span>{' '}
+                <span className="text-[var(--text-secondary)]">abonnés</span>
+              </span>
+              <span className="text-small">
+                <span className="font-bold">{offres.length}</span>{' '}
+                <span className="text-[var(--text-secondary)]">offres</span>
+              </span>
             </div>
           </div>
         </div>
@@ -152,37 +162,38 @@ export default function InfluencerProfile() {
           </p>
         )}
 
-        {/* réseaux sociaux en pills */}
+        {/* réseaux sociaux : icône + chiffre, à plat, accumulés à côté les uns des autres */}
         {reseaux.length > 0 && (
-          <div className="flex gap-2 mt-3 flex-wrap">
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
             {reseaux.map((r) => (
               <a
                 key={r.id}
                 href={r.lien_profil}
                 target="_blank"
                 rel="noreferrer"
-                className="glass rounded-full px-3 py-2 text-caption-medium"
+                className="flex items-center gap-1 text-caption text-[var(--text-secondary)]"
               >
-                {r.plateforme} · {r.nombre_abonnes?.toLocaleString()}
+                <SocialIcon platform={r.plateforme} size={13} />
+                {r.nombre_abonnes?.toLocaleString()}
               </a>
             ))}
           </div>
         )}
 
-        <div className="mt-6 flex gap-2">
+        <div className="mt-4 flex gap-2">
           {isMe ? (
             <>
-              <Button variant="glass" fullWidth onClick={() => navigate('/profil/modifier')}>
+              <Button variant="glass" shape="rect" fullWidth onClick={() => navigate('/profil/modifier')}>
                 Modifier le profil
               </Button>
-              <Button variant="glass" onClick={() => navigate('/dashboard')}>
+              <Button variant="glass" shape="rect" onClick={() => navigate('/dashboard')}>
                 Dashboard
               </Button>
             </>
           ) : (
             <>
-              <Button fullWidth>Suivre</Button>
-              <Button variant="glass" fullWidth onClick={() => navigate(`/messages/nouveau?influenceur=${target.id}`)}>
+              <Button shape="rect" fullWidth>Suivre</Button>
+              <Button variant="glass" shape="rect" fullWidth onClick={() => navigate(`/messages/nouveau?influenceur=${target.id}`)}>
                 Contacter
               </Button>
             </>
