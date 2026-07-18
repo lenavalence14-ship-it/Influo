@@ -50,13 +50,13 @@ export default function NewConversation() {
     setSending(true)
     const influenceurId = offre?.profils_influenceur?.id || influenceurIdParam
 
-    // vérifier si une conversation existe déjà pour cette offre/ce client
+    // vérifier si une conversation existe déjà entre ce client et cet influenceur
+    // (une conversation = un couple client/influenceur, quelle que soit l'offre d'origine)
     const { data: existing } = await supabase
       .from('conversations')
       .select('id')
       .eq('client_id', user.id)
       .eq('influenceur_id', influenceurId)
-      .eq('offre_id', offreId || null)
       .maybeSingle()
 
     let conversationId = existing?.id
