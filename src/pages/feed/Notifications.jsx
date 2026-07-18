@@ -38,12 +38,6 @@ export default function Notifications() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: unreadIds } = await supabase
-        .from('notifications')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('lu', false)
-
       const { data } = await supabase
         .from('notifications')
         .select('*, from_user:from_user_id(nom_complet, photo_url, profils_influenceur(id, verifie))')
@@ -74,16 +68,15 @@ export default function Notifications() {
 
       setNotifications(enriched)
       setLoading(false)
-
-      const unreadIdSet = new Set((unreadIds || []).map((n) => n.id))
-      if (unreadIdSet.size > 0) {
-        await supabase.from('notifications').update({ lu: true }).eq('user_id', user.id).eq('lu', false)
-      }
     }
     if (user) load()
   }, [user])
 
-  const handleClick = (n) => {
+  const handleClick = async (n) => {
+    if (!n.lu) {
+      setNotifications((prev) => prev.map((item) => (item.id === n.id ? { ...item, lu: true } : item)))
+      await supabase.from('notifications').update({ lu: true }).eq('id', n.id)
+    }
     if (!n.lien_ref_id) return
     if (n.type === 'like' || n.type === 'comment') navigate('/')
     else if (n.type === 'commande') navigate('/dashboard')
@@ -184,7 +177,7 @@ export default function Notifications() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {!n.lu && <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent)]" />}
+                      {!n.lu && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#a855f7' }} />}
                       {n.post_thumbnail?.url && (
                         n.post_thumbnail.type === 'video' ? (
                           <video
