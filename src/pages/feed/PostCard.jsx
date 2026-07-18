@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Heart, MessageCircle, Send, MoreHorizontal, X, Trash2, Pencil } from 'lucide-react'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
+import { InstagramIcon, TikTokIcon } from '../../components/ui/SocialIcons'
 import Card from '../../components/ui/Card'
 import Avatar from '../../components/ui/Avatar'
 import BottomSheet from '../../components/ui/BottomSheet'
@@ -27,6 +28,12 @@ export default function PostCard({ post, onDeleted }) {
 
   const influencer = post.profils_influenceur
   const isOwner = influencer?.user_id === user?.id
+
+  // collaboration vérifiée : ce post découle d'une commande validée
+  const isCollabVerifiee = Boolean(post.commande_id)
+  const client = post.client
+  const lienInstagram = post.commandes?.lien_instagram
+  const lienTiktok = post.commandes?.lien_tiktok
 
   const toggleLike = async () => {
     if (liked) {
@@ -57,19 +64,31 @@ export default function PostCard({ post, onDeleted }) {
       <Card variant="strong">
         {/* header */}
         <div className="flex items-center justify-between p-4">
-          <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-3">
-            <Avatar src={influencer?.users?.photo_url} seed={influencer?.id} size="md" />
-            <div className="flex items-center gap-2">
-              <span className="text-small-medium">{influencer?.users?.nom_complet}</span>
-              {influencer?.verifie && <VerifiedBadge size={15} />}
-            </div>
-          </Link>
+          <div className="flex items-center gap-3 min-w-0">
+            <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-3 shrink-0">
+              <Avatar src={influencer?.users?.photo_url} seed={influencer?.id} size="md" />
+              <div className="flex items-center gap-2">
+                <span className="text-small-medium">{influencer?.users?.nom_complet}</span>
+                {influencer?.verifie && <VerifiedBadge size={15} />}
+              </div>
+            </Link>
+
+            {isCollabVerifiee && client && (
+              <>
+                <span className="text-[var(--text-secondary)] opacity-40 shrink-0">|</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Avatar src={client.photo_url} seed={client.nom_complet} size="md" />
+                  <span className="text-small-medium truncate">{client.nom_complet}</span>
+                </div>
+              </>
+            )}
+          </div>
 
           {isOwner && (
             <button
               onClick={() => setShowMenu(true)}
               aria-label="Options"
-              className="w-11 h-11 -mr-2 flex items-center justify-center text-[var(--text-secondary)]"
+              className="w-11 h-11 -mr-2 flex items-center justify-center text-[var(--text-secondary)] shrink-0"
             >
               <MoreHorizontal size={20} />
             </button>
@@ -84,7 +103,7 @@ export default function PostCard({ post, onDeleted }) {
         )}
 
         {/* actions */}
-        <div className="flex items-center gap-4 px-4 pt-3">
+        <div className="flex items-center gap-4 px-4 pt-3 flex-wrap">
           <button onClick={toggleLike} className="active:scale-90 transition-transform duration-200">
             <Heart size={24} className={liked ? 'fill-red-500 text-red-500' : ''} strokeWidth={2} />
           </button>
@@ -98,6 +117,27 @@ export default function PostCard({ post, onDeleted }) {
           <button className="active:scale-90 transition-transform duration-200">
             <Send size={22} strokeWidth={2} />
           </button>
+
+          {lienInstagram && (
+            <a
+              href={lienInstagram}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 glass rounded-full pl-3 pr-3.5 py-1.5 text-caption-medium active:scale-95 transition-transform duration-200"
+            >
+              Voir sur <InstagramIcon size={14} />
+            </a>
+          )}
+          {lienTiktok && (
+            <a
+              href={lienTiktok}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 glass rounded-full pl-3 pr-3.5 py-1.5 text-caption-medium active:scale-95 transition-transform duration-200"
+            >
+              Voir sur <TikTokIcon size={14} />
+            </a>
+          )}
         </div>
 
         {/* caption */}
