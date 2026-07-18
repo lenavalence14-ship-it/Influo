@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { ArrowLeft, Image as ImageIcon, X, Type, Check } from 'lucide-react'
+import { compressImage, compressVideo } from '../../lib/mediaCompression'
 
 const FORMATS = [
   { value: 'carre', label: '1:1', aspect: 'aspect-square' },
@@ -121,14 +122,15 @@ export default function CreatePost() {
     }
 
     for (let i = 0; i < files.length; i++) {
-      const file = files[i]
+      const rawFile = files[i]
+      const file = isVideoFile(rawFile) ? await compressVideo(rawFile) : await compressImage(rawFile)
       const fileName = `${influencerProfile.id}/${post.id}/${i}-${file.name}`
       await supabase.storage.from('posts').upload(fileName, file)
       const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
       await supabase.from('post_medias').insert({
         post_id: post.id,
         media_url: urlData.publicUrl,
-        media_type: isVideoFile(file) ? 'video' : 'image',
+        media_type: isVideoFile(rawFile) ? 'video' : 'image',
         position: i,
       })
     }
