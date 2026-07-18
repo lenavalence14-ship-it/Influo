@@ -38,6 +38,12 @@ export default function Notifications() {
 
   useEffect(() => {
     const load = async () => {
+      const { data: unreadIds } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('lu', false)
+
       const { data } = await supabase
         .from('notifications')
         .select('*, from_user:from_user_id(nom_complet, photo_url, profils_influenceur(id, verifie))')
@@ -52,11 +58,11 @@ export default function Notifications() {
       if (postIds.length > 0) {
         const { data: medias } = await supabase
           .from('post_medias')
-          .select('post_id, media_url, position')
+          .select('post_id, media_url, media_type, position')
           .in('post_id', postIds)
           .order('position', { ascending: true })
         mediaByPostId = (medias || []).reduce((acc, m) => {
-          if (!acc[m.post_id]) acc[m.post_id] = m.media_url
+          if (!acc[m.post_id]) acc[m.post_id] = { url: m.media_url, type: m.media_type }
           return acc
         }, {})
       }
@@ -69,7 +75,10 @@ export default function Notifications() {
       setNotifications(enriched)
       setLoading(false)
 
-      await supabase.from('notifications').update({ lu: true }).eq('user_id', user.id).eq('lu', false)
+      const unreadIdSet = new Set((unreadIds || []).map((n) => n.id))
+      if (unreadIdSet.size > 0) {
+        await supabase.from('notifications').update({ lu: true }).eq('user_id', user.id).eq('lu', false)
+      }
     }
     if (user) load()
   }, [user])
@@ -176,8 +185,18 @@ export default function Notifications() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {!n.lu && <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent)]" />}
-                      {n.post_thumbnail && (
-                        <img src={n.post_thumbnail} alt="" className="w-11 h-11 rounded-md object-cover" />
+                      {n.post_thumbnail?.url && (
+                        n.post_thumbnail.type === 'video' ? (
+                          <video
+                            src={n.post_thumbnail.url}
+                            className="w-11 h-11 rounded-md object-cover"
+                            muted
+                            playsInline
+                            preload="metadata"
+                          />
+                        ) : (
+                          <img src={n.post_thumbnail.url} alt="" className="w-11 h-11 rounded-md object-cover" />
+                        )
                       )}
                     </div>
                   </button>
