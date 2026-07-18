@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
 import CommentsSheet from './CommentsSheet'
+import { useActiveStories } from '../../hooks/useActiveStories'
 
 const cropClasses = {
   carre: 'aspect-square',
@@ -19,6 +20,7 @@ const cropClasses = {
 export default function PostCard({ post, onDeleted }) {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const activeStoryIds = useActiveStories()
   const [liked, setLiked] = useState(post.liked_by_me)
   const [likeCount, setLikeCount] = useState(post.like_count || 0)
   const [commentCount, setCommentCount] = useState(post.comment_count || 0)
@@ -66,7 +68,7 @@ export default function PostCard({ post, onDeleted }) {
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3 min-w-0">
             <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-3 shrink-0">
-              <Avatar src={influencer?.users?.photo_url} seed={influencer?.id} size="md" />
+              <Avatar src={influencer?.users?.photo_url} seed={influencer?.id} size="md" ring={activeStoryIds.has(influencer?.id)} />
               <div className="flex items-center gap-2">
                 <span className="text-small-medium">{influencer?.users?.nom_complet}</span>
                 {influencer?.verifie && <VerifiedBadge size={15} />}
