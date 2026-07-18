@@ -57,12 +57,12 @@ export default function InfluencerProfile() {
       const { data: postsData } = await supabase
         .from('posts')
         .select(`
-          id, legende, crop_format, created_at,
-          post_medias(media_url, position),
+          id, legende, crop_format, created_at, type,
+          post_medias(media_url, media_type, position),
           profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
         `)
         .eq('influenceur_id', targetId)
-        .in('type', ['photo', 'carrousel'])
+        .in('type', ['photo', 'carrousel', 'video'])
         .order('created_at', { ascending: false })
 
       const postIds = (postsData || []).map((p) => p.id)
@@ -287,31 +287,36 @@ export default function InfluencerProfile() {
 
       {/* contenu onglet */}
       {tab === 'publications' ? (
-        subTab === 'video' ? (
-          <div className="py-16 text-center text-[var(--text-secondary)] text-body">
-            Les vidéos arrivent bientôt.
-          </div>
-        ) : (
-        <div className="grid grid-cols-3 gap-0.5 p-0.5">
-          {posts.length === 0 ? (
-            <div className="col-span-3 py-16 text-center text-[var(--text-secondary)] text-body">
-              Aucune publication.
+        (() => {
+          const filteredPosts = posts.filter((p) =>
+            subTab === 'video' ? p.type === 'video' : p.type !== 'video'
+          )
+          return (
+            <div className="grid grid-cols-3 gap-0.5 p-0.5">
+              {filteredPosts.length === 0 ? (
+                <div className="col-span-3 py-16 text-center text-[var(--text-secondary)] text-body">
+                  {subTab === 'video' ? 'Aucune vidéo.' : 'Aucune publication.'}
+                </div>
+              ) : (
+                filteredPosts.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedPost(p)}
+                    className="aspect-[4/5] bg-black/20 relative"
+                  >
+                    {p.post_medias?.[0]?.media_url && (
+                      p.type === 'video' ? (
+                        <video src={p.post_medias[0].media_url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                      ) : (
+                        <img src={p.post_medias[0].media_url} alt="" className="w-full h-full object-cover" />
+                      )
+                    )}
+                  </button>
+                ))
+              )}
             </div>
-          ) : (
-            posts.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedPost(p)}
-                className="aspect-[4/5] bg-black/20"
-              >
-                {p.post_medias?.[0]?.media_url && (
-                  <img src={p.post_medias[0].media_url} alt="" className="w-full h-full object-cover" />
-                )}
-              </button>
-            ))
-          )}
-        </div>
-        )
+          )
+        })()
       ) : (
         <div className="p-4 space-y-4">
           {isMe && (
