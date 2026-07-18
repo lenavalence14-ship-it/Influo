@@ -10,7 +10,7 @@ import { generateReceipt } from '../../lib/receipt'
 const FORMATS = [
   { value: 'carre', label: '1:1' },
   { value: 'horizontal', label: '4:3' },
-  { value: 'vertical', label: '3:4' },
+  { value: 'vertical', label: '2:3' },
   { value: 'vertical_45', label: '4:5' },
 ]
 
@@ -421,7 +421,7 @@ export default function Chat() {
                   deliverFormat === 'carre' ? 'aspect-square'
                   : deliverFormat === 'horizontal' ? 'aspect-[4/3]'
                   : deliverFormat === 'vertical_45' ? 'aspect-[4/5]'
-                  : 'aspect-[3/4]'
+                  : 'aspect-[2/3]'
                 } rounded-2xl overflow-hidden bg-black/20`}>
                   <img src={deliverPreview} alt="" className="w-full h-full object-cover" />
                 </div>
