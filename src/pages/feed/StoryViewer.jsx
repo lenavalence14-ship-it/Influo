@@ -215,7 +215,7 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
   return (
     <div className="fixed inset-0 z-[100] bg-black overflow-hidden">
       {/* fond flouté plein écran (uniquement si le média n'est pas déjà vertical plein écran) */}
-      {story.crop_format && story.crop_format !== 'vertical' && (
+      {story.crop_format && story.crop_format !== 'vertical' && story.crop_format !== 'vertical_45' && (
         <div
           className="absolute inset-0 scale-150 blur-3xl brightness-[0.35]"
           style={{ backgroundImage: `url(${story.media_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
@@ -227,7 +227,7 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
         src={story.media_url}
         alt=""
         className={`absolute inset-0 w-full h-full select-none ${
-          !story.crop_format || story.crop_format === 'vertical' ? 'object-cover' : 'object-contain'
+          !story.crop_format || story.crop_format === 'vertical' || story.crop_format === 'vertical_45' ? 'object-cover' : 'object-contain'
         }`}
         draggable={false}
       />
