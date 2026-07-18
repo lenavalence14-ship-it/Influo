@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Trash2, Pencil } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 
@@ -125,7 +125,11 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
 
       {/* header */}
       <div className="flex items-center justify-between px-4 py-3 shrink-0">
-        <div className="flex items-center gap-2">
+        <Link
+          to={`/influenceur/${group.influenceurId}`}
+          className="flex items-center gap-2"
+          onClick={(e) => e.stopPropagation()}
+        >
           <img
             src={group.photoUrl || `https://api.dicebear.com/9.x/glass/svg?seed=${group.influenceurId}`}
             alt=""
@@ -135,7 +139,7 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
             {group.nom}
             {group.verifie && <VerifiedBadge size={14} />}
           </span>
-        </div>
+        </Link>
         <div className="flex items-center">
           {isOwner && (
             <>
@@ -163,7 +167,20 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
 
       {/* media */}
       <div className="relative flex-1 overflow-hidden" onClick={handleTap}>
-        <img src={story.media_url} alt="" className="w-full h-full object-contain select-none" draggable={false} />
+        {story.crop_format && story.crop_format !== 'vertical' && (
+          <div
+            className="absolute inset-0 scale-125 blur-2xl brightness-50"
+            style={{ backgroundImage: `url(${story.media_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+          />
+        )}
+        <img
+          src={story.media_url}
+          alt=""
+          className={`relative w-full h-full select-none ${
+            !story.crop_format || story.crop_format === 'vertical' ? 'object-cover' : 'object-contain'
+          }`}
+          draggable={false}
+        />
         {story.texte_overlay && (
           <div
             className="absolute -translate-x-1/2 -translate-y-1/2 text-center font-semibold px-4 max-w-[90%] whitespace-pre-wrap"
