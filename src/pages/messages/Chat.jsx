@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { ArrowLeft, Paperclip, Send, Camera, Download, Image as ImageIcon, Check } from 'lucide-react'
+import { ArrowLeft, Paperclip, Send, Camera, Download, Image as ImageIcon, Check, Banknote } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
+import BottomSheet from '../../components/ui/BottomSheet'
 import { generateReceipt } from '../../lib/receipt'
 import { timeShort } from '../../lib/time'
 
@@ -339,10 +340,33 @@ export default function Chat() {
           alt=""
           className="w-9 h-9 rounded-full object-cover"
         />
-        <p className="text-body-medium flex items-center gap-1.5">
+        <p className="text-body-medium flex items-center gap-1.5 flex-1 min-w-0 truncate">
           {other?.nom_complet}
           {!isInfluencer && conversation.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
         </p>
+
+        {isInfluencer && (!commande || commande.status === 'en_discussion') && (
+          <div className="relative shrink-0">
+            <div
+              className="absolute -top-9 right-1/2 translate-x-1/2 whitespace-nowrap glass-strong rounded-xl px-3 py-1.5 text-[11px]"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Recevoir le paiement
+              <div
+                className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 rotate-45"
+                style={{ background: 'var(--surface-primary)' }}
+              />
+            </div>
+            <button
+              onClick={() => setShowPaymentAsk(true)}
+              className="w-10 h-10 rounded-full flex items-center justify-center"
+              style={{ background: 'var(--accent)', color: '#fff' }}
+              aria-label="Recevoir le paiement"
+            >
+              <Banknote size={18} />
+            </button>
+          </div>
+        )}
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
@@ -378,27 +402,8 @@ export default function Chat() {
         <div ref={bottomRef} />
       </div>
 
-      {/* zone d'actions paiement selon rôle et statut */}
-      <div className="px-4 pb-2">
-        {isInfluencer && (!commande || commande.status === 'en_discussion') && !showPaymentAsk && (
-          <Button variant="glass" fullWidth onClick={() => setShowPaymentAsk(true)} className="mb-2">
-            Recevoir le paiement
-          </Button>
-        )}
-
-        {showPaymentAsk && (
-          <div className="glass-strong rounded-2xl p-3 mb-2 flex gap-2">
-            <input
-              type="number"
-              value={paymentAmount}
-              onChange={(e) => setPaymentAmount(e.target.value)}
-              placeholder="Montant en €"
-              className="flex-1 bg-transparent outline-none text-body px-2"
-            />
-            <Button onClick={handleRequestPayment}>Demander</Button>
-          </div>
-        )}
-
+      {/* zone d'actions : boutons discrets, les formulaires vivent en popup (BottomSheet) */}
+      <div className="px-4 pb-2 flex flex-col gap-1">
         {!isInfluencer && commande?.status === 'paiement_demande' && (
           <Button fullWidth onClick={handlePay} className="mb-2">
             Payer {commande.montant} €
@@ -414,14 +419,40 @@ export default function Chat() {
           </button>
         )}
 
-        {isInfluencer && commande?.status === 'paiement_effectue' && !showDeliverForm && (
+        {isInfluencer && commande?.status === 'paiement_effectue' && (
           <Button variant="glass" fullWidth onClick={() => setShowDeliverForm(true)} className="mb-2">
             Livrer la prestation
           </Button>
         )}
 
-        {isInfluencer && showDeliverForm && (
-          <div className="glass-strong rounded-2xl p-4 mb-2 space-y-3">
+        {!isInfluencer && commande?.status === 'en_attente_validation' && (
+          <Button fullWidth onClick={handleConfirmReception} className="mb-2">
+            Confirmer la réception
+          </Button>
+        )}
+      </div>
+
+      {/* popup : demande de paiement (icône cash dans le header) */}
+      {showPaymentAsk && (
+        <BottomSheet onClose={() => setShowPaymentAsk(false)} title="Recevoir le paiement">
+          <div className="px-4 pb-2 flex gap-2">
+            <input
+              type="number"
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
+              placeholder="Montant en €"
+              autoFocus
+              className="flex-1 glass rounded-2xl outline-none text-body px-4 py-3"
+            />
+            <Button onClick={handleRequestPayment} disabled={!paymentAmount}>Demander</Button>
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* popup : livraison de la prestation */}
+      {showDeliverForm && (
+        <BottomSheet onClose={() => setShowDeliverForm(false)} title="Livrer la prestation" height="tall">
+          <div className="px-4 pb-4 space-y-3">
             <p className="text-caption text-[var(--text-secondary)]">
               Envoie le média de ta publication réelle + le(s) lien(s). Elle apparaîtra comme collaboration vérifiée dans le feed.
             </p>
@@ -491,42 +522,4 @@ export default function Chat() {
                 className="flex-1"
               >
                 {deliverLoading ? 'Envoi...' : (
-                  <span className="flex items-center justify-center gap-2">
-                    <Check size={16} /> Livrer
-                  </span>
-                )}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {!isInfluencer && commande?.status === 'en_attente_validation' && (
-          <Button fullWidth onClick={handleConfirmReception} className="mb-2">
-            Confirmer la réception
-          </Button>
-        )}
-      </div>
-
-      {/* input message */}
-      <div className="px-4 pb-6 pt-2 flex items-center gap-2">
-        <button onClick={() => fileInputRef.current?.click()} className="glass rounded-full p-3 shrink-0">
-          <Paperclip size={18} />
-        </button>
-        <input ref={fileInputRef} type="file" onChange={handleFileUpload} className="hidden" />
-        <button onClick={() => cameraInputRef.current?.click()} className="glass rounded-full p-3 shrink-0">
-          <Camera size={18} />
-        </button>
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={handleFileUpload}
-          className="hidden"
-        />
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="Message..."
-          className="f
+ 
