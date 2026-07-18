@@ -6,7 +6,7 @@ export default function VideoComingSoon() {
   const { profile } = useAuth()
 
   return (
-    <div className="bg-black flex flex-col text-white" style={{ height: 'calc(100vh - 96px)' }}>
+    <div className="fixed inset-0 z-30 bg-black flex flex-col text-white">
       {/* header : + à gauche (importera un réel au lancement), "Réel collab" centré */}
       <div className="flex items-center px-4 pt-4 pb-2 relative shrink-0 z-10">
         <button
