@@ -73,7 +73,7 @@ export default function StoryBar() {
 
   return (
     <>
-      <div className="flex gap-4 overflow-x-auto px-4 py-4" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex gap-4 overflow-x-auto px-4 pt-4 pb-3" style={{ scrollbarWidth: 'none' }}>
         {profile?.role === 'influenceur' && (
           <div className="flex flex-col items-center gap-2 shrink-0 cursor-pointer" onClick={handleClickMine}>
             <div
