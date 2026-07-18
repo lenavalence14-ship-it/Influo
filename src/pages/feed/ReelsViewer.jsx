@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Heart, MessageCircle, Send, MoreVertical, Video } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft } from 'lucide-react'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
@@ -8,11 +8,14 @@ import CommentsSheet from './CommentsSheet'
 
 export default function ReelsViewer() {
   const { user } = useAuth()
+  const { postId } = useParams()
+  const navigate = useNavigate()
   const [reels, setReels] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeIndex, setActiveIndex] = useState(0)
   const containerRef = useRef(null)
   const videoRefs = useRef([])
+  const hasScrolledToStart = useRef(false)
 
   useEffect(() => {
     const load = async () => {
@@ -41,6 +44,22 @@ export default function ReelsViewer() {
     }
     load()
   }, [user])
+
+  // scrolle instantanément vers le réel demandé par l'URL, une seule fois au chargement
+  useEffect(() => {
+    if (!reels.length || hasScrolledToStart.current) return
+    if (!postId) { hasScrolledToStart.current = true; return }
+
+    const idx = reels.findIndex((r) => r.id === postId)
+    if (idx <= 0) { hasScrolledToStart.current = true; return }
+
+    const container = containerRef.current
+    const slide = container?.querySelector(`[data-index="${idx}"]`)
+    if (slide) {
+      slide.scrollIntoView({ behavior: 'instant', block: 'start' })
+    }
+    hasScrolledToStart.current = true
+  }, [reels, postId])
 
   // observe quelle vidéo est visible à l'écran pour l'autoplay
   useEffect(() => {
@@ -97,6 +116,16 @@ export default function ReelsViewer() {
       className="fixed inset-0 z-30 bg-black overflow-y-scroll snap-y snap-mandatory"
       style={{ scrollSnapType: 'y mandatory' }}
     >
+      {postId && (
+        <button
+          onClick={() => navigate(-1)}
+          aria-label="Retour"
+          className="fixed top-3 left-3 z-40 w-10 h-10 rounded-full bg-black/40 flex items-center justify-center text-white"
+          style={{ marginTop: 'env(safe-area-inset-top)' }}
+        >
+          <ArrowLeft size={20} />
+        </button>
+      )}
       {reels.map((reel, i) => (
         <ReelSlide
           key={reel.id}
