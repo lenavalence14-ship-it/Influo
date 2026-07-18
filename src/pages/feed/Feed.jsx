@@ -20,9 +20,11 @@ export default function Feed() {
       const { data } = await supabase
         .from('posts')
         .select(`
-          id, legende, crop_format, type, created_at,
+          id, legende, crop_format, type, created_at, commande_id,
           post_medias(media_url, position),
-          profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
+          profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
+          client:client_id(nom_complet, photo_url),
+          commandes(lien_instagram, lien_tiktok)
         `)
         .in('type', ['photo', 'carrousel'])
         .order('created_at', { ascending: false })
