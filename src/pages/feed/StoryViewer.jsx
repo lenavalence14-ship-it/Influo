@@ -23,6 +23,11 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
   const story = group?.stories?.[storyIndex]
   const isOwner = group?.influenceurId === myInfluencerId
 
+  // resynchronise avec les données fraîches si elles changent (ex: retour après modification d'une story)
+  useEffect(() => {
+    setLocalGroups(groups)
+  }, [groups])
+
   const goNext = () => {
     if (!group) return onClose()
     if (storyIndex < group.stories.length - 1) {
