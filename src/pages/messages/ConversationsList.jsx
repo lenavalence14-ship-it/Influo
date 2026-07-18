@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
+import { timeShort } from '../../lib/time'
 
 export default function ConversationsList() {
   const [conversations, setConversations] = useState([])
@@ -81,6 +82,11 @@ export default function ConversationsList() {
                     {lastMsg?.contenu || (c.offres?.titre && `Offre : ${c.offres.titre}`) || 'Nouvelle conversation'}
                   </p>
                 </div>
+                {lastMsg?.created_at && (
+                  <span className="text-[11px] shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                    {timeShort(lastMsg.created_at)}
+                  </span>
+                )}
               </div>
             )
           })}
