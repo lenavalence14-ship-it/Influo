@@ -8,6 +8,7 @@ const FORMATS = [
   { value: 'carre', label: '1:1', aspect: 'aspect-square' },
   { value: 'horizontal', label: '4:3', aspect: 'aspect-[4/3]' },
   { value: 'vertical', label: '3:4', aspect: 'aspect-[3/4]' },
+  { value: 'vertical_45', label: '4:5', aspect: 'aspect-[4/5]' },
 ]
 
 const TEXT_COLORS = ['#ffffff', '#000000', '#f43f5e', '#3b82f6', '#22c55e', '#eab308']
@@ -206,7 +207,7 @@ export default function CreatePost() {
             className="relative w-full max-w-[380px] aspect-[9/16] rounded-2xl overflow-hidden bg-neutral-900"
             onClick={handleMediaTap}
           >
-            {format !== 'vertical' && (
+            {format !== 'vertical' && format !== 'vertical_45' && (
               <div
                 className="absolute inset-0 scale-150 blur-3xl brightness-[0.35]"
                 style={{ backgroundImage: `url(${mainPreview})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
@@ -215,7 +216,7 @@ export default function CreatePost() {
             <img
               src={mainPreview}
               alt=""
-              className={`relative w-full h-full select-none ${format === 'vertical' ? 'object-cover' : 'object-contain'}`}
+              className={`relative w-full h-full select-none ${format === 'vertical' || format === 'vertical_45' ? 'object-cover' : 'object-contain'}`}
               draggable={false}
             />
             {texteOverlay && (
