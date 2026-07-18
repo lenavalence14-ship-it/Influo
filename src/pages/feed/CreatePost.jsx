@@ -225,7 +225,7 @@ export default function CreatePost() {
                   left: `${textePos.x}%`,
                   top: `${textePos.y}%`,
                   color: texteCouleur,
-                  fontFamily: 'DM Sans',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
                   fontSize: '28px',
                   textShadow: '0 1px 6px rgba(0,0,0,0.5)',
                 }}
