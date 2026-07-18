@@ -3,13 +3,19 @@ export default function Button({
   onClick,
   type = 'button',
   variant = 'primary', // primary | glass | ghost | danger
+  shape = 'pill', // pill | rect
   className = '',
   disabled = false,
   fullWidth = false,
 }) {
   const base =
-    'h-12 px-6 inline-flex items-center justify-center gap-2 rounded-full text-body-medium ' +
+    'h-9 px-4 inline-flex items-center justify-center gap-2 text-small-medium ' +
     'transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100'
+
+  const shapes = {
+    pill: 'rounded-full h-12 px-6 text-body-medium',
+    rect: 'rounded-lg',
+  }
 
   const variants = {
     primary: 'bg-[var(--text-primary)] text-[var(--bg-primary)] hover:opacity-90',
@@ -23,7 +29,7 @@ export default function Button({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`${base} ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${className}`}
+      className={`${base} ${shapes[shape]} ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${className}`}
     >
       {children}
     </button>
