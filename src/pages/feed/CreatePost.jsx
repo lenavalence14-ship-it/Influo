@@ -29,6 +29,7 @@ export default function CreatePost() {
   const [files, setFiles] = useState([])
   const [previews, setPreviews] = useState([]) // fichiers locaux à uploader (nouveau post)
   const [existingMediaUrls, setExistingMediaUrls] = useState([]) // médias déjà en ligne (mode édition)
+  const [existingMediaTypes, setExistingMediaTypes] = useState([]) // 'image' ou 'video' pour chaque média existant
   const [legende, setLegende] = useState('')
   const [format, setFormat] = useState(isStory ? 'vertical' : 'carre')
   const [loading, setLoading] = useState(false)
@@ -57,6 +58,7 @@ export default function CreatePost() {
         setTexteCouleur(data.texte_couleur || '#ffffff')
         const sorted = [...(data.post_medias || [])].sort((a, b) => a.position - b.position)
         setExistingMediaUrls(sorted.map((m) => m.media_url))
+        setExistingMediaTypes(sorted.map((m) => m.media_type || 'image'))
       }
       setLoadingExisting(false)
     }
@@ -70,6 +72,9 @@ export default function CreatePost() {
     setPreviews(selected.map((f) => URL.createObjectURL(f)))
     setStep('edit')
   }
+
+  const isVideoFile = (f) => f?.type?.startsWith('video/')
+  const mainIsVideo = isEditing ? existingMediaTypes[0] === 'video' : isVideoFile(files[0])
 
   const handlePublish = async () => {
     if (!isEditing && files.length === 0) return
@@ -93,11 +98,12 @@ export default function CreatePost() {
       return
     }
 
+    const hasVideo = files.some(isVideoFile)
     const { data: post, error } = await supabase
       .from('posts')
       .insert({
         influenceur_id: influencerProfile.id,
-        type: isStory ? 'story' : files.length > 1 ? 'carrousel' : 'photo',
+        type: isStory ? 'story' : hasVideo ? 'video' : files.length > 1 ? 'carrousel' : 'photo',
         legende: isStory ? null : legende,
         crop_format: format,
         expire_at: isStory ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null,
@@ -119,7 +125,12 @@ export default function CreatePost() {
       const fileName = `${influencerProfile.id}/${post.id}/${i}-${file.name}`
       await supabase.storage.from('posts').upload(fileName, file)
       const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
-      await supabase.from('post_medias').insert({ post_id: post.id, media_url: urlData.publicUrl, position: i })
+      await supabase.from('post_medias').insert({
+        post_id: post.id,
+        media_url: urlData.publicUrl,
+        media_type: isVideoFile(file) ? 'video' : 'image',
+        position: i,
+      })
     }
 
     setLoading(false)
@@ -147,12 +158,12 @@ export default function CreatePost() {
         <label className="block cursor-pointer">
           <div className={`${isStory ? 'aspect-[9/16]' : 'aspect-square'} rounded-2xl glass-strong flex flex-col items-center justify-center gap-2 text-[var(--text-secondary)]`}>
             <ImageIcon size={28} />
-            <span className="text-body">Choisir {isStory ? 'une photo' : 'une ou plusieurs photos'}</span>
+            <span className="text-body">Choisir {isStory ? 'une photo ou vidéo' : 'des photos ou vidéos'}</span>
           </div>
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,video/*"
             multiple={!isStory}
             onChange={handleFilesChange}
             className="hidden"
@@ -238,7 +249,9 @@ export default function CreatePost() {
         ) : (
           <div className="w-full max-w-[380px]">
             <div className={`relative w-full ${FORMATS.find((f) => f.value === format)?.aspect} rounded-2xl overflow-hidden bg-neutral-900`}>
-              {displayMedias.length > 1 ? (
+              {mainIsVideo ? (
+                <video src={mainPreview} className="w-full h-full object-cover" controls playsInline />
+              ) : displayMedias.length > 1 ? (
                 <div className="grid grid-cols-3 gap-1 w-full h-full">
                   {displayMedias.map((p, i) => (
                     <div key={i} className="aspect-square overflow-hidden">
