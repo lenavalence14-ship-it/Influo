@@ -16,7 +16,7 @@ export default function StoryBar() {
     const { data } = await supabase
       .from('posts')
       .select(
-        'id, influenceur_id, media_url:post_medias(media_url), texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille, created_at, profils_influenceur(id, user_id, verifie, users(nom_complet, photo_url))'
+        'id, influenceur_id, crop_format, media_url:post_medias(media_url), texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille, created_at, profils_influenceur(id, user_id, verifie, users(nom_complet, photo_url))'
       )
       .eq('type', 'story')
       .gt('expire_at', new Date().toISOString())
@@ -44,6 +44,7 @@ export default function StoryBar() {
     groupsMap.get(infId).stories.push({
       id: s.id,
       media_url: s.media_url?.[0]?.media_url,
+      crop_format: s.crop_format,
       texte_overlay: s.texte_overlay,
       texte_x: s.texte_x,
       texte_y: s.texte_y,
