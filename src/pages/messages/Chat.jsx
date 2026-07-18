@@ -522,4 +522,49 @@ export default function Chat() {
                 className="flex-1"
               >
                 {deliverLoading ? 'Envoi...' : (
- 
+ <span className="flex items-center justify-center gap-2">
+                    <Check size={16} /> Livrer
+                  </span>
+                )}
+              </Button>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* input message */}
+      <div className="px-4 pb-6 pt-2 flex items-center gap-2">
+        <button onClick={() => fileInputRef.current?.click()} className="glass rounded-full p-3 shrink-0">
+          <Paperclip size={18} />
+        </button>
+        <input ref={fileInputRef} type="file" onChange={handleFileUpload} className="hidden" />
+        <button onClick={() => cameraInputRef.current?.click()} className="glass rounded-full p-3 shrink-0">
+          <Camera size={18} />
+        </button>
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+          placeholder="Message..."
+          className="flex-1 glass rounded-full px-4 h-11 outline-none text-body"
+        />
+        <button
+          onClick={handleSend}
+          disabled={!text.trim()}
+          className="rounded-full p-3 shrink-0 disabled:opacity-40"
+          style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)' }}
+        >
+          <Send size={18} />
+        </button>
+      </div>
+    </div>
+  )
+                } 
