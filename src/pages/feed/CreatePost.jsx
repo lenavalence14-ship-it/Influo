@@ -7,7 +7,7 @@ import { ArrowLeft, Image as ImageIcon, X, Type, Check } from 'lucide-react'
 const FORMATS = [
   { value: 'carre', label: '1:1', aspect: 'aspect-square' },
   { value: 'horizontal', label: '4:3', aspect: 'aspect-[4/3]' },
-  { value: 'vertical', label: '4:5', aspect: 'aspect-[4/5]' },
+  { value: 'vertical', label: '3:4', aspect: 'aspect-[3/4]' },
 ]
 
 const TEXT_COLORS = ['#ffffff', '#000000', '#f43f5e', '#3b82f6', '#22c55e', '#eab308']
