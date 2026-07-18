@@ -64,6 +64,9 @@ export default function Chat() {
       .eq('conversation_id', id)
       .order('created_at', { ascending: true })
     setMessages(msgs || [])
+
+    const readField = isInfluencer ? 'influenceur_last_read_at' : 'client_last_read_at'
+    await supabase.from('conversations').update({ [readField]: new Date().toISOString() }).eq('id', id)
   }
 
   useEffect(() => {
