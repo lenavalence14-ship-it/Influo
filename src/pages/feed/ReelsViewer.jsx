@@ -24,7 +24,7 @@ export default function ReelsViewer() {
         .from('posts')
         .select(`
           id, legende, created_at, filtre,
-          post_medias(media_url, media_type, position),
+          post_medias(media_url, media_type, thumbnail_url, position),
           profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
         `)
         .eq('type', 'video')
@@ -170,6 +170,7 @@ function ReelSlide({ reel, index, setVideoRef, muted, onToggleMute }) {
 
   const influencer = reel.profils_influenceur
   const mediaUrl = reel.post_medias?.[0]?.media_url
+  const thumbnailUrl = reel.post_medias?.[0]?.thumbnail_url
 
   useEffect(() => {
     supabase
@@ -201,6 +202,7 @@ function ReelSlide({ reel, index, setVideoRef, muted, onToggleMute }) {
      <video
         ref={setVideoRef}
         src={mediaUrl}
+        poster={thumbnailUrl || undefined}
         className="absolute inset-0 w-full h-full object-cover"
         loop
         muted={muted}
