@@ -181,8 +181,7 @@ export default function CreatePost() {
 
     let dessinUrl = null
     if (dessinFile) {
-      const fileName = `${influencerProfile.id}/dessin-${Date.now()}.png`
-      await supabase.storage.from('posts').upload(fileName, dessinFile)
+      const fileName = `${influencerProfile.id}/dessin-${Date.now()}.png`      await supabase.storage.from('posts').upload(fileName, dessinFile)
       const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
       dessinUrl = urlData.publicUrl
     }
@@ -365,8 +364,7 @@ export default function CreatePost() {
                   </p>
                 )}
                 {el.type === 'sticker' && <span className="text-5xl">{el.contenu}</span>}
-                {el.type === 'mention' && (
-                  <span className="bg-black/40 backdrop-blur px-3 py-1.5 rounded-full text-body-medium text-white">
+                {el.type === 'mention' && (                  <span className="bg-black/40 backdrop-blur px-3 py-1.5 rounded-full text-body-medium text-white">
                     @{el.contenu}
                   </span>
                 )}
@@ -499,4 +497,54 @@ export default function CreatePost() {
                 onClick={() => setFormat(f.value)}
                 className={`flex-1 rounded-2xl py-3 text-caption-medium transition-colors ${
                   format === f.value ? 'bg-white text-black' : 'bg-white/10 text-white'
-   
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <textarea
+            value={legende}
+            onChange={(e) => setLegende(e.target.value)}
+            rows={2}
+            placeholder="Écris une légende..."
+            className="w-full rounded-2xl px-4 py-3 bg-white/10 text-white outline-none resize-none text-body placeholder:text-white/50 mb-3"
+          />
+
+          <button
+            onClick={handlePublish}
+            disabled={loading}
+            className="w-full h-12 rounded-full bg-white text-black text-body-medium disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            {loading ? 'Enregistrement...' : (
+              <>
+                <Check size={18} strokeWidth={2.5} /> {isEditing ? 'Enregistrer' : 'Publier'}
+              </>
+            )}
+          </button>
+        </footer>
+      )}
+
+      {/* story : bouton Publier flottant, pas de pied de page qui rogne la photo */}
+      {isStory && (
+        <div
+          className="shrink-0 px-4 pb-6 pt-3"
+          style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+        >
+          <button
+            onClick={handlePublish}
+            disabled={loading}
+            className="w-full h-12 rounded-full bg-white text-black text-body-medium disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            {loading ? 'Publication...' : (
+              <>
+                <Send size={16} /> {isEditing ? 'Enregistrer' : 'Publier'}
+              </>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
