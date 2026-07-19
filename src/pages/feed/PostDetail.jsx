@@ -35,15 +35,10 @@ export default function PostDetail() {
         return
       }
 
-      const { data: likes } = await supabase
-        .from('post_likes')
-        .select('post_id, user_id')
-        .eq('post_id', data.id)
-
-      const { data: comments } = await supabase
-        .from('post_comments')
-        .select('post_id')
-        .eq('post_id', data.id)
+      const [{ data: likes }, { data: comments }] = await Promise.all([
+        supabase.from('post_likes').select('post_id, user_id').eq('post_id', data.id),
+        supabase.from('post_comments').select('post_id').eq('post_id', data.id),
+      ])
 
       setPost({
         ...data,

@@ -12,14 +12,15 @@ const SIZES = {
   xxl: 'w-24 h-24',
 }
 
-export default function Avatar({ src, seed, size = 'md', className = '', ring = false }) {
+export default function Avatar({ src, seed, size = 'md', className = '', ring = false, eager = false }) {
   const fallback = `https://api.dicebear.com/9.x/glass/svg?seed=${seed || 'default'}`
+  const loading = eager ? 'eager' : 'lazy'
 
   if (ring) {
     return (
       <div className={`${SIZES[size]} rounded-full p-[2.5px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400 shrink-0 ${className}`}>
         <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
-          <img src={src || fallback} alt="" className="w-full h-full rounded-full object-cover" />
+          <img src={src || fallback} alt="" loading={loading} decoding="async" className="w-full h-full rounded-full object-cover" />
         </div>
       </div>
     )
@@ -29,6 +30,8 @@ export default function Avatar({ src, seed, size = 'md', className = '', ring = 
     <img
       src={src || fallback}
       alt=""
+      loading={loading}
+      decoding="async"
       className={`${SIZES[size]} rounded-full object-cover shrink-0 ${className}`}
     />
   )

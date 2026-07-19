@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import { ArrowLeft, Plus, Trash2, Camera } from 'lucide-react'
+import { compressImage } from '../../lib/mediaCompression'
 
 const PLATEFORMES = ['tiktok', 'instagram', 'youtube', 'facebook', 'x', 'snapchat', 'autre']
 
@@ -44,9 +45,14 @@ export default function EditProfile() {
 
     let photoUrl = profile?.photo_url || null
     if (photoFile) {
-      const ext = photoFile.name.split('.').pop()
+      // Un avatar est vu par chaque follower, sur chaque post, dans le feed, les stories,
+      // les commentaires : il n'y a pas de photo plus souvent re-téléchargée dans l'app.
+      // La compresser avant upload réduit directement le volume réseau consommé par
+      // tout le monde, pas seulement par la personne qui l'a uploadée.
+      const compressed = await compressImage(photoFile, { maxDimension: 512, quality: 0.85 })
+      const ext = compressed.name.split('.').pop()
       const fileName = `${user.id}/avatar-${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, photoFile, {
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, compressed, {
         upsert: true,
       })
       if (!uploadError) {
@@ -60,17 +66,18 @@ export default function EditProfile() {
     if (influencerProfile?.id) {
       await supabase.from('profils_influenceur').update({ bio, pays, ville }).eq('id', influencerProfile.id)
 
-      for (const r of reseaux) {
-        if (r.nom_compte) {
-          await supabase.from('reseaux_sociaux').insert({
+      const reseauxToInsert = reseaux.filter((r) => r.nom_compte)
+      await Promise.all(
+        reseauxToInsert.map((r) =>
+          supabase.from('reseaux_sociaux').insert({
             influenceur_id: influencerProfile.id,
             plateforme: r.plateforme,
             nom_compte: r.nom_compte,
             lien_profil: r.lien_profil,
             nombre_abonnes: parseInt(r.nombre_abonnes, 10) || 0,
           })
-        }
-      }
+        )
+      )
     }
 
     await refreshProfile()

@@ -1,50 +1,60 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft, Plus, Volume2, VolumeX } from 'lucide-react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import CommentsSheet from './CommentsSheet'
 import { getFilterCss } from './editor/FilterPicker'
+
+const REELS_PAGE_SIZE = 20
+
+async function fetchReels(userId) {
+  const { data } = await supabase
+    .from('posts')
+    .select(`
+      id, legende, created_at, filtre,
+      post_medias(media_url, media_type, thumbnail_url, position),
+      profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
+    `)
+    .eq('type', 'video')
+    .order('created_at', { ascending: false })
+    .limit(REELS_PAGE_SIZE)
+
+  const postIds = (data || []).map((p) => p.id)
+  const [{ data: likes }, { data: commentCounts }] = await Promise.all([
+    postIds.length
+      ? supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds)
+      : Promise.resolve({ data: [] }),
+    postIds.length
+      ? supabase.from('post_comments').select('post_id').in('post_id', postIds)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  return (data || []).map((p) => ({
+    ...p,
+    like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
+    liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === userId) || false,
+    comment_count: commentCounts?.filter((c) => c.post_id === p.id).length || 0,
+  }))
+}
+
 export default function ReelsViewer() {
   const { user } = useAuth()
   const { postId } = useParams()
   const navigate = useNavigate()
-  const [reels, setReels] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [activeIndex, setActiveIndex] = useState(0)
   const containerRef = useRef(null)
   const videoRefs = useRef([])
   const hasScrolledToStart = useRef(false)
+  const [activeIndex, setActiveIndex] = useState(0)
   const [muted, setMuted] = useState(true)
 
-  useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase
-        .from('posts')
-        .select(`
-          id, legende, created_at, filtre,
-          post_medias(media_url, media_type, thumbnail_url, position),
-          profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
-        `)
-        .eq('type', 'video')
-        .order('created_at', { ascending: false })
-
-      const postIds = (data || []).map((p) => p.id)
-      const { data: likes } = postIds.length
-        ? await supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds)
-        : { data: [] }
-
-      const enriched = (data || []).map((p) => ({
-        ...p,
-        like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
-        liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === user?.id) || false,
-      }))
-      setReels(enriched)
-      setLoading(false)
-    }
-    load()
-  }, [user])
+  const { data: reels = [], isLoading: loading } = useQuery({
+    queryKey: ['reels', user?.id],
+    queryFn: () => fetchReels(user?.id),
+    enabled: !!user,
+  })
 
   // scrolle instantanément vers le réel demandé par l'URL, une seule fois au chargement
   useEffect(() => {
@@ -54,6 +64,7 @@ export default function ReelsViewer() {
     const idx = reels.findIndex((r) => r.id === postId)
     if (idx <= 0) { hasScrolledToStart.current = true; return }
 
+    setActiveIndex(idx)
     const container = containerRef.current
     const slide = container?.querySelector(`[data-index="${idx}"]`)
     if (slide) {
@@ -72,15 +83,8 @@ export default function ReelsViewer() {
       (entries) => {
         entries.forEach((entry) => {
           const idx = Number(entry.target.dataset.index)
-          const video = videoRefs.current[idx]
-          if (!video) return
           if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
             setActiveIndex(idx)
-            video.currentTime = 0
-            video.muted = muted
-            video.play().catch(() => {})
-          } else {
-            video.pause()
           }
         })
       },
@@ -92,6 +96,24 @@ export default function ReelsViewer() {
 
     return () => observer.disconnect()
   }, [reels])
+
+  // joue uniquement la vidéo active, met en pause toutes les autres.
+  // Cet effet remplace la logique précédente qui pilotait play/pause directement
+  // depuis l'IntersectionObserver ; il centralise la décision sur activeIndex,
+  // ce qui est nécessaire maintenant que seules activeIndex-1..activeIndex+1
+  // sont montées dans le DOM (voir shouldMount plus bas).
+  useEffect(() => {
+    videoRefs.current.forEach((video, idx) => {
+      if (!video) return
+      if (idx === activeIndex) {
+        video.currentTime = 0
+        video.muted = muted
+        video.play().catch(() => {})
+      } else {
+        video.pause()
+      }
+    })
+  }, [activeIndex, muted])
 
   // applique immédiatement mute/unmute à la vidéo en cours de lecture
   useEffect(() => {
@@ -152,6 +174,11 @@ export default function ReelsViewer() {
           key={reel.id}
           reel={reel}
           index={i}
+          // Précharge uniquement la vidéo visible et la suivante (comportement demandé) :
+          // on monte la balise <video> pour activeIndex-1, activeIndex et activeIndex+1.
+          // Le reste du flux n'affiche que sa miniature (poster), donc pas de téléchargement
+          // vidéo tant que le slide n'est pas sur le point d'être atteint.
+          shouldMount={Math.abs(i - activeIndex) <= 1}
           setVideoRef={(el) => (videoRefs.current[i] = el)}
           muted={muted}
           onToggleMute={() => setMuted((m) => !m)}
@@ -161,24 +188,16 @@ export default function ReelsViewer() {
   )
 }
 
-function ReelSlide({ reel, index, setVideoRef, muted, onToggleMute }) {
+const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, setVideoRef, muted, onToggleMute }) {
   const { user } = useAuth()
   const [liked, setLiked] = useState(reel.liked_by_me)
   const [likeCount, setLikeCount] = useState(reel.like_count || 0)
   const [showComments, setShowComments] = useState(false)
-  const [commentCount, setCommentCount] = useState(0)
+  const [commentCount, setCommentCount] = useState(reel.comment_count || 0)
 
   const influencer = reel.profils_influenceur
   const mediaUrl = reel.post_medias?.[0]?.media_url
   const thumbnailUrl = reel.post_medias?.[0]?.thumbnail_url
-
-  useEffect(() => {
-    supabase
-      .from('post_comments')
-      .select('id', { count: 'exact', head: true })
-      .eq('post_id', reel.id)
-      .then(({ count }) => setCommentCount(count || 0))
-  }, [reel.id])
 
   const toggleLike = async () => {
     if (!user) return
@@ -199,17 +218,29 @@ function ReelSlide({ reel, index, setVideoRef, muted, onToggleMute }) {
       className="relative w-full snap-start snap-always"
       style={{ height: '100dvh' }}
     >
-     <video
-        ref={setVideoRef}
-        src={mediaUrl}
-        poster={thumbnailUrl || undefined}
-        className="absolute inset-0 w-full h-full object-cover"
-        loop
-        muted={muted}
-        playsInline
-        preload="metadata"
-        style={{ filter: getFilterCss(reel.filtre) }}
-      />
+      {/* miniature réelle affichée tant que la vidéo n'est pas montée : jamais d'icône
+          vidéo grise, jamais d'écran noir vide pendant le chargement. */}
+      {!shouldMount && (
+        <img
+          src={thumbnailUrl || undefined}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover bg-black"
+          style={{ filter: getFilterCss(reel.filtre) }}
+        />
+      )}
+      {shouldMount && (
+        <video
+          ref={setVideoRef}
+          src={mediaUrl}
+          poster={thumbnailUrl || undefined}
+          className="absolute inset-0 w-full h-full object-cover"
+          loop
+          muted={muted}
+          playsInline
+          preload="metadata"
+          style={{ filter: getFilterCss(reel.filtre) }}
+        />
+      )}
 
       {/* dégradés pour lisibilité de l'UI */}
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
@@ -255,6 +286,8 @@ function ReelSlide({ reel, index, setVideoRef, muted, onToggleMute }) {
           <img
             src={influencer?.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${influencer?.id}`}
             alt=""
+            loading="lazy"
+            decoding="async"
             className="w-9 h-9 rounded-full object-cover shrink-0"
           />
           <span className="text-white text-body-medium flex items-center gap-1.5 truncate">
@@ -272,4 +305,4 @@ function ReelSlide({ reel, index, setVideoRef, muted, onToggleMute }) {
       )}
     </div>
   )
-}
+})

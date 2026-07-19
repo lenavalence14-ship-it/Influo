@@ -1,4 +1,4 @@
-import PostDetail from './pages/feed/PostDetail'
+import { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -7,30 +7,45 @@ import AppLayout from './components/layout/AppLayout'
 import MyProfileRouter from './components/MyProfileRouter'
 import MyDashboardRouter from './components/MyDashboardRouter'
 
+// Login est la première chose qu'un utilisateur non connecté voit : reste en import statique
+// pour éviter un flash de chargement au tout premier écran de l'app.
 import Login from './pages/auth/Login'
-import Signup from './pages/auth/Signup'
-import ForgotPassword from './pages/auth/ForgotPassword'
 
-import Feed from './pages/feed/Feed'
-import Search from './pages/feed/Search'
-import Notifications from './pages/feed/Notifications'
-import CreatePost from './pages/feed/CreatePost'
-import ReelsViewer from './pages/feed/ReelsViewer'
+// Tout le reste est chargé à la demande (code-splitting par route) : le bundle initial
+// ne contient plus l'éditeur de post, l'admin, le wallet, la messagerie, etc.
+// Cela réduit fortement le JS à parser/exécuter au démarrage, donc le temps d'ouverture de l'app.
+const Signup = lazy(() => import('./pages/auth/Signup'))
+const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'))
 
-import InfluencerProfile from './pages/profile/InfluencerProfile'
-import EditProfile from './pages/profile/EditProfile'
+const Feed = lazy(() => import('./pages/feed/Feed'))
+const Search = lazy(() => import('./pages/feed/Search'))
+const Notifications = lazy(() => import('./pages/feed/Notifications'))
+const CreatePost = lazy(() => import('./pages/feed/CreatePost'))
+const ReelsViewer = lazy(() => import('./pages/feed/ReelsViewer'))
+const PostDetail = lazy(() => import('./pages/feed/PostDetail'))
 
-import CreateOffer from './pages/offers/CreateOffer'
-import OfferDetail from './pages/offers/OfferDetail'
+const InfluencerProfile = lazy(() => import('./pages/profile/InfluencerProfile'))
+const EditProfile = lazy(() => import('./pages/profile/EditProfile'))
 
-import ConversationsList from './pages/messages/ConversationsList'
-import NewConversation from './pages/messages/NewConversation'
-import Chat from './pages/messages/Chat'
+const CreateOffer = lazy(() => import('./pages/offers/CreateOffer'))
+const OfferDetail = lazy(() => import('./pages/offers/OfferDetail'))
 
-import Wallet from './pages/wallet/Wallet'
+const ConversationsList = lazy(() => import('./pages/messages/ConversationsList'))
+const NewConversation = lazy(() => import('./pages/messages/NewConversation'))
+const Chat = lazy(() => import('./pages/messages/Chat'))
 
-import AdminDashboard from './pages/admin/AdminDashboard'
-import AdminLogin from './pages/admin/AdminLogin'
+const Wallet = lazy(() => import('./pages/wallet/Wallet'))
+
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'))
+
+function RouteFallback() {
+  return (
+    <div className="flex justify-center py-20">
+      <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+    </div>
+  )
+}
 
 function AdminRoute({ children }) {
   const { user, profile, loading } = useAuth()
@@ -41,56 +56,58 @@ function AdminRoute({ children }) {
 
 function AppRoutes() {
   return (
-    <Routes>
-      {/* Auth */}
-      <Route path="/connexion" element={<Login />} />
-      <Route path="/inscription" element={<Signup />} />
-      <Route path="/mot-de-passe-oublie" element={<ForgotPassword />} />
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        {/* Auth */}
+        <Route path="/connexion" element={<Login />} />
+        <Route path="/inscription" element={<Signup />} />
+        <Route path="/mot-de-passe-oublie" element={<ForgotPassword />} />
 
-      {/* Admin (séparé, pas de bottom nav) */}
-      <Route path="/admin/connexion" element={<AdminLogin />} />
-      <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+        {/* Admin (séparé, pas de bottom nav) */}
+        <Route path="/admin/connexion" element={<AdminLogin />} />
+        <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
-      {/* Chat (séparé, pas de bottom nav — plein écran comme Messenger) */}
-      <Route
-        path="/messages/:id"
-        element={
-          <ProtectedRoute>
-            <Chat />
-          </ProtectedRoute>
-        }
-      />
+        {/* Chat (séparé, pas de bottom nav — plein écran comme Messenger) */}
+        <Route
+          path="/messages/:id"
+          element={
+            <ProtectedRoute>
+              <Chat />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* App principale avec bottom nav */}
-      <Route
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/" element={<Feed />} />
-        <Route path="/recherche" element={<Search />} />
-        <Route path="/notifications" element={<Notifications />} />
-        <Route path="/publier" element={<CreatePost />} />
-        <Route path="/publier/:postId/modifier" element={<CreatePost />} />
-        <Route path="/video" element={<ReelsViewer />} />
-        <Route path="/video/:postId" element={<ReelsViewer />} />
-        <Route path="/post/:id" element={<PostDetail />} />
-        <Route path="/profil" element={<MyProfileRouter />} />
-        <Route path="/profil/modifier" element={<EditProfile />} />
-        <Route path="/influenceur/:id" element={<InfluencerProfile />} />
-        <Route path="/offre/nouvelle" element={<CreateOffer />} />
-        <Route path="/offre/:id/modifier" element={<CreateOffer />} />
-        <Route path="/offre/:id" element={<OfferDetail />} />
-        <Route path="/messages" element={<ConversationsList />} />
-        <Route path="/messages/nouveau" element={<NewConversation />} />
-        <Route path="/dashboard" element={<MyDashboardRouter />} />
-        <Route path="/wallet" element={<Wallet />} />
-      </Route>
+        {/* App principale avec bottom nav */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/" element={<Feed />} />
+          <Route path="/recherche" element={<Search />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/publier" element={<CreatePost />} />
+          <Route path="/publier/:postId/modifier" element={<CreatePost />} />
+          <Route path="/video" element={<ReelsViewer />} />
+          <Route path="/video/:postId" element={<ReelsViewer />} />
+          <Route path="/post/:id" element={<PostDetail />} />
+          <Route path="/profil" element={<MyProfileRouter />} />
+          <Route path="/profil/modifier" element={<EditProfile />} />
+          <Route path="/influenceur/:id" element={<InfluencerProfile />} />
+          <Route path="/offre/nouvelle" element={<CreateOffer />} />
+          <Route path="/offre/:id/modifier" element={<CreateOffer />} />
+          <Route path="/offre/:id" element={<OfferDetail />} />
+          <Route path="/messages" element={<ConversationsList />} />
+          <Route path="/messages/nouveau" element={<NewConversation />} />
+          <Route path="/dashboard" element={<MyDashboardRouter />} />
+          <Route path="/wallet" element={<Wallet />} />
+        </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }
 

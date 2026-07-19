@@ -35,6 +35,7 @@ async function fetchNotifications(userId) {
     .select('*, from_user:from_user_id(nom_complet, photo_url, profils_influenceur(id, verifie))')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
+    .limit(100)
 
   const postIds = (data || [])
     .filter((n) => (n.type === 'like' || n.type === 'comment') && n.lien_ref_id)
@@ -44,11 +45,11 @@ async function fetchNotifications(userId) {
   if (postIds.length > 0) {
     const { data: medias } = await supabase
       .from('post_medias')
-      .select('post_id, media_url, media_type, position')
+      .select('post_id, media_url, media_type, thumbnail_url, position')
       .in('post_id', postIds)
       .order('position', { ascending: true })
     mediaByPostId = (medias || []).reduce((acc, m) => {
-      if (!acc[m.post_id]) acc[m.post_id] = { url: m.media_url, type: m.media_type }
+      if (!acc[m.post_id]) acc[m.post_id] = { url: m.media_url, type: m.media_type, thumbnailUrl: m.thumbnail_url }
       return acc
     }, {})
   }
@@ -183,15 +184,25 @@ else if (n.type === 'comment') navigate(`/post/${n.lien_ref_id}?comments=1`)
                       {!n.lu && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#a855f7' }} />}
                       {n.post_thumbnail?.url && (
                         n.post_thumbnail.type === 'video' ? (
-                          <video
-                            src={n.post_thumbnail.url}
-                            className="w-11 h-11 rounded-md object-cover"
-                            muted
-                            playsInline
-                            preload="metadata"
-                          />
+                          n.post_thumbnail.thumbnailUrl ? (
+                            <img
+                              src={n.post_thumbnail.thumbnailUrl}
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                              className="w-11 h-11 rounded-md object-cover"
+                            />
+                          ) : (
+                            <div className="w-11 h-11 rounded-md bg-black/20" />
+                          )
                         ) : (
-                          <img src={n.post_thumbnail.url} alt="" className="w-11 h-11 rounded-md object-cover" />
+                          <img
+                            src={n.post_thumbnail.url}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            className="w-11 h-11 rounded-md object-cover"
+                          />
                         )
                       )}
                     </div>

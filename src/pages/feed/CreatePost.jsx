@@ -224,25 +224,42 @@ export default function CreatePost() {
       return
     }
 
-    for (let i = 0; i < files.length; i++) {
-      const rawFile = files[i]
+    // Chaque fichier du post (photo unique, carrousel, vidéo) est traité en parallèle :
+    // compression + génération de miniature + upload, au lieu d'une boucle séquentielle
+    // qui attend chaque étape de chaque fichier avant de passer au suivant. Pour un
+    // carrousel de 5 photos, cela remplace 5 allers-retours réseau successifs par 5
+    // en parallèle, et la publication se termine bien plus vite.
+    await Promise.all(files.map(async (rawFile, i) => {
       const isVideo = isVideoFile(rawFile)
-      const file = isVideo ? rawFile : await compressImage(rawFile)
-      const fileName = `${influencerProfile.id}/${post.id}/${i}-${file.name}`
-      await supabase.storage.from('posts').upload(fileName, file)
-      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
 
-      // pour une vidéo, on génère aussi une miniature (poster) pour éviter l'icône play cassée pendant le chargement
-      let thumbnailUrl = null
-      if (isVideo) {
-        const thumbFile = await generateVideoThumbnail(rawFile)
-        if (thumbFile) {
-          const thumbName = `${influencerProfile.id}/${post.id}/${i}-thumb.jpg`
-          await supabase.storage.from('posts').upload(thumbName, thumbFile)
-          const { data: thumbUrlData } = supabase.storage.from('posts').getPublicUrl(thumbName)
-          thumbnailUrl = thumbUrlData.publicUrl
-        }
+      // Compresse systématiquement avant upload : réduit le volume envoyé sur le réseau
+      // (upload) ET le volume que chaque viewer devra ensuite télécharger (download),
+      // ce qui est le levier de performance le plus direct sur connexion 4G.
+      // La génération de la miniature vidéo se fait en parallèle de la compression,
+      // pas après, car les deux lisent le fichier source indépendamment.
+      const [file, thumbFile] = await Promise.all([
+        isVideo ? compressVideo(rawFile) : compressImage(rawFile),
+        isVideo ? generateVideoThumbnail(rawFile) : Promise.resolve(null),
+      ])
+
+      const fileName = `${influencerProfile.id}/${post.id}/${i}-${file.name}`
+
+      const uploadTasks = [
+        supabase.storage.from('posts').upload(fileName, file),
+      ]
+
+      let thumbName = null
+      if (isVideo && thumbFile) {
+        thumbName = `${influencerProfile.id}/${post.id}/${i}-thumb.jpg`
+        uploadTasks.push(supabase.storage.from('posts').upload(thumbName, thumbFile))
       }
+
+      await Promise.all(uploadTasks)
+
+      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
+      const thumbnailUrl = thumbName
+        ? supabase.storage.from('posts').getPublicUrl(thumbName).data.publicUrl
+        : null
 
       await supabase.from('post_medias').insert({
         post_id: post.id,
@@ -251,7 +268,7 @@ export default function CreatePost() {
         thumbnail_url: thumbnailUrl,
         position: i,
       })
-    }
+    }))
 
     setLoading(false)
     navigate('/')
