@@ -288,9 +288,9 @@ export default function CreatePost() {
           )}
         </div>
 
-        {/* sidebar Instagram — colonne dédiée à côté de la photo, jamais en absolute par-dessus */}
+        {/* sidebar Instagram — label à gauche, icône ronde avec fond, alignée à droite */}
         {isStory && (
-          <div className="w-16 shrink-0 flex flex-col items-center justify-between py-3 pr-1">
+          <div className="w-28 shrink-0 flex flex-col items-center justify-between py-4 pr-2">
             {SIDEBAR_ITEMS.map(({ key, icon: Icon, label, enabled }) => {
               const isActive = key === 'texte' && addingText
               return (
@@ -298,10 +298,12 @@ export default function CreatePost() {
                   key={key}
                   onClick={() => enabled && handleSidebarClick(key)}
                   aria-label={enabled ? label : `${label} — bientôt disponible`}
-                  className={`flex flex-col items-center gap-1 w-full ${enabled ? '' : 'opacity-40 pointer-events-none'}`}
+                  className={`flex items-center justify-end gap-2 w-full ${enabled ? '' : 'opacity-40 pointer-events-none'}`}
                 >
-                  <Icon size={20} className={isActive ? 'bg-white text-black rounded-full p-1 box-content' : ''} />
-                  <span className="text-[10px] leading-none text-center">{label}</span>
+                  <span className="text-[13px] whitespace-nowrap">{label}</span>
+                  <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${isActive ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
+                    <Icon size={17} />
+                  </span>
                 </button>
               )
             })}
