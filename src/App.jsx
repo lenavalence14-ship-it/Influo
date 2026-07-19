@@ -75,7 +75,8 @@ function AppRoutes() {
         <Route path="/publier" element={<CreatePost />} />
         <Route path="/publier/:postId/modifier" element={<CreatePost />} />
         <Route path="/video" element={<ReelsViewer />} />
-        <Route path="/video/:postId"<Route path="/post/:id" element={<PostDetail />} /> element={<ReelsViewer />} />
+        <Route path="/video/:postId" element={<ReelsViewer />} />
+        <Route path="/post/:id" element={<PostDetail />} />
         <Route path="/profil" element={<MyProfileRouter />} />
         <Route path="/profil/modifier" element={<EditProfile />} />
         <Route path="/influenceur/:id" element={<InfluencerProfile />} />
