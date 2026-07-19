@@ -199,46 +199,47 @@ export default function CreatePost() {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col text-white">
       {/* header */}
-      <div className="flex items-center justify-between px-4 py-3 shrink-0 relative z-10">
+      <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0">
         <button
           onClick={() => (isEditing ? navigate(-1) : setStep('select'))}
-          aria-label="Fermer" className="text-white w-11 h-11 flex items-center justify-center"
+          aria-label="Fermer"
+          className="w-9 h-9 flex items-center justify-center"
         >
-          <X size={24} />
+          <X size={22} />
         </button>
-        <span className="text-white text-body-medium">
+        <span className="text-body-medium">
           {isEditing ? 'Modifier' : isStory ? 'Nouvelle story' : 'Nouvelle publication'}
         </span>
         <div className="w-9" />
       </div>
 
-      {/* preview zone */}
-      <div className="flex-1 flex items-center justify-center px-4 relative">
+      {/* zone photo, avec la sidebar Instagram répartie sur toute sa hauteur */}
+      <div className="flex-1 min-h-0 flex items-center justify-center px-4 relative">
         {isStory && (
-          <div className="absolute right-3 top-6 flex flex-col items-center gap-7 z-20">
+          <div className="absolute right-3 top-2 bottom-2 flex flex-col items-center justify-between z-20 py-2">
             {[
-              { icon: Music, label: 'Audio', disabled: true },
-              { icon: Type, label: 'Texte', disabled: false, onClick: () => setAddingText((a) => !a), active: addingText },
-              { icon: Sticker, label: 'Superposition', disabled: true },
-              { icon: Sparkles, label: 'Filtre', disabled: true },
-              { icon: PenLine, label: 'Modifier', disabled: true },
-              { icon: ImageIcon, label: 'Ratio', disabled: true },
-            ].map(({ icon: Icon, label, disabled, onClick, active }) => (
+              { icon: Music, label: 'Audio', enabled: false },
+              { icon: Type, label: 'Texte', enabled: true, onClick: () => setAddingText((a) => !a), active: addingText },
+              { icon: Sticker, label: 'Superposition', enabled: false },
+              { icon: Sparkles, label: 'Filtre', enabled: false },
+              { icon: PenLine, label: 'Modifier', enabled: false },
+              { icon: ImageIcon, label: 'Ratio', enabled: false },
+            ].map(({ icon: Icon, label, enabled, onClick, active }) => (
               <button
                 key={label}
-                onClick={onClick}
-                disabled={disabled}
-                aria-label={disabled ? `${label} — bientôt disponible` : label}
-                className={`flex flex-col items-center gap-1 w-16 shrink-0 ${disabled ? 'opacity-40' : ''} ${active ? 'text-black' : 'text-white'}`}
+                onClick={enabled ? onClick : undefined}
+                aria-label={enabled ? label : `${label} — bientôt disponible`}
+                className={`flex flex-col items-center gap-1 w-16 shrink-0 ${enabled ? '' : 'opacity-40 pointer-events-none'}`}
               >
-                <Icon size={20} className={active ? 'bg-white rounded-full p-1 box-content' : ''} />
-                <span className="text-white text-[10px] leading-none text-center whitespace-nowrap">{label}</span>
+                <Icon size={20} className={active ? 'bg-white text-black rounded-full p-1 box-content' : ''} />
+                <span className="text-[10px] leading-none text-center whitespace-nowrap">{label}</span>
               </button>
             ))}
           </div>
         )}
+
         {isStory ? (
           <div
             className="relative w-full max-w-[380px] aspect-[9/16] rounded-2xl overflow-hidden bg-neutral-900"
@@ -298,7 +299,7 @@ export default function CreatePost() {
         )}
       </div>
 
-      {/* text input popover for story */}
+      {/* popover saisie texte (story) */}
       {isStory && addingText && (
         <div className="px-4 pb-3 shrink-0">
           <div className="flex items-center gap-2 mb-2">
@@ -322,7 +323,7 @@ export default function CreatePost() {
         </div>
       )}
 
-      {/* bas : miniature + bouton publier, façon Instagram */}
+      {/* bas : miniature + ratio + légende + publier, façon Instagram */}
       <div className="shrink-0 px-4 pb-6 pt-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
         <div className="flex items-center gap-3 mb-3">
           <div className="w-11 h-11 rounded-lg overflow-hidden border-2 border-white shrink-0 bg-neutral-800">
@@ -341,45 +342,28 @@ export default function CreatePost() {
           </button>
         </div>
 
-        {isStory && (
-          <div className="flex gap-2 mb-3">
-            {FORMATS.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setFormat(f.value)}
-                className={`flex-1 rounded-2xl py-3 text-caption-medium transition-colors ${
-                  format === f.value ? 'bg-white text-black' : 'bg-white/10 text-white'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex gap-2 mb-3">
+          {FORMATS.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setFormat(f.value)}
+              className={`flex-1 rounded-2xl py-3 text-caption-medium transition-colors ${
+                format === f.value ? 'bg-white text-black' : 'bg-white/10 text-white'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
 
         {!isStory && (
-          <>
-            <div className="flex gap-2 mb-3">
-              {FORMATS.map((f) => (
-                <button
-                  key={f.value}
-                  onClick={() => setFormat(f.value)}
-                  className={`flex-1 rounded-2xl py-3 text-caption-medium transition-colors ${
-                    format === f.value ? 'bg-white text-black' : 'bg-white/10 text-white'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <textarea
-              value={legende}
-              onChange={(e) => setLegende(e.target.value)}
-              rows={2}
-              placeholder="Écris une légende..."
-              className="w-full rounded-2xl px-4 py-3 bg-white/10 text-white outline-none resize-none text-body placeholder:text-white/50 mb-3"
-            />
-          </>
+          <textarea
+            value={legende}
+            onChange={(e) => setLegende(e.target.value)}
+            rows={2}
+            placeholder="Écris une légende..."
+            className="w-full rounded-2xl px-4 py-3 bg-white/10 text-white outline-none resize-none text-body placeholder:text-white/50 mb-3"
+          />
         )}
 
         <button
