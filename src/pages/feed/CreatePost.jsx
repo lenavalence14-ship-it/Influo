@@ -348,7 +348,7 @@ export default function CreatePost() {
               }`}
             >
               {mainIsVideo ? (
-                <video src={mainPreview} className="w-full h-full object-cover" controls={!isStory} playsInline style={{ filter: filterCss }} />
+                <video src={mainPreview} className="w-full h-full object-cover" controls autoPlay playsInline style={{ filter: filterCss }} />
               ) : !isStory && displayMedias.length > 1 ? (
                 <div className="grid grid-cols-3 gap-1 w-full h-full">
                   {displayMedias.map((p, i) => (
