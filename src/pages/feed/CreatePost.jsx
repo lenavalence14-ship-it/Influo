@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { Image as ImageIcon, X, Type, Check, Music, Sticker, PenLine, Sparkles } from 'lucide-react'
+import { Image as ImageIcon, X, Type, Check, Music, Sticker, PenLine, Sparkles, Plus } from 'lucide-react'
 import { compressImage, compressVideo } from '../../lib/mediaCompression'
 
 const FORMATS = [
@@ -217,30 +217,26 @@ export default function CreatePost() {
       {/* preview zone */}
       <div className="flex-1 flex items-center justify-center overflow-hidden px-4 relative">
         {isStory && (
-          <div className="absolute right-2 top-0 bottom-0 flex flex-col items-center justify-center gap-4 z-20">
-            <button
-              onClick={() => setAddingText((a) => !a)}
-              aria-label="Ajouter du texte"
-              className={`w-10 h-10 rounded-full flex items-center justify-center ${addingText ? 'bg-white text-black' : 'bg-black/40 text-white'}`}
-            >
-              <Type size={18} />
-            </button>
+          <div className="absolute right-3 top-4 flex flex-col items-center gap-5 z-20">
             {[
-              { icon: Music, label: 'Musique' },
-              { icon: Sticker, label: 'Stickers' },
-              { icon: PenLine, label: 'Dessiner' },
-              { icon: Sparkles, label: 'Effets' },
-            ].map(({ icon: Icon, label }) => (
+              { icon: Music, label: 'Audio', disabled: true },
+              { icon: Type, label: 'Texte', disabled: false, onClick: () => setAddingText((a) => !a), active: addingText },
+              { icon: Sticker, label: 'Superposition', disabled: true },
+              { icon: Sparkles, label: 'Filtre', disabled: true },
+              { icon: PenLine, label: 'Modifier', disabled: true },
+              { icon: ImageIcon, label: 'Ratio', disabled: true },
+            ].map(({ icon: Icon, label, disabled, onClick, active }) => (
               <button
                 key={label}
-                disabled
-                aria-label={`${label} — bientôt disponible`}
-                className="w-10 h-10 rounded-full bg-black/40 text-white/30 flex items-center justify-center relative"
+                onClick={onClick}
+                disabled={disabled}
+                aria-label={disabled ? `${label} — bientôt disponible` : label}
+                className={`flex flex-col items-center gap-1 ${disabled ? 'opacity-40' : ''}`}
               >
-                <Icon size={18} />
-                <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 -translate-x-full text-[10px] text-white/40 whitespace-nowrap pr-1">
-                  bientôt
-                </span>
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center ${active ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
+                  <Icon size={17} />
+                </div>
+                <span className="text-white text-[10px] leading-none">{label}</span>
               </button>
             ))}
           </div>
@@ -328,8 +324,25 @@ export default function CreatePost() {
         </div>
       )}
 
-      {/* bottom controls */}
+      {/* bas : miniature + bouton publier, façon Instagram */}
       <div className="shrink-0 px-4 pb-6 pt-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-11 h-11 rounded-lg overflow-hidden border-2 border-white shrink-0 bg-neutral-800">
+            {mainIsVideo ? (
+              <video src={mainPreview} className="w-full h-full object-cover" muted />
+            ) : (
+              <img src={mainPreview} alt="" className="w-full h-full object-cover" />
+            )}
+          </div>
+          <button
+            disabled
+            aria-label="Ajouter un média — bientôt disponible"
+            className="w-11 h-11 rounded-lg border border-white/20 flex items-center justify-center text-white/30 shrink-0"
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+
         {isStory && (
           <div className="flex gap-2 mb-3">
             {FORMATS.map((f) => (
