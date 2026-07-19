@@ -1,3 +1,4 @@
+import PostDetail from './pages/feed/PostDetail'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -74,7 +75,7 @@ function AppRoutes() {
         <Route path="/publier" element={<CreatePost />} />
         <Route path="/publier/:postId/modifier" element={<CreatePost />} />
         <Route path="/video" element={<ReelsViewer />} />
-        <Route path="/video/:postId" element={<ReelsViewer />} />
+        <Route path="/video/:postId"<Route path="/post/:id" element={<PostDetail />} /> element={<ReelsViewer />} />
         <Route path="/profil" element={<MyProfileRouter />} />
         <Route path="/profil/modifier" element={<EditProfile />} />
         <Route path="/influenceur/:id" element={<InfluencerProfile />} />
