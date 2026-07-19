@@ -16,16 +16,16 @@ export default function ReelsViewer() {
   const containerRef = useRef(null)
   const videoRefs = useRef([])
   const hasScrolledToStart = useRef(false)
-  const [muted, setMuted] = useState(false)
+  const [muted, setMuted] = useState(true)
 
   useEffect(() => {
     const load = async () => {
       const { data } = await supabase
         .from('posts')
         .select(`
-          id, legende, created_at,
-          post_medias(media_url, media_type, position),
-          profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
+          id, legende, created_at, filtre,
+post_medias(media_url, media_type, position),
+profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
         `)
         .eq('type', 'video')
         .order('created_at', { ascending: false })
