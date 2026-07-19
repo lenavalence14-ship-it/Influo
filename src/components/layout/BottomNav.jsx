@@ -24,17 +24,35 @@ function PlayIcon({ size = 24, className = '', isActive = false }) {
         </mask>
       </defs>
 
-      <rect
-        x="3"
-        y="3"
-        width="18"
-        height="18"
-        rx="5"
-        fill={isActive ? '#8b5cf6' : 'none'}
-        stroke="currentColor"
-        strokeWidth="2.2"
-        mask={isActive ? `url(#${maskId})` : undefined}
-      />
+      {isActive ? (
+        <rect
+          x="3"
+          y="3"
+          width="18"
+          height="18"
+          rx="5"
+          fill="#8b5cf6"
+          mask={`url(#${maskId})`}
+        />
+      ) : (
+        <>
+          <rect
+            x="3"
+            y="3"
+            width="18"
+            height="18"
+            rx="5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+          />
+
+          <path
+            d="M10 8L16 12L10 16V8Z"
+            fill="currentColor"
+          />
+        </>
+      )}
     </svg>
   )
 }
@@ -48,7 +66,12 @@ export default function BottomNav() {
     { to: '/', icon: Home, label: 'Accueil' },
     { to: '/recherche', icon: Search, label: 'Recherche' },
     ...(canPublish ? [{ to: '/video', icon: PlayIcon, label: 'Vidéo' }] : []),
-    { to: '/notifications', icon: Heart, label: 'Notifications', dot: hasUnreadNotifications },
+    {
+      to: '/notifications',
+      icon: Heart,
+      label: 'Notifications',
+      dot: hasUnreadNotifications,
+    },
     { to: '/profil', label: 'Profil', isAvatar: true },
   ]
 
