@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import CommentsSheet from './CommentsSheet'
-
+import { getFilterCss } from './editor/FilterPicker'
 export default function ReelsViewer() {
   const { user } = useAuth()
   const { postId } = useParams()
@@ -24,8 +24,8 @@ export default function ReelsViewer() {
         .from('posts')
         .select(`
           id, legende, created_at, filtre,
-post_medias(media_url, media_type, position),
-profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
+          post_medias(media_url, media_type, position),
+          profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
         `)
         .eq('type', 'video')
         .order('created_at', { ascending: false })
@@ -198,7 +198,7 @@ function ReelSlide({ reel, index, setVideoRef, muted, onToggleMute }) {
       className="relative w-full snap-start snap-always"
       style={{ height: '100dvh' }}
     >
-      <video
+     <video
         ref={setVideoRef}
         src={mediaUrl}
         className="absolute inset-0 w-full h-full object-cover"
@@ -206,6 +206,7 @@ function ReelSlide({ reel, index, setVideoRef, muted, onToggleMute }) {
         muted={muted}
         playsInline
         preload="metadata"
+        style={{ filter: getFilterCss(reel.filtre) }}
       />
 
       {/* dégradés pour lisibilité de l'UI */}
