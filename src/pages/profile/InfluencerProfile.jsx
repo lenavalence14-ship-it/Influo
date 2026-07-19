@@ -296,3 +296,152 @@ export default function InfluencerProfile() {
               {filteredPosts.length === 0 ? (
                 <div className="col-span-3 py-16 text-center text-[var(--text-secondary)] text-body">
                   {subTab === 'video' ? 'Aucune vidéo.' : 'Aucune publication.'}
+                </div>
+              ) : (
+                filteredPosts.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => (p.type === 'video' ? navigate(`/video/${p.id}`) : setSelectedPost(p))}
+                    className="aspect-[4/5] bg-black/20 relative"
+                  >
+                    {p.post_medias?.[0]?.media_url && (
+                      p.type === 'video' ? (
+                        <video src={p.post_medias[0].media_url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                      ) : (
+                        <img src={p.post_medias[0].media_url} alt="" className="w-full h-full object-cover" />
+                      )
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          )
+        })()
+      ) : (
+        <div className="p-4 space-y-4">
+          {isMe && (
+            <button
+              onClick={() => navigate('/offre/nouvelle')}
+              className="glass rounded-2xl px-4 py-3 text-body-medium w-full"
+            >
+              + Nouvelle offre
+            </button>
+          )}
+          {offresAffichees.length === 0 ? (
+            <div className="py-16 text-center text-[var(--text-secondary)] text-body">
+              Aucune offre disponible.
+            </div>
+          ) : (
+            offresAffichees.map((o) => (
+              <OfferCard key={o.id} offre={o} editable={isMe} onChange={reloadOffres} />
+            ))
+          )}
+        </div>
+      )}
+
+      {selectedPost && (
+        <div className="fixed inset-0 z-[100] bg-[var(--bg-primary)] overflow-y-auto">
+          <div className="flex items-center px-4 py-3 sticky top-0 bg-[var(--bg-primary)]/90 backdrop-blur-xl z-10">
+            <button
+              onClick={() => setSelectedPost(null)}
+              aria-label="Fermer"
+              className="w-11 h-11 -ml-2 flex items-center justify-center"
+            >
+              <X size={22} />
+            </button>
+          </div>
+          <div className="px-4 pb-6">
+            <PostCard
+              post={selectedPost}
+              onDeleted={(id) => {
+                setPosts((ps) => ps.filter((p) => p.id !== id))
+                setSelectedPost(null)
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OfferCard({ offre, editable, onChange }) {
+  const navigate = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  const handleToggleActive = async (e) => {
+    e.stopPropagation()
+    await supabase.from('offres').update({ actif: !offre.actif }).eq('id', offre.id)
+    setMenuOpen(false)
+    onChange?.()
+  }
+
+  const handleDelete = async (e) => {
+    e.stopPropagation()
+    if (!window.confirm('Supprimer cette offre définitivement ?')) return
+    await supabase.from('offres').delete().eq('id', offre.id)
+    setMenuOpen(false)
+    onChange?.()
+  }
+
+  const handleEdit = (e) => {
+    e.stopPropagation()
+    navigate(`/offre/${offre.id}/modifier`)
+  }
+
+  return (
+    <div
+      className="glass-strong rounded-2xl overflow-hidden cursor-pointer relative"
+      onClick={() => navigate(`/offre/${offre.id}`)}
+    >
+      <div className="relative aspect-[4/3] bg-gradient-to-br from-white/10 to-transparent">
+        {offre.photo_url ? (
+          <img src={offre.photo_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] text-body">
+            Aucune image
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+
+        {!offre.actif && (
+          <div className="absolute top-3 left-3 glass rounded-full px-3 py-1 text-caption text-white">
+            Désactivée
+          </div>
+        )}
+
+        {editable && (
+          <div className="absolute top-3 right-3">
+            <button
+              onClick={(e) => { e.stopPropagation(); setMenuOpen((m) => !m) }}
+              className="glass rounded-full p-2 text-white"
+            >
+              ⋯
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 mt-2 glass-strong rounded-2xl overflow-hidden w-40 z-10">
+                <button onClick={handleEdit} className="block w-full text-left px-4 py-3 text-body text-white hover:bg-white/10">
+                  Modifier
+                </button>
+                <button onClick={handleToggleActive} className="block w-full text-left px-4 py-3 text-body text-white hover:bg-white/10">
+                  {offre.actif ? 'Désactiver' : 'Activer'}
+                </button>
+                <button onClick={handleDelete} className="block w-full text-left px-4 py-3 text-body text-red-400 hover:bg-white/10">
+                  Supprimer
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="absolute bottom-0 left-0 right-0 p-4">
+          <p className="text-white text-h1">{offre.titre}</p>
+          <div className="flex items-center gap-3 mt-1">
+            <span className="text-white font-semibold">{offre.prix} €</span>
+            <span className="text-white/70 text-body">{offre.delai_jours}j de délai</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
