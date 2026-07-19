@@ -21,7 +21,7 @@ export default function BottomNav() {
       className="fixed bottom-0 left-0 right-0 z-40 pb-safe border-t"
       style={{ backgroundColor: 'var(--surface-primary)', borderColor: 'var(--border)' }}
     >
-      <div className="px-2 py-1">
+      <div className="px-2 py-0.5">
         <div className="flex items-center justify-around">
           {items.map(({ to, icon: Icon, label, dot, isAvatar }) => (
             <NavLink
@@ -30,23 +30,25 @@ export default function BottomNav() {
               end={to === '/'}
               aria-label={label}
               className={({ isActive }) =>
-                `relative flex items-center justify-center w-11 h-11 rounded-2xl transition-opacity duration-200 ${
+                `relative flex items-center justify-center w-11 h-10 rounded-2xl transition-opacity duration-200 ${
                   isActive ? 'opacity-100' : 'opacity-50'
                 }`
               }
             >
               {({ isActive }) =>
                 isAvatar ? (
-                  <img
-                    src={profile?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${profile?.id}`}
-                    alt=""
-                    className="w-[22px] h-[22px] rounded-full object-cover"
-                  />
+                  <span className={`flex items-center justify-center rounded-full ${isActive ? 'ring-2 ring-violet-500 p-0.5' : ''}`}>
+                    <img
+                      src={profile?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${profile?.id}`}
+                      alt=""
+                      className="w-[22px] h-[22px] rounded-full object-cover"
+                    />
+                  </span>
                 ) : (
                   <>
-                    <Icon size={22} strokeWidth={2.2} />
+                    <Icon size={24} strokeWidth={2.6} fill={isActive ? 'currentColor' : 'none'} />
                     {dot && (
-                      <span className="absolute top-2 right-2.5 w-2 h-2 rounded-full bg-violet-500" />
+                      <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-violet-500" />
                     )}
                   </>
                 )
