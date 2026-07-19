@@ -13,7 +13,7 @@ export function getFilterCss(key) {
   return FILTERS.find((f) => f.key === key)?.css || 'none'
 }
 
-export default function FilterPicker({ imageUrl, value, onChange }) {
+export default function FilterPicker({ imageUrl, isVideo, value, onChange }) {
   return (
     <div className="flex gap-3 overflow-x-auto px-4 pb-3 pt-2">
       {FILTERS.map((f) => (
@@ -27,12 +27,23 @@ export default function FilterPicker({ imageUrl, value, onChange }) {
               (value || 'normal') === f.key ? 'border-white' : 'border-transparent'
             }`}
           >
-            <img
-              src={imageUrl}
-              alt=""
-              className="w-full h-full object-cover"
-              style={{ filter: f.css }}
-            />
+            {isVideo ? (
+              <video
+                src={imageUrl}
+                className="w-full h-full object-cover"
+                style={{ filter: f.css }}
+                muted
+                playsInline
+                preload="metadata"
+              />
+            ) : (
+              <img
+                src={imageUrl}
+                alt=""
+                className="w-full h-full object-cover"
+                style={{ filter: f.css }}
+              />
+            )}
           </div>
           <span className="text-[11px] text-white/80">{f.label}</span>
         </button>
