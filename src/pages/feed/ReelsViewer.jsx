@@ -179,8 +179,13 @@ export default function ReelsViewer() {
           // Le reste du flux n'affiche que sa miniature (poster), donc pas de téléchargement
           // vidéo tant que le slide n'est pas sur le point d'être atteint.
           shouldMount={Math.abs(i - activeIndex) <= 1}
-          // La vidéo active charge tout son contenu (comme TikTok), les voisines montées
-          // ne préchargent que les métadonnées pour ne pas gaspiller de data avant le swipe.
+          // La vidéo active ET la suivante (i === activeIndex + 1) préchargent leur contenu
+          // en entier pendant que tu regardes la vidéo courante — comme TikTok, qui télécharge
+          // la vidéo suivante en avance pour qu'elle soit prête instantanément au swipe.
+          // Une fois chargée par le navigateur, elle reste en cache mémoire tant que la balise
+          // <video> reste montée avec la même URL (garanti par shouldMount ci-dessus) : swiper
+          // dessus ne redéclenche donc aucun nouveau téléchargement.
+          shouldPreload={i === activeIndex || i === activeIndex + 1}
           isActive={i === activeIndex}
           setVideoRef={(el) => (videoRefs.current[i] = el)}
           muted={muted}
@@ -191,7 +196,7 @@ export default function ReelsViewer() {
   )
 }
 
-const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, isActive, setVideoRef, muted, onToggleMute }) {
+const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPreload, isActive, setVideoRef, muted, onToggleMute }) {
   const { user } = useAuth()
   const [liked, setLiked] = useState(reel.liked_by_me)
   const [likeCount, setLikeCount] = useState(reel.like_count || 0)
@@ -240,11 +245,10 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, isActive, 
           loop
           muted={muted}
           playsInline
-          // La vidéo active télécharge tout son contenu dès maintenant (comme TikTok
-          // précharge la vidéo en cours). Les vidéos voisines déjà montées (précédente/
-          // suivante) ne chargent que les métadonnées, pour ne pas gaspiller de data sur
-          // des vidéos qui ne seront peut-être jamais regardées.
-          preload={isActive ? 'auto' : 'metadata'}
+          // La vidéo active ET la suivante téléchargent leur contenu dès maintenant.
+          // Les autres vidéos montées (celle qu'on vient de quitter, en N-1) restent en
+          // "metadata" seul : pas besoin de re-précharger une vidéo déjà vue en arrière.
+          preload={shouldPreload ? 'auto' : 'metadata'}
           style={{ filter: getFilterCss(reel.filtre) }}
         />
       )}
