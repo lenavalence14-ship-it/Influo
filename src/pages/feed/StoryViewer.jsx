@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Trash2, Pencil, Send, Heart, MessageCircle, Share } from 'lucide-react'
+import { X, Trash2, Pencil, Send, Heart, MessageCircle, Share, Volume2, VolumeX } from 'lucide-react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -10,7 +10,7 @@ import { getFilterCss } from './editor/FilterPicker'
 
 const STORY_DURATION_MS = 5000
 
-// groups: array of { influenceurId, nom, photoUrl, verifie, stories: [{id, media_url, texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille}] }
+// groups: array of { influenceurId, nom, photoUrl, verifie, stories: [{id, media_url, media_type, texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille}] }
 export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, onClose }) {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -26,14 +26,17 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
   const [liked, setLiked] = useState(false)
   const [showComments, setShowComments] = useState(false)
   const [commentCount, setCommentCount] = useState(0)
+  const [muted, setMuted] = useState(true)
   const timerRef = useRef(null)
   const rafRef = useRef(null)
   const startRef = useRef(null)
   const elapsedRef = useRef(0)
+  const videoRef = useRef(null)
 
   const group = localGroups[groupIndex]
   const story = group?.stories?.[storyIndex]
   const isOwner = group?.influenceurId === myInfluencerId
+  const isVideo = story?.media_type === 'video'
 
   // resynchronise avec les données fraîches si elles changent (ex: retour après modification d'une story)
   useEffect(() => {
@@ -85,8 +88,9 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
     }
   }
 
+  // pour les images : progression pilotée par un timer fixe de 5s
   useEffect(() => {
-    if (paused) return
+    if (paused || isVideo) return
     setProgress(0)
     startRef.current = performance.now()
 
@@ -106,7 +110,36 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
       clearTimeout(timerRef.current)
       cancelAnimationFrame(rafRef.current)
     }
-  }, [groupIndex, storyIndex, paused])
+  }, [groupIndex, storyIndex, paused, isVideo])
+
+  // pour les vidéos : progression pilotée par la lecture réelle (currentTime / duration)
+  useEffect(() => {
+    if (!isVideo) return
+    setProgress(0)
+    const video = videoRef.current
+    if (!video) return
+
+    if (paused) {
+      video.pause()
+      cancelAnimationFrame(rafRef.current)
+      return
+    }
+
+    video.muted = muted
+    video.play().catch(() => {})
+
+    const tick = () => {
+      if (video.duration) {
+        setProgress(Math.min(video.currentTime / video.duration, 1))
+      }
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+
+    return () => {
+      cancelAnimationFrame(rafRef.current)
+    }
+  }, [groupIndex, storyIndex, paused, isVideo, muted])
 
   if (!story) return null
 
@@ -225,15 +258,31 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
       )}
 
       {/* media : remplit littéralement tout l'écran, y compris derrière le header */}
-      <img
-        src={story.media_url}
-        alt=""
-        className={`absolute inset-0 w-full h-full select-none ${
-          !story.crop_format || story.crop_format === 'vertical' || story.crop_format === 'vertical_45' ? 'object-cover' : 'object-contain'
-        }`}
-        draggable={false}
-        style={{ filter: getFilterCss(story.filtre) }}
-      />
+      {isVideo ? (
+        <video
+          key={story.id}
+          ref={videoRef}
+          src={story.media_url}
+          className={`absolute inset-0 w-full h-full select-none ${
+            !story.crop_format || story.crop_format === 'vertical' || story.crop_format === 'vertical_45' ? 'object-cover' : 'object-contain'
+          }`}
+          style={{ filter: getFilterCss(story.filtre) }}
+          playsInline
+          autoPlay
+          muted={muted}
+          onEnded={goNext}
+        />
+      ) : (
+        <img
+          src={story.media_url}
+          alt=""
+          className={`absolute inset-0 w-full h-full select-none ${
+            !story.crop_format || story.crop_format === 'vertical' || story.crop_format === 'vertical_45' ? 'object-cover' : 'object-contain'
+          }`}
+          draggable={false}
+          style={{ filter: getFilterCss(story.filtre) }}
+        />
+      )}
 
       {story.dessin_url && (
         <img src={story.dessin_url} alt="" className="absolute inset-0 w-full h-full pointer-events-none" />
@@ -319,6 +368,15 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
           </span>
         </Link>
         <div className="flex items-center">
+          {isVideo && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setMuted((m) => !m) }}
+              aria-label={muted ? 'Activer le son' : 'Couper le son'}
+              className="text-white w-11 h-11 flex items-center justify-center"
+            >
+              {muted ? <VolumeX size={19} /> : <Volume2 size={19} />}
+            </button>
+          )}
           {isOwner && (
             <>
               <button
