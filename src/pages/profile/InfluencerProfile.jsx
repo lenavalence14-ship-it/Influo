@@ -57,7 +57,7 @@ export default function InfluencerProfile() {
       const { data: postsData } = await supabase
         .from('posts')
         .select(`
-          id, legende, crop_format, created_at, type,
+          id, legende, crop_format, created_at, type, filtre,
           post_medias(media_url, media_type, position),
           profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
         `)
