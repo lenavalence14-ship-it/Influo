@@ -14,6 +14,17 @@ const FORMATS = [
 
 const TEXT_COLORS = ['#ffffff', '#000000', '#f43f5e', '#3b82f6', '#22c55e', '#eab308']
 
+// Boutons de la sidebar façon Instagram. Seul "texte" a un vrai onClick câblé plus bas ;
+// les autres sont volontairement inertes (enabled: false) tant que la fonctionnalité n'existe pas.
+const SIDEBAR_ITEMS = [
+  { key: 'audio', icon: Music, label: 'Audio', enabled: false },
+  { key: 'texte', icon: Type, label: 'Texte', enabled: true },
+  { key: 'superposition', icon: Sticker, label: 'Superposition', enabled: false },
+  { key: 'filtre', icon: Sparkles, label: 'Filtre', enabled: false },
+  { key: 'modifier', icon: PenLine, label: 'Modifier', enabled: false },
+  { key: 'ratio', icon: ImageIcon, label: 'Ratio', enabled: false },
+]
+
 export default function CreatePost() {
   const [searchParams] = useSearchParams()
   const { postId } = useParams()
@@ -25,17 +36,15 @@ export default function CreatePost() {
   const [isStory, setIsStory] = useState(searchParams.get('type') === 'story')
   const [loadingExisting, setLoadingExisting] = useState(isEditing)
 
-  // step 1: sélection, step 2: éditeur plein écran
   const [step, setStep] = useState(isEditing ? 'edit' : 'select')
   const [files, setFiles] = useState([])
-  const [previews, setPreviews] = useState([]) // fichiers locaux à uploader (nouveau post)
-  const [existingMediaUrls, setExistingMediaUrls] = useState([]) // médias déjà en ligne (mode édition)
-  const [existingMediaTypes, setExistingMediaTypes] = useState([]) // 'image' ou 'video' pour chaque média existant
+  const [previews, setPreviews] = useState([])
+  const [existingMediaUrls, setExistingMediaUrls] = useState([])
+  const [existingMediaTypes, setExistingMediaTypes] = useState([])
   const [legende, setLegende] = useState('')
   const [format, setFormat] = useState(isStory ? 'vertical' : 'carre')
   const [loading, setLoading] = useState(false)
 
-  // story text overlay
   const [addingText, setAddingText] = useState(false)
   const [texteOverlay, setTexteOverlay] = useState('')
   const [textePos, setTextePos] = useState({ x: 50, y: 50 })
@@ -76,6 +85,20 @@ export default function CreatePost() {
 
   const isVideoFile = (f) => f?.type?.startsWith('video/')
   const mainIsVideo = isEditing ? existingMediaTypes[0] === 'video' : isVideoFile(files[0])
+  const displayMedias = isEditing ? existingMediaUrls : previews
+  const mainPreview = displayMedias[0]
+
+  const handleMediaTap = (e) => {
+    if (!isStory || !addingText) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * 100
+    const y = ((e.clientY - rect.top) / rect.height) * 100
+    setTextePos({ x, y })
+  }
+
+  const handleSidebarClick = (key) => {
+    if (key === 'texte') setAddingText((a) => !a)
+  }
 
   const handlePublish = async () => {
     if (!isEditing && files.length === 0) return
@@ -147,22 +170,21 @@ export default function CreatePost() {
     )
   }
 
-  // --- Étape 1 : sélection de fichier (uniquement pour une nouvelle publication) ---
+  // ============================================================
+  // ÉCRAN 1 — SÉLECTION
+  // ============================================================
   if (step === 'select') {
     return (
-      <div className="fixed inset-0 z-[100] bg-black flex flex-col text-white">
-        {/* header façon Instagram */}
-        <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0">
+      <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col">
+        <header className="flex items-center justify-between px-4 pt-3 pb-2 h-14 shrink-0">
           <button onClick={() => navigate(-1)} aria-label="Fermer" className="w-9 h-9 flex items-center justify-center">
             <X size={22} />
           </button>
           <span className="text-body-medium">{isStory ? 'Nouvelle story' : 'Nouvelle publication'}</span>
           <div className="w-9" />
-        </div>
+        </header>
 
-        {/* le sélecteur natif du téléphone reste la seule vraie source de médias en PWA :
-            on ouvre le picker au tap sur la grande carte, façon "Choisir des photos ou vidéos" d'IG */}
-        <label className="flex-1 flex flex-col items-center justify-center px-6 cursor-pointer gap-4">
+        <label className="flex-1 flex flex-col items-center justify-center px-6 gap-4 cursor-pointer">
           <div className={`${isStory ? 'aspect-[9/16] max-h-[55vh]' : 'aspect-square'} w-full max-w-[380px] rounded-2xl border-2 border-dashed border-white/15 bg-white/[0.04] flex flex-col items-center justify-center gap-3 text-white/50`}>
             <ImageIcon size={30} />
             <span className="text-body text-center px-6">
@@ -185,23 +207,12 @@ export default function CreatePost() {
     )
   }
 
-  // --- Étape 2 : éditeur plein écran ---
-  const displayMedias = isEditing ? existingMediaUrls : previews
-  const mainPreview = displayMedias[0]
-
-  const handleMediaTap = (e) => {
-    if (!isStory) return
-    if (!addingText) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = ((e.clientX - rect.left) / rect.width) * 100
-    const y = ((e.clientY - rect.top) / rect.height) * 100
-    setTextePos({ x, y })
-  }
-
+  // ============================================================
+  // ÉCRAN 2 — ÉDITION (structure neuve, calquée sur Instagram)
+  // ============================================================
   return (
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col text-white">
-      {/* header */}
-      <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0">
+    <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col">
+      <header className="flex items-center justify-between px-4 pt-3 pb-2 h-14 shrink-0">
         <button
           onClick={() => (isEditing ? navigate(-1) : setStep('select'))}
           aria-label="Fermer"
@@ -213,91 +224,90 @@ export default function CreatePost() {
           {isEditing ? 'Modifier' : isStory ? 'Nouvelle story' : 'Nouvelle publication'}
         </span>
         <div className="w-9" />
-      </div>
+      </header>
 
-      {/* zone photo, avec la sidebar Instagram répartie sur toute sa hauteur */}
-      <div className="flex-1 min-h-0 flex items-center justify-center px-4 relative">
-        {isStory && (
-          <div className="absolute right-3 top-2 bottom-2 flex flex-col items-center justify-between z-20 py-2">
-            {[
-              { icon: Music, label: 'Audio', enabled: false },
-              { icon: Type, label: 'Texte', enabled: true, onClick: () => setAddingText((a) => !a), active: addingText },
-              { icon: Sticker, label: 'Superposition', enabled: false },
-              { icon: Sparkles, label: 'Filtre', enabled: false },
-              { icon: PenLine, label: 'Modifier', enabled: false },
-              { icon: ImageIcon, label: 'Ratio', enabled: false },
-            ].map(({ icon: Icon, label, enabled, onClick, active }) => (
-              <button
-                key={label}
-                onClick={enabled ? onClick : undefined}
-                aria-label={enabled ? label : `${label} — bientôt disponible`}
-                className={`flex flex-col items-center gap-1 w-16 shrink-0 ${enabled ? '' : 'opacity-40 pointer-events-none'}`}
-              >
-                <Icon size={20} className={active ? 'bg-white text-black rounded-full p-1 box-content' : ''} />
-                <span className="text-[10px] leading-none text-center whitespace-nowrap">{label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {isStory ? (
-          <div
-            className="relative w-full max-w-[380px] aspect-[9/16] rounded-2xl overflow-hidden bg-neutral-900"
-            onClick={handleMediaTap}
-          >
-            {format !== 'vertical' && format !== 'vertical_45' && (
-              <div
-                className="absolute inset-0 scale-150 blur-3xl brightness-[0.35]"
-                style={{ backgroundImage: `url(${mainPreview})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+      {/* zone médiane : photo + sidebar, hauteur flexible mais jamais rognée */}
+      <main className="flex-1 min-h-0 flex">
+        <div className="flex-1 flex items-center justify-center px-4 py-2 min-w-0">
+          {isStory ? (
+            <div
+              className="relative w-full max-w-[380px] aspect-[9/16] max-h-full rounded-2xl overflow-hidden bg-neutral-900"
+              onClick={handleMediaTap}
+            >
+              {format !== 'vertical' && format !== 'vertical_45' && (
+                <div
+                  className="absolute inset-0 scale-150 blur-3xl brightness-[0.35]"
+                  style={{ backgroundImage: `url(${mainPreview})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                />
+              )}
+              <img
+                src={mainPreview}
+                alt=""
+                className={`relative w-full h-full select-none ${format === 'vertical' || format === 'vertical_45' ? 'object-cover' : 'object-contain'}`}
+                draggable={false}
               />
-            )}
-            <img
-              src={mainPreview}
-              alt=""
-              className={`relative w-full h-full select-none ${format === 'vertical' || format === 'vertical_45' ? 'object-cover' : 'object-contain'}`}
-              draggable={false}
-            />
-            {texteOverlay && (
-              <div
-                className="absolute -translate-x-1/2 -translate-y-1/2 text-center font-semibold px-4 max-w-[90%] whitespace-pre-wrap pointer-events-none"
-                style={{
-                  left: `${textePos.x}%`,
-                  top: `${textePos.y}%`,
-                  color: texteCouleur,
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-                  fontSize: '28px',
-                  textShadow: '0 1px 6px rgba(0,0,0,0.5)',
-                }}
-              >
-                {texteOverlay}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="w-full max-w-[380px]">
-            <div className={`relative w-full ${FORMATS.find((f) => f.value === format)?.aspect} rounded-2xl overflow-hidden bg-neutral-900`}>
-              {mainIsVideo ? (
-                <video src={mainPreview} className="w-full h-full object-cover" controls playsInline />
-              ) : displayMedias.length > 1 ? (
-                <div className="grid grid-cols-3 gap-1 w-full h-full">
-                  {displayMedias.map((p, i) => (
-                    <div key={i} className="aspect-square overflow-hidden">
-                      <img src={p} alt="" className="w-full h-full object-cover" />
-                    </div>
-                  ))}
+              {texteOverlay && (
+                <div
+                  className="absolute -translate-x-1/2 -translate-y-1/2 text-center font-semibold px-4 max-w-[90%] whitespace-pre-wrap pointer-events-none"
+                  style={{
+                    left: `${textePos.x}%`,
+                    top: `${textePos.y}%`,
+                    color: texteCouleur,
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                    fontSize: '28px',
+                    textShadow: '0 1px 6px rgba(0,0,0,0.5)',
+                  }}
+                >
+                  {texteOverlay}
                 </div>
-              ) : (
-                <img src={mainPreview} alt="" className="w-full h-full object-cover" />
               )}
             </div>
-            {isEditing && (
-              <p className="text-white/40 text-caption text-center mt-3">
-                Pour changer la photo, supprime cette publication et republie.
-              </p>
-            )}
+          ) : (
+            <div className="w-full max-w-[380px]">
+              <div className={`relative w-full ${FORMATS.find((f) => f.value === format)?.aspect} rounded-2xl overflow-hidden bg-neutral-900`}>
+                {mainIsVideo ? (
+                  <video src={mainPreview} className="w-full h-full object-cover" controls playsInline />
+                ) : displayMedias.length > 1 ? (
+                  <div className="grid grid-cols-3 gap-1 w-full h-full">
+                    {displayMedias.map((p, i) => (
+                      <div key={i} className="aspect-square overflow-hidden">
+                        <img src={p} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <img src={mainPreview} alt="" className="w-full h-full object-cover" />
+                )}
+              </div>
+              {isEditing && (
+                <p className="text-white/40 text-caption text-center mt-3">
+                  Pour changer la photo, supprime cette publication et republie.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* sidebar Instagram — colonne dédiée à côté de la photo, jamais en absolute par-dessus */}
+        {isStory && (
+          <div className="w-16 shrink-0 flex flex-col items-center justify-between py-3 pr-1">
+            {SIDEBAR_ITEMS.map(({ key, icon: Icon, label, enabled }) => {
+              const isActive = key === 'texte' && addingText
+              return (
+                <button
+                  key={key}
+                  onClick={() => enabled && handleSidebarClick(key)}
+                  aria-label={enabled ? label : `${label} — bientôt disponible`}
+                  className={`flex flex-col items-center gap-1 w-full ${enabled ? '' : 'opacity-40 pointer-events-none'}`}
+                >
+                  <Icon size={20} className={isActive ? 'bg-white text-black rounded-full p-1 box-content' : ''} />
+                  <span className="text-[10px] leading-none text-center">{label}</span>
+                </button>
+              )
+            })}
           </div>
         )}
-      </div>
+      </main>
 
       {/* popover saisie texte (story) */}
       {isStory && addingText && (
@@ -323,8 +333,8 @@ export default function CreatePost() {
         </div>
       )}
 
-      {/* bas : miniature + ratio + légende + publier, façon Instagram */}
-      <div className="shrink-0 px-4 pb-6 pt-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+      {/* pied : miniature + ratio + légende + publier */}
+      <footer className="shrink-0 px-4 pb-6 pt-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
         <div className="flex items-center gap-3 mb-3">
           <div className="w-11 h-11 rounded-lg overflow-hidden border-2 border-white shrink-0 bg-neutral-800">
             {mainIsVideo ? (
@@ -377,7 +387,7 @@ export default function CreatePost() {
             </>
           )}
         </button>
-      </div>
+      </footer>
     </div>
   )
 }
