@@ -78,7 +78,8 @@ export default function Notifications() {
       await supabase.from('notifications').update({ lu: true }).eq('id', n.id)
     }
     if (!n.lien_ref_id) return
-    if (n.type === 'like' || n.type === 'comment') navigate('/')
+    if (n.type === 'like') navigate(`/post/${n.lien_ref_id}`)
+else if (n.type === 'comment') navigate(`/post/${n.lien_ref_id}?comments=1`)
     else if (n.type === 'commande') navigate('/dashboard')
     else if (n.type === 'retrait') navigate('/wallet')
   }
