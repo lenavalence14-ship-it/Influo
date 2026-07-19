@@ -79,7 +79,7 @@ export default function CreatePost() {
     const loadPost = async () => {
       const { data } = await supabase
         .from('posts')
-        .select('*, post_medias(media_url, position)')
+      .select('*, post_medias(media_url, media_type, position)')
         .eq('id', postId)
         .maybeSingle()
 
