@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import CommentsSheet from './CommentsSheet'
 import { timeAgo } from '../../lib/time'
+import { getFilterCss } from './editor/FilterPicker'
 
 const STORY_DURATION_MS = 5000
 
@@ -231,22 +232,50 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
           !story.crop_format || story.crop_format === 'vertical' || story.crop_format === 'vertical_45' ? 'object-cover' : 'object-contain'
         }`}
         draggable={false}
+        style={{ filter: getFilterCss(story.filtre) }}
       />
-      {story.texte_overlay && (
+
+      {story.dessin_url && (
+        <img src={story.dessin_url} alt="" className="absolute inset-0 w-full h-full pointer-events-none" />
+      )}
+
+      {Array.isArray(story.elements) && story.elements.length > 0 ? (
+        story.elements.map((el) => (
+          <div
+            key={el.id}
+            className="absolute -translate-x-1/2 -translate-y-1/2"
+            style={{ left: `${el.x}%`, top: `${el.y}%` }}
+          >
+            {el.type === 'texte' && (
+              <p
+                className="text-center font-semibold px-4 max-w-[85vw] whitespace-pre-wrap"
+                style={{ color: el.couleur || '#ffffff', fontSize: '26px', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}
+              >
+                {el.contenu}
+              </p>
+            )}
+            {el.type === 'sticker' && <span className="text-5xl">{el.contenu}</span>}
+            {el.type === 'mention' && (
+              <span className="bg-black/40 backdrop-blur px-3 py-1.5 rounded-full text-body-medium text-white">
+                @{el.contenu}
+              </span>
+            )}
+          </div>
+        ))
+      ) : story.texte_overlay ? (
         <div
           className="absolute -translate-x-1/2 -translate-y-1/2 text-center font-semibold px-4 max-w-[90%] whitespace-pre-wrap"
           style={{
             left: `${story.texte_x ?? 50}%`,
             top: `${story.texte_y ?? 50}%`,
             color: story.texte_couleur || '#ffffff',
-            fontFamily: story.texte_police || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
             fontSize: `${story.texte_taille || 28}px`,
             textShadow: '0 1px 6px rgba(0,0,0,0.5)',
           }}
         >
           {story.texte_overlay}
         </div>
-      )}
+      ) : null}
 
       {/* zone de tap plein écran pour naviguer (sous l'UI flottante, au-dessus du média) */}
       <div className="absolute inset-0" onClick={handleTap} />
