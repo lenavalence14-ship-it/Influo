@@ -147,3 +147,152 @@ export default function InfluencerProfile() {
                 <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
                   <img
                     src={target.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${target.id}`}
+                    alt=""
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                </div>
+              </div>
+            ) : (
+              <img
+                src={target.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${target.id}`}
+                alt=""
+                className="w-20 h-20 rounded-full object-cover"
+              />
+            )}
+            {isMe && (
+              <button
+                onClick={() => navigate('/publier?type=story')}
+                className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[var(--accent)] border-2 border-[var(--bg-primary)] flex items-center justify-center"
+                aria-label="Ajouter une story"
+              >
+                <Plus size={15} className="text-white" strokeWidth={3} />
+              </button>
+            )}
+          </div>
+          <div className="flex-1 pt-1">
+            <div className="flex items-center gap-1.5 mb-2">
+              <h1 className="text-h2 font-bold">{target.users?.nom_complet}</h1>
+              {target.verifie && <VerifiedBadge size={16} />}
+            </div>
+            <div className="flex gap-4">
+              <span className="text-small">
+                <span className="font-bold">{posts.length}</span>{' '}
+                <span className="text-[var(--text-secondary)]">publications</span>
+              </span>
+              <span className="text-small">
+                <span className="font-bold">{totalAbonnes.toLocaleString()}</span>{' '}
+                <span className="text-[var(--text-secondary)]">abonnés</span>
+              </span>
+              <span className="text-small">
+                <span className="font-bold">{offres.length}</span>{' '}
+                <span className="text-[var(--text-secondary)]">offres</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {target.bio && <p className="text-small mt-4">{target.bio}</p>}
+        {(target.pays || target.ville) && (
+          <p className="text-caption mt-1">
+            {[target.ville, target.pays].filter(Boolean).join(', ')}
+          </p>
+        )}
+
+        {/* réseaux sociaux : icône + chiffre, à plat, accumulés à côté les uns des autres */}
+        {reseaux.length > 0 && (
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            {reseaux.map((r) => {
+              const Icon = PLATFORM_ICONS[r.plateforme?.toLowerCase()]
+              return (
+                <a
+                  key={r.id}
+                  href={r.lien_profil}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1 text-caption text-[var(--text-secondary)]"
+                >
+                  {Icon ? <Icon size={13} /> : <Link2 size={13} />}
+                  {r.nombre_abonnes?.toLocaleString()}
+                </a>
+              )
+            })}
+          </div>
+        )}
+
+        <div className="mt-4 flex gap-2">
+          {isMe ? (
+            <>
+              <Button variant="glass" shape="rect" fullWidth onClick={() => navigate('/profil/modifier')}>
+                Modifier le profil
+              </Button>
+              <Button variant="glass" shape="rect" onClick={() => navigate('/dashboard')}>
+                Dashboard
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button shape="rect" fullWidth>Suivre</Button>
+              <Button variant="glass" shape="rect" fullWidth onClick={() => navigate(`/messages/nouveau?influenceur=${target.id}`)}>
+                Contacter
+              </Button>
+            </>
+          )}
+        </div>
+
+      </div>
+
+      {/* onglets */}
+      <div className="flex border-t border-[var(--border)] sticky top-0 bg-[var(--bg-primary)]/90 backdrop-blur-xl z-20">
+        <button
+          onClick={() => setTab('publications')}
+          className={`flex-1 py-3 text-body-medium border-b-2 transition-colors ${
+            tab === 'publications' ? 'border-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'
+          }`}
+        >
+          Collaboration vérifiée
+        </button>
+        <button
+          onClick={() => setTab('offres')}
+          className={`flex-1 py-3 text-body-medium border-b-2 transition-colors ${
+            tab === 'offres' ? 'border-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'
+          }`}
+        >
+          Offre
+        </button>
+      </div>
+
+      {/* sous-barre grille / vidéo, uniquement dans l'onglet Collaboration vérifiée */}
+      {tab === 'publications' && (
+        <div className="flex border-b border-[var(--border)]">
+          <button
+            onClick={() => setSubTab('grille')}
+            aria-label="Grille"
+            className={`flex-1 py-2.5 flex items-center justify-center ${
+              subTab === 'grille' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
+            }`}
+          >
+            <Grid3x3 size={20} />
+          </button>
+          <button
+            onClick={() => setSubTab('video')}
+            aria-label="Vidéo"
+            className={`flex-1 py-2.5 flex items-center justify-center ${
+              subTab === 'video' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
+            }`}
+          >
+            <Video size={20} />
+          </button>
+        </div>
+      )}
+
+      {/* contenu onglet */}
+      {tab === 'publications' ? (
+        (() => {
+          const filteredPosts = posts.filter((p) =>
+            subTab === 'video' ? p.type === 'video' : p.type !== 'video'
+          )
+          return (
+            <div className="grid grid-cols-3 gap-0.5 p-0.5">
+              {filteredPosts.length === 0 ? (
+                <div className="col-span-3 py-16 text-center text-[var(--text-secondary)] text-body">
+                  {subTab === 'video' ? 'Aucune vidéo.' : 'Aucune publication.'}
