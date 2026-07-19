@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { ArrowLeft, Image as ImageIcon, X, Type, Check } from 'lucide-react'
+import { Image as ImageIcon, X, Type, Check, Music, Sticker, PenLine, Sparkles } from 'lucide-react'
 import { compressImage, compressVideo } from '../../lib/mediaCompression'
 
 const FORMATS = [
@@ -150,18 +150,28 @@ export default function CreatePost() {
   // --- Étape 1 : sélection de fichier (uniquement pour une nouvelle publication) ---
   if (step === 'select') {
     return (
-      <div className="px-5 pt-6 pb-6">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-caption mb-6">
-          <ArrowLeft size={16} /> Retour
-        </button>
-        <h1 className="text-h1 mb-6">
-          {isStory ? 'Nouvelle story' : 'Nouvelle publication'}
-        </h1>
-        <label className="block cursor-pointer">
-          <div className={`${isStory ? 'aspect-[9/16]' : 'aspect-square'} rounded-2xl glass-strong flex flex-col items-center justify-center gap-2 text-[var(--text-secondary)]`}>
-            <ImageIcon size={28} />
-            <span className="text-body">Choisir {isStory ? 'une photo ou vidéo' : 'des photos ou vidéos'}</span>
+      <div className="fixed inset-0 z-[100] bg-black flex flex-col text-white">
+        {/* header façon Instagram */}
+        <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0">
+          <button onClick={() => navigate(-1)} aria-label="Fermer" className="w-9 h-9 flex items-center justify-center">
+            <X size={22} />
+          </button>
+          <span className="text-body-medium">{isStory ? 'Nouvelle story' : 'Nouvelle publication'}</span>
+          <div className="w-9" />
+        </div>
+
+        {/* le sélecteur natif du téléphone reste la seule vraie source de médias en PWA :
+            on ouvre le picker au tap sur la grande carte, façon "Choisir des photos ou vidéos" d'IG */}
+        <label className="flex-1 flex flex-col items-center justify-center px-6 cursor-pointer gap-4">
+          <div className={`${isStory ? 'aspect-[9/16] max-h-[55vh]' : 'aspect-square'} w-full max-w-[380px] rounded-2xl border-2 border-dashed border-white/15 bg-white/[0.04] flex flex-col items-center justify-center gap-3 text-white/50`}>
+            <ImageIcon size={30} />
+            <span className="text-body text-center px-6">
+              Choisir {isStory ? 'une photo ou vidéo' : 'des photos ou vidéos'}
+            </span>
           </div>
+          <span className="text-caption text-white/40 text-center max-w-[280px]">
+            Ouvre la galerie de ton téléphone{!isStory ? ' — tu peux sélectionner plusieurs fichiers' : ''}
+          </span>
           <input
             ref={fileInputRef}
             type="file"
@@ -201,20 +211,40 @@ export default function CreatePost() {
         <span className="text-white text-body-medium">
           {isEditing ? 'Modifier' : isStory ? 'Nouvelle story' : 'Nouvelle publication'}
         </span>
-        {isStory ? (
-          <button
-            onClick={() => setAddingText((a) => !a)}
-            aria-label="Ajouter du texte" className={`w-11 h-11 flex items-center justify-center rounded-full ${addingText ? 'bg-white text-black' : 'text-white'}`}
-          >
-            <Type size={20} />
-          </button>
-        ) : (
-          <div className="w-9" />
-        )}
+        <div className="w-9" />
       </div>
 
       {/* preview zone */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden px-4">
+      <div className="flex-1 flex items-center justify-center overflow-hidden px-4 relative">
+        {isStory && (
+          <div className="absolute right-2 top-0 bottom-0 flex flex-col items-center justify-center gap-4 z-20">
+            <button
+              onClick={() => setAddingText((a) => !a)}
+              aria-label="Ajouter du texte"
+              className={`w-10 h-10 rounded-full flex items-center justify-center ${addingText ? 'bg-white text-black' : 'bg-black/40 text-white'}`}
+            >
+              <Type size={18} />
+            </button>
+            {[
+              { icon: Music, label: 'Musique' },
+              { icon: Sticker, label: 'Stickers' },
+              { icon: PenLine, label: 'Dessiner' },
+              { icon: Sparkles, label: 'Effets' },
+            ].map(({ icon: Icon, label }) => (
+              <button
+                key={label}
+                disabled
+                aria-label={`${label} — bientôt disponible`}
+                className="w-10 h-10 rounded-full bg-black/40 text-white/30 flex items-center justify-center relative"
+              >
+                <Icon size={18} />
+                <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 -translate-x-full text-[10px] text-white/40 whitespace-nowrap pr-1">
+                  bientôt
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
         {isStory ? (
           <div
             className="relative w-full max-w-[380px] aspect-[9/16] rounded-2xl overflow-hidden bg-neutral-900"
