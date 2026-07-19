@@ -1,0 +1,9 @@
+{
+  "appId": "com.influo.app",
+  "appName": "Influo",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "url": "https://influo-virid.vercel.app/"
+  }
+}
