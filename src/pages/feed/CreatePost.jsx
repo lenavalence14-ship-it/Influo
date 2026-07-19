@@ -227,42 +227,56 @@ export default function CreatePost() {
       </header>
 
       {/* zone médiane : photo + sidebar, hauteur flexible mais jamais rognée */}
-      <main className="flex-1 min-h-0 flex">
-        <div className="flex-1 flex items-center justify-center px-4 py-2 min-w-0">
-          {isStory ? (
-            <div
-              className="relative w-full max-w-[380px] aspect-[9/16] max-h-full rounded-2xl overflow-hidden bg-neutral-900"
-              onClick={handleMediaTap}
-            >
-              {format !== 'vertical' && format !== 'vertical_45' && (
-                <div
-                  className="absolute inset-0 scale-150 blur-3xl brightness-[0.35]"
-                  style={{ backgroundImage: `url(${mainPreview})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-                />
-              )}
-              <img
-                src={mainPreview}
-                alt=""
-                className={`relative w-full h-full select-none ${format === 'vertical' || format === 'vertical_45' ? 'object-cover' : 'object-contain'}`}
-                draggable={false}
-              />
-              {texteOverlay && (
-                <div
-                  className="absolute -translate-x-1/2 -translate-y-1/2 text-center font-semibold px-4 max-w-[90%] whitespace-pre-wrap pointer-events-none"
-                  style={{
-                    left: `${textePos.x}%`,
-                    top: `${textePos.y}%`,
-                    color: texteCouleur,
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-                    fontSize: '28px',
-                    textShadow: '0 1px 6px rgba(0,0,0,0.5)',
-                  }}
-                >
-                  {texteOverlay}
-                </div>
-              )}
+      <main className="flex-1 min-h-0 relative">
+        {isStory ? (
+          <div
+            className="absolute inset-0"
+            onClick={handleMediaTap}
+          >
+            <img
+              src={mainPreview}
+              alt=""
+              className="w-full h-full object-cover select-none"
+              draggable={false}
+            />
+            {texteOverlay && (
+              <div
+                className="absolute -translate-x-1/2 -translate-y-1/2 text-center font-semibold px-4 max-w-[90%] whitespace-pre-wrap pointer-events-none"
+                style={{
+                  left: `${textePos.x}%`,
+                  top: `${textePos.y}%`,
+                  color: texteCouleur,
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                  fontSize: '28px',
+                  textShadow: '0 1px 6px rgba(0,0,0,0.5)',
+                }}
+              >
+                {texteOverlay}
+              </div>
+            )}
+
+            {/* boutons flottant par-dessus la photo, en haut à droite, exactement comme Instagram */}
+            <div className="absolute top-3 right-3 flex flex-col items-end gap-6">
+              {SIDEBAR_ITEMS.map(({ key, icon: Icon, label, enabled }) => {
+                const isActive = key === 'texte' && addingText
+                return (
+                  <button
+                    key={key}
+                    onClick={(e) => { e.stopPropagation(); enabled && handleSidebarClick(key) }}
+                    aria-label={enabled ? label : `${label} — bientôt disponible`}
+                    className={`flex items-center gap-2 ${enabled ? '' : 'opacity-40 pointer-events-none'}`}
+                  >
+                    <span className="text-[13px] text-white whitespace-nowrap">{label}</span>
+                    <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${isActive ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
+                      <Icon size={17} />
+                    </span>
+                  </button>
+                )
+              })}
             </div>
-          ) : (
+          </div>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center px-4">
             <div className="w-full max-w-[380px]">
               <div className={`relative w-full ${FORMATS.find((f) => f.value === format)?.aspect} rounded-2xl overflow-hidden bg-neutral-900`}>
                 {mainIsVideo ? (
@@ -285,28 +299,6 @@ export default function CreatePost() {
                 </p>
               )}
             </div>
-          )}
-        </div>
-
-        {/* sidebar Instagram — label à gauche, icône ronde avec fond, alignée à droite */}
-        {isStory && (
-          <div className="w-28 shrink-0 flex flex-col items-center justify-between py-4 pr-2">
-            {SIDEBAR_ITEMS.map(({ key, icon: Icon, label, enabled }) => {
-              const isActive = key === 'texte' && addingText
-              return (
-                <button
-                  key={key}
-                  onClick={() => enabled && handleSidebarClick(key)}
-                  aria-label={enabled ? label : `${label} — bientôt disponible`}
-                  className={`flex items-center justify-end gap-2 w-full ${enabled ? '' : 'opacity-40 pointer-events-none'}`}
-                >
-                  <span className="text-[13px] whitespace-nowrap">{label}</span>
-                  <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${isActive ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
-                    <Icon size={17} />
-                  </span>
-                </button>
-              )
-            })}
           </div>
         )}
       </main>
