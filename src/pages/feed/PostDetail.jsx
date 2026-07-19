@@ -21,7 +21,7 @@ export default function PostDetail() {
         .from('posts')
         .select(`
           id, legende, crop_format, type, created_at, commande_id,
-          post_medias(media_url, media_type, position),
+          post_medias(media_url, media_type, thumbnail_url, position),
           profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
           client:client_id(nom_complet, photo_url),
           commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)
