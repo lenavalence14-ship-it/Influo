@@ -269,7 +269,6 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
           style={{ filter: getFilterCss(story.filtre) }}
           playsInline
           autoPlay
-          muted={muted}
           onEnded={goNext}
         />
       ) : (
