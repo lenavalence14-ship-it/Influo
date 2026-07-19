@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -28,53 +29,54 @@ const TABS = [
 
 const SECTION_ORDER = ["Aujourd'hui", 'Hier', '7 derniers jours', '30 derniers jours', 'Plus ancien']
 
+async function fetchNotifications(userId) {
+  const { data } = await supabase
+    .from('notifications')
+    .select('*, from_user:from_user_id(nom_complet, photo_url, profils_influenceur(id, verifie))')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  const postIds = (data || [])
+    .filter((n) => (n.type === 'like' || n.type === 'comment') && n.lien_ref_id)
+    .map((n) => n.lien_ref_id)
+
+  let mediaByPostId = {}
+  if (postIds.length > 0) {
+    const { data: medias } = await supabase
+      .from('post_medias')
+      .select('post_id, media_url, media_type, position')
+      .in('post_id', postIds)
+      .order('position', { ascending: true })
+    mediaByPostId = (medias || []).reduce((acc, m) => {
+      if (!acc[m.post_id]) acc[m.post_id] = { url: m.media_url, type: m.media_type }
+      return acc
+    }, {})
+  }
+
+  return (data || []).map((n) => ({
+    ...n,
+    post_thumbnail: (n.type === 'like' || n.type === 'comment') ? mediaByPostId[n.lien_ref_id] : null,
+  }))
+}
+
 export default function Notifications() {
-  const [notifications, setNotifications] = useState([])
-  const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('tout')
   const { user } = useAuth()
   const navigate = useNavigate()
   const activeStoryIds = useActiveStories()
+  const queryClient = useQueryClient()
 
-  useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase
-        .from('notifications')
-        .select('*, from_user:from_user_id(nom_complet, photo_url, profils_influenceur(id, verifie))')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-
-      const postIds = (data || [])
-        .filter((n) => (n.type === 'like' || n.type === 'comment') && n.lien_ref_id)
-        .map((n) => n.lien_ref_id)
-
-      let mediaByPostId = {}
-      if (postIds.length > 0) {
-        const { data: medias } = await supabase
-          .from('post_medias')
-          .select('post_id, media_url, media_type, position')
-          .in('post_id', postIds)
-          .order('position', { ascending: true })
-        mediaByPostId = (medias || []).reduce((acc, m) => {
-          if (!acc[m.post_id]) acc[m.post_id] = { url: m.media_url, type: m.media_type }
-          return acc
-        }, {})
-      }
-
-      const enriched = (data || []).map((n) => ({
-        ...n,
-        post_thumbnail: (n.type === 'like' || n.type === 'comment') ? mediaByPostId[n.lien_ref_id] : null,
-      }))
-
-      setNotifications(enriched)
-      setLoading(false)
-    }
-    if (user) load()
-  }, [user])
+  const { data: notifications = [], isLoading: loading } = useQuery({
+    queryKey: ['notifications', user?.id],
+    queryFn: () => fetchNotifications(user.id),
+    enabled: !!user,
+  })
 
   const handleClick = async (n) => {
     if (!n.lu) {
-      setNotifications((prev) => prev.map((item) => (item.id === n.id ? { ...item, lu: true } : item)))
+      queryClient.setQueryData(['notifications', user?.id], (old) =>
+        (old || []).map((item) => (item.id === n.id ? { ...item, lu: true } : item))
+      )
       await supabase.from('notifications').update({ lu: true }).eq('id', n.id)
     }
     if (!n.lien_ref_id) return
