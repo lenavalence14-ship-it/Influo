@@ -472,7 +472,7 @@ export default function CreatePost() {
 
       {activeTool === 'filtre' && (
         <div className="shrink-0 border-t border-white/10">
-          <FilterPicker imageUrl={mainPreview} value={filtre} onChange={setFiltre} />
+          <FilterPicker imageUrl={mainPreview} isVideo={mainIsVideo} value={filtre} onChange={setFiltre} />
         </div>
       )}
 
