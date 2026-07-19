@@ -334,114 +334,107 @@ export default function CreatePost() {
         </button>
       </header>
 
-      {/* zone médiane : canvas photo avec tous les overlays */}
+      {/* zone médiane : canvas photo avec tous les overlays, commun à post et story */}
       <main className="flex-1 min-h-0 relative overflow-hidden">
-        {isStory ? (
-          <div
-            ref={canvasRef}
-            className="absolute inset-0"
-            onClick={() => activeTool === 'texte' && editingTextId && commitTextEdit()}
-          >
-            <img
-              src={mainPreview}
-              alt=""
-              className="w-full h-full object-cover select-none"
-              draggable={false}
-              style={{ filter: filterCss }}
-            />
+        <div
+          ref={canvasRef}
+          className="absolute inset-0 flex items-center justify-center px-4"
+          onClick={() => activeTool === 'texte' && editingTextId && commitTextEdit()}
+        >
+          <div className={`relative w-full ${isStory ? 'h-full max-w-none' : 'max-w-[380px]'}`}>
+            <div
+              className={`relative w-full overflow-hidden bg-neutral-900 ${
+                isStory ? 'h-full rounded-none' : `${FORMATS.find((f) => f.value === format)?.aspect} rounded-2xl`
+              }`}
+            >
+              {mainIsVideo ? (
+                <video src={mainPreview} className="w-full h-full object-cover" controls={!isStory} playsInline style={{ filter: filterCss }} />
+              ) : !isStory && displayMedias.length > 1 ? (
+                <div className="grid grid-cols-3 gap-1 w-full h-full">
+                  {displayMedias.map((p, i) => (
+                    <div key={i} className="aspect-square overflow-hidden">
+                      <img src={p} alt="" className="w-full h-full object-cover" style={{ filter: filterCss }} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <img src={mainPreview} alt="" className="w-full h-full object-cover select-none" draggable={false} style={{ filter: filterCss }} />
+              )}
 
-            {dessinDataUrl && (
-              <img src={dessinDataUrl} alt="" className="absolute inset-0 w-full h-full pointer-events-none" />
-            )}
+              {dessinDataUrl && (
+                <img src={dessinDataUrl} alt="" className="absolute inset-0 w-full h-full pointer-events-none" />
+              )}
 
-            {elements.map((el) => (
-              <DraggableElement key={el.id} element={el} onMove={moveElement} onTap={handleElementTap}>
-                {el.type === 'texte' && el.id !== editingTextId && (
-                  <p
-                    className="text-center font-semibold px-2 max-w-[80vw] whitespace-pre-wrap"
-                    style={{ color: el.couleur, fontSize: '26px', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}
-                  >
-                    {el.contenu}
-                  </p>
-                )}
-                {el.type === 'sticker' && <span className="text-5xl">{el.contenu}</span>}
-                {el.type === 'mention' && (
-                  <span className="bg-black/40 backdrop-blur px-3 py-1.5 rounded-full text-body-medium text-white">
-                    @{el.contenu}
-                  </span>
-                )}
-              </DraggableElement>
-            ))}
-
-            <DrawCanvas
-              active={activeTool === 'dessiner'}
-              width={canvasSize.width}
-              height={canvasSize.height}
-              onExport={handleDessinExport}
-            />
-
-            {/* barre d'icônes horizontale sous la zone photo, style Instagram (verticale à droite ici car format story plein écran) */}
-            <div className="absolute top-3 right-3 flex flex-col items-end gap-5 z-10">
-              {PRIMARY_TOOLS.map(({ key, icon: Icon, label }) => (
-                <button
-                  key={key}
-                  onClick={(e) => { e.stopPropagation(); handleToolClick(key) }}
-                  className="flex items-center gap-2"
-                >
-                  <span className="text-[13px] text-white whitespace-nowrap">{label}</span>
-                  <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${activeTool === key ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
-                    <Icon size={17} />
-                  </span>
-                </button>
+              {elements.map((el) => (
+                <DraggableElement key={el.id} element={el} onMove={moveElement} onTap={handleElementTap}>
+                  {el.type === 'texte' && el.id !== editingTextId && (
+                    <p
+                      className="text-center font-semibold px-2 max-w-[80vw] whitespace-pre-wrap"
+                      style={{ color: el.couleur, fontSize: '26px', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}
+                    >
+                      {el.contenu}
+                    </p>
+                  )}
+                  {el.type === 'sticker' && <span className="text-5xl">{el.contenu}</span>}
+                  {el.type === 'mention' && (
+                    <span className="bg-black/40 backdrop-blur px-3 py-1.5 rounded-full text-body-medium text-white">
+                      @{el.contenu}
+                    </span>
+                  )}
+                </DraggableElement>
               ))}
 
-              <button onClick={(e) => { e.stopPropagation(); setShowMore((s) => !s) }} className="flex items-center gap-2">
-                <span className="text-[13px] text-white whitespace-nowrap">Plus</span>
-                <span className="w-9 h-9 rounded-full bg-black/40 text-white flex items-center justify-center shrink-0">
-                  <MoreHorizontal size={17} />
+              <DrawCanvas
+                active={activeTool === 'dessiner'}
+                width={canvasSize.width}
+                height={canvasSize.height}
+                onExport={handleDessinExport}
+              />
+            </div>
+
+            {isEditing && !isStory && (
+              <p className="text-white/40 text-caption text-center mt-3">
+                Pour changer la photo, supprime cette publication et republie.
+              </p>
+            )}
+          </div>
+
+          {/* barre d'icônes verticale flottante, façon Instagram, commune à post et story */}
+          <div className="absolute top-3 right-3 flex flex-col items-end gap-5 z-10">
+            {PRIMARY_TOOLS.map(({ key, icon: Icon, label }) => (
+              <button
+                key={key}
+                onClick={(e) => { e.stopPropagation(); handleToolClick(key) }}
+                className="flex items-center gap-2"
+              >
+                <span className="text-[13px] text-white whitespace-nowrap">{label}</span>
+                <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${activeTool === key ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
+                  <Icon size={17} />
                 </span>
               </button>
+            ))}
 
-              {showMore && MORE_TOOLS.map(({ key, icon: Icon, label }) => (
-                <button
-                  key={key}
-                  onClick={(e) => { e.stopPropagation(); handleToolClick(key) }}
-                  className="flex items-center gap-2"
-                >
-                  <span className="text-[13px] text-white whitespace-nowrap">{label}</span>
-                  <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${activeTool === key ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
-                    <Icon size={17} />
-                  </span>
-                </button>
-              ))}
-            </div>
+            <button onClick={(e) => { e.stopPropagation(); setShowMore((s) => !s) }} className="flex items-center gap-2">
+              <span className="text-[13px] text-white whitespace-nowrap">Plus</span>
+              <span className="w-9 h-9 rounded-full bg-black/40 text-white flex items-center justify-center shrink-0">
+                <MoreHorizontal size={17} />
+              </span>
+            </button>
+
+            {showMore && MORE_TOOLS.map(({ key, icon: Icon, label }) => (
+              <button
+                key={key}
+                onClick={(e) => { e.stopPropagation(); handleToolClick(key) }}
+                className="flex items-center gap-2"
+              >
+                <span className="text-[13px] text-white whitespace-nowrap">{label}</span>
+                <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${activeTool === key ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
+                  <Icon size={17} />
+                </span>
+              </button>
+            ))}
           </div>
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center px-4">
-            <div className="w-full max-w-[380px]">
-              <div className={`relative w-full ${FORMATS.find((f) => f.value === format)?.aspect} rounded-2xl overflow-hidden bg-neutral-900`}>
-                {mainIsVideo ? (
-                  <video src={mainPreview} className="w-full h-full object-cover" controls playsInline />
-                ) : displayMedias.length > 1 ? (
-                  <div className="grid grid-cols-3 gap-1 w-full h-full">
-                    {displayMedias.map((p, i) => (
-                      <div key={i} className="aspect-square overflow-hidden">
-                        <img src={p} alt="" className="w-full h-full object-cover" style={{ filter: filterCss }} />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <img src={mainPreview} alt="" className="w-full h-full object-cover" style={{ filter: filterCss }} />
-                )}
-              </div>
-              {isEditing && (
-                <p className="text-white/40 text-caption text-center mt-3">
-                  Pour changer la photo, supprime cette publication et republie.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+        </div>
       </main>
 
       {/* panneau d'outil actif (texte, stickers, filtre, mentionner) */}
