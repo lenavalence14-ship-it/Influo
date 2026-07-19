@@ -94,6 +94,13 @@ export async function compressVideo(file, { maxDimension = 1280, videoBitsPerSec
     const blob = new Blob(chunks, { type: 'video/webm' })
     if (blob.size >= file.size) return file // garde l'original si pas de gain réel
 
+    return new File([blob], file.name.replace(/\.\w+$/, '.webm'), { type: 'video/webm' })
+  } catch (err) {
+    console.warn('Compression vidéo échouée, envoi du fichier original:', err)
+    return file
+  }
+}
+
 // Capture une frame de la vidéo (par défaut à 0.5s, pour éviter un premier frame souvent noir/flou)
 // et la retourne comme fichier JPEG, utilisable comme miniature (poster) avant chargement de la vidéo.
 export async function generateVideoThumbnail(file, { seekTime = 0.5, quality = 0.8 } = {}) {
