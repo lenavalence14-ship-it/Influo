@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -9,57 +9,58 @@ import { Sun, Moon, MessageCircle, Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useUnreadCounts } from '../../hooks/useUnreadCounts'
 
+async function fetchFeed(userId) {
+  const { data, error } = await supabase
+    .from('posts')
+    .select(`
+      id, legende, crop_format, type, created_at, commande_id, filtre,
+      post_medias(media_url, media_type, position),
+      profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
+      client:client_id(nom_complet, photo_url),
+      commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)
+    `)
+    .in('type', ['photo', 'carrousel', 'video'])
+    .order('created_at', { ascending: false })
+    .limit(30)
+
+  if (error) console.error('Erreur chargement feed:', error)
+  if (!data) return []
+
+  const postIds = data.map((p) => p.id)
+  const { data: likes } = await supabase
+    .from('post_likes')
+    .select('post_id, user_id')
+    .in('post_id', postIds)
+
+  const { data: comments } = await supabase
+    .from('post_comments')
+    .select('post_id')
+    .in('post_id', postIds)
+
+  return data.map((p) => ({
+    ...p,
+    like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
+    liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === userId) || false,
+    comment_count: comments?.filter((c) => c.post_id === p.id).length || 0,
+  }))
+}
+
 export default function Feed() {
-  const [posts, setPosts] = useState([])
-  const [loading, setLoading] = useState(true)
   const { user, profile } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const { hasUnreadMessages } = useUnreadCounts()
+  const queryClient = useQueryClient()
 
-  useEffect(() => {
-    const loadFeed = async () => {
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          id, legende, crop_format, type, created_at, commande_id, filtre,
-          post_medias(media_url, media_type, position),
-          profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
-          client:client_id(nom_complet, photo_url),
-          commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)
-        `)
-        .in('type', ['photo', 'carrousel', 'video'])
-        .order('created_at', { ascending: false })
-        .limit(30)
+  const { data: posts = [], isLoading: loading } = useQuery({
+    queryKey: ['feed', user?.id],
+    queryFn: () => fetchFeed(user.id),
+    enabled: !!user,
+  })
 
-      if (error) console.error('Erreur chargement feed:', error)
-
-      if (!data) { setPosts([]); setLoading(false); return }
-
-      // récupérer les likes/comments count + si l'utilisateur a liké
-      const postIds = data.map((p) => p.id)
-      const { data: likes } = await supabase
-        .from('post_likes')
-        .select('post_id, user_id')
-        .in('post_id', postIds)
-
-      const { data: comments } = await supabase
-        .from('post_comments')
-        .select('post_id')
-        .in('post_id', postIds)
-
-      const enriched = data.map((p) => ({
-        ...p,
-        like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
-        liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === user.id) || false,
-        comment_count: comments?.filter((c) => c.post_id === p.id).length || 0,
-      }))
-
-      setPosts(enriched)
-      setLoading(false)
-    }
-    loadFeed()
-  }, [user])
+  const handleDeleted = (id) => {
+    queryClient.setQueryData(['feed', user?.id], (old) => (old || []).filter((p) => p.id !== id))
+  }
 
   return (
     <div>
@@ -124,7 +125,7 @@ export default function Feed() {
             <PostCard
               key={post.id}
               post={post}
-              onDeleted={(id) => setPosts((ps) => ps.filter((p) => p.id !== id))}
+              onDeleted={handleDeleted}
             />
           ))}
         </div>
