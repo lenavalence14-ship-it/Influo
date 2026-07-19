@@ -366,3 +366,187 @@ export default function CreatePost() {
                 )}
                 {el.type === 'sticker' && <span className="text-5xl">{el.contenu}</span>}
                 {el.type === 'mention' && (
+                  <span className="bg-black/40 backdrop-blur px-3 py-1.5 rounded-full text-body-medium text-white">
+                    @{el.contenu}
+                  </span>
+                )}
+              </DraggableElement>
+            ))}
+
+            <DrawCanvas
+              active={activeTool === 'dessiner'}
+              width={canvasSize.width}
+              height={canvasSize.height}
+              onExport={handleDessinExport}
+            />
+
+            {/* barre d'icônes horizontale sous la zone photo, style Instagram (verticale à droite ici car format story plein écran) */}
+            <div className="absolute top-3 right-3 flex flex-col items-end gap-5 z-10">
+              {PRIMARY_TOOLS.map(({ key, icon: Icon, label }) => (
+                <button
+                  key={key}
+                  onClick={(e) => { e.stopPropagation(); handleToolClick(key) }}
+                  className="flex items-center gap-2"
+                >
+                  <span className="text-[13px] text-white whitespace-nowrap">{label}</span>
+                  <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${activeTool === key ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
+                    <Icon size={17} />
+                  </span>
+                </button>
+              ))}
+
+              <button onClick={(e) => { e.stopPropagation(); setShowMore((s) => !s) }} className="flex items-center gap-2">
+                <span className="text-[13px] text-white whitespace-nowrap">Plus</span>
+                <span className="w-9 h-9 rounded-full bg-black/40 text-white flex items-center justify-center shrink-0">
+                  <MoreHorizontal size={17} />
+                </span>
+              </button>
+
+              {showMore && MORE_TOOLS.map(({ key, icon: Icon, label }) => (
+                <button
+                  key={key}
+                  onClick={(e) => { e.stopPropagation(); handleToolClick(key) }}
+                  className="flex items-center gap-2"
+                >
+                  <span className="text-[13px] text-white whitespace-nowrap">{label}</span>
+                  <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${activeTool === key ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
+                    <Icon size={17} />
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center px-4">
+            <div className="w-full max-w-[380px]">
+              <div className={`relative w-full ${FORMATS.find((f) => f.value === format)?.aspect} rounded-2xl overflow-hidden bg-neutral-900`}>
+                {mainIsVideo ? (
+                  <video src={mainPreview} className="w-full h-full object-cover" controls playsInline />
+                ) : displayMedias.length > 1 ? (
+                  <div className="grid grid-cols-3 gap-1 w-full h-full">
+                    {displayMedias.map((p, i) => (
+                      <div key={i} className="aspect-square overflow-hidden">
+                        <img src={p} alt="" className="w-full h-full object-cover" style={{ filter: filterCss }} />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <img src={mainPreview} alt="" className="w-full h-full object-cover" style={{ filter: filterCss }} />
+                )}
+              </div>
+              {isEditing && (
+                <p className="text-white/40 text-caption text-center mt-3">
+                  Pour changer la photo, supprime cette publication et republie.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* panneau d'outil actif (texte, stickers, filtre, mentionner) */}
+      {activeTool === 'texte' && editingTextId && (
+        <div className="px-4 pb-3 shrink-0">
+          <div className="flex items-center gap-2 mb-2">
+            {TEXT_COLORS.map((c) => (
+              <button
+                key={c}
+                onClick={() => setTextColor(c)}
+                className={`w-7 h-7 rounded-full border-2 ${textColor === c ? 'border-white' : 'border-transparent'}`}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+          <input
+            value={textDraft}
+            onChange={(e) => setTextDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && commitTextEdit()}
+            placeholder="Ajouter du texte..."
+            autoFocus
+            className="w-full h-12 rounded-2xl px-4 bg-white/10 text-white outline-none text-body placeholder:text-white/50"
+          />
+          <div className="flex justify-end mt-2">
+            <button onClick={commitTextEdit} className="text-white text-body-medium px-3 py-1.5">Terminé</button>
+          </div>
+        </div>
+      )}
+
+      {activeTool === 'stickers' && (
+        <div className="shrink-0 border-t border-white/10">
+          <StickerPicker onPick={addSticker} />
+        </div>
+      )}
+
+      {activeTool === 'filtre' && (
+        <div className="shrink-0 border-t border-white/10">
+          <FilterPicker imageUrl={mainPreview} value={filtre} onChange={setFiltre} />
+        </div>
+      )}
+
+      {activeTool === 'mentionner' && (
+        <div className="shrink-0 border-t border-white/10">
+          <MentionPicker onPick={addMention} />
+        </div>
+      )}
+
+      {/* pied : ratio (post uniquement) + légende + publier */}
+      {!isStory && (
+        <footer className="shrink-0 px-4 pb-6 pt-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+          <div className="flex gap-2 mb-3">
+            {FORMATS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setFormat(f.value)}
+                className={`flex-1 rounded-2xl py-3 text-caption-medium transition-colors ${
+                  format === f.value ? 'bg-white text-black' : 'bg-white/10 text-white'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <textarea
+            value={legende}
+            onChange={(e) => setLegende(e.target.value)}
+            rows={2}
+            placeholder="Écris une légende..."
+            className="w-full rounded-2xl px-4 py-3 bg-white/10 text-white outline-none resize-none text-body placeholder:text-white/50 mb-3"
+          />
+
+          <button
+            onClick={handlePublish}
+            disabled={loading}
+            className="w-full h-12 rounded-full bg-white text-black text-body-medium disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            {loading ? 'Enregistrement...' : (
+              <>
+                <Check size={18} strokeWidth={2.5} /> {isEditing ? 'Enregistrer' : 'Publier'}
+              </>
+            )}
+          </button>
+        </footer>
+      )}
+
+      {/* story : bouton Publier flottant, pas de pied de page qui rogne la photo */}
+      {isStory && (
+        <div
+          className="shrink-0 px-4 pb-6 pt-3"
+          style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+        >
+          <button
+            onClick={handlePublish}
+            disabled={loading}
+            className="w-full h-12 rounded-full bg-white text-black text-body-medium disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            {loading ? 'Publication...' : (
+              <>
+                <Send size={16} /> {isEditing ? 'Enregistrer' : 'Publier'}
+              </>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
