@@ -179,6 +179,9 @@ export default function ReelsViewer() {
           // Le reste du flux n'affiche que sa miniature (poster), donc pas de téléchargement
           // vidéo tant que le slide n'est pas sur le point d'être atteint.
           shouldMount={Math.abs(i - activeIndex) <= 1}
+          // La vidéo active charge tout son contenu (comme TikTok), les voisines montées
+          // ne préchargent que les métadonnées pour ne pas gaspiller de data avant le swipe.
+          isActive={i === activeIndex}
           setVideoRef={(el) => (videoRefs.current[i] = el)}
           muted={muted}
           onToggleMute={() => setMuted((m) => !m)}
@@ -188,7 +191,7 @@ export default function ReelsViewer() {
   )
 }
 
-const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, setVideoRef, muted, onToggleMute }) {
+const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, isActive, setVideoRef, muted, onToggleMute }) {
   const { user } = useAuth()
   const [liked, setLiked] = useState(reel.liked_by_me)
   const [likeCount, setLikeCount] = useState(reel.like_count || 0)
@@ -237,7 +240,11 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, setVideoRe
           loop
           muted={muted}
           playsInline
-          preload="metadata"
+          // La vidéo active télécharge tout son contenu dès maintenant (comme TikTok
+          // précharge la vidéo en cours). Les vidéos voisines déjà montées (précédente/
+          // suivante) ne chargent que les métadonnées, pour ne pas gaspiller de data sur
+          // des vidéos qui ne seront peut-être jamais regardées.
+          preload={isActive ? 'auto' : 'metadata'}
           style={{ filter: getFilterCss(reel.filtre) }}
         />
       )}
