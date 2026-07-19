@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
@@ -182,8 +181,7 @@ export default function CreatePost() {
 
     let dessinUrl = null
     if (dessinFile) {
-      const fileName = `${influencerProfile.id}/dessin-${Date.now()}.png`
-      await supabase.storage.from('posts').upload(fileName, dessinFile)
+      const fileName = `${influencerProfile.id}/dessin-${Date.now()}.png`      await supabase.storage.from('posts').upload(fileName, dessinFile)
       const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
       dessinUrl = urlData.publicUrl
     }
