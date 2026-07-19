@@ -5,9 +5,10 @@ import { useTheme } from '../../contexts/ThemeContext'
 import StoryBar from './StoryBar'
 import PostCard from './PostCard'
 import Card from '../../components/ui/Card'
-import { Sun, Moon, MessageCircle, Plus } from 'lucide-react'
+import { Sun, Moon, MessageCircle, Plus, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useUnreadCounts } from '../../hooks/useUnreadCounts'
+import { usePullToRefresh } from '../../hooks/usePullToRefresh'
 
 async function fetchFeed(userId) {
   const { data, error } = await supabase
@@ -52,11 +53,13 @@ export default function Feed() {
   const { hasUnreadMessages } = useUnreadCounts()
   const queryClient = useQueryClient()
 
-  const { data: posts = [], isLoading: loading } = useQuery({
+  const { data: posts = [], isLoading: loading, refetch } = useQuery({
     queryKey: ['feed', user?.id],
     queryFn: () => fetchFeed(user.id),
     enabled: !!user,
   })
+
+  const { pullDistance, refreshing, threshold } = usePullToRefresh(refetch)
 
   const handleDeleted = (id) => {
     queryClient.setQueryData(['feed', user?.id], (old) => (old || []).filter((p) => p.id !== id))
@@ -104,6 +107,26 @@ export default function Feed() {
           </button>
         </div>
       </header>
+
+      {(pullDistance > 0 || refreshing) && (
+        <div
+          className="flex justify-center items-center overflow-hidden transition-[height]"
+          style={{ height: refreshing ? 44 : pullDistance }}
+        >
+          <RefreshCw
+            size={20}
+            className={refreshing ? 'animate-spin text-violet-500' : 'text-[var(--text-secondary)]'}
+            style={
+              refreshing
+                ? undefined
+                : {
+                    transform: `rotate(${(pullDistance / threshold) * 360}deg)`,
+                    opacity: Math.min(1, pullDistance / threshold),
+                  }
+            }
+          />
+        </div>
+      )}
 
       <StoryBar />
 
