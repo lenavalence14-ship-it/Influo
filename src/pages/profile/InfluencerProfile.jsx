@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
@@ -442,6 +443,57 @@ function OfferCard({ offre, editable, onChange }) {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+}\`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <textarea
+            value={legende}
+            onChange={(e) => setLegende(e.target.value)}
+            rows={2}
+            placeholder="Écris une légende..."
+            className="w-full rounded-2xl px-4 py-3 bg-white/10 text-white outline-none resize-none text-body placeholder:text-white/50 mb-3"
+          />
+
+          <button
+            onClick={handlePublish}
+            disabled={loading}
+            className="w-full h-12 rounded-full bg-white text-black text-body-medium disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            {loading ? 'Enregistrement...' : (
+              <>
+                <Check size={18} strokeWidth={2.5} /> {isEditing ? 'Enregistrer' : 'Publier'}
+              </>
+            )}
+          </button>
+        </footer>
+      )}
+
+      {/* story : bouton Publier flottant, pas de pied de page qui rogne la photo */}
+      {isStory && (
+        <div
+          className="shrink-0 px-4 pb-6 pt-3"
+          style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+        >
+          <button
+            onClick={handlePublish}
+            disabled={loading}
+            className="w-full h-12 rounded-full bg-white text-black text-body-medium disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            {loading ? 'Publication...' : (
+              <>
+                <Send size={16} /> {isEditing ? 'Enregistrer' : 'Publier'}
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
