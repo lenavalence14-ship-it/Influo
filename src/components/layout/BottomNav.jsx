@@ -3,40 +3,37 @@ import { Home, Search, Heart } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useUnreadCounts } from '../../hooks/useUnreadCounts'
 
-function PlayIcon({
-  size = 24,
-  className = '',
-  isActive = false,
-}: {
-  size?: number
-  className?: string
-  isActive?: boolean
-}) {
+function PlayIcon({ size = 24, className = '', isActive = false }) {
+  const maskId = 'play-cutout-mask'
+
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
       className={className}
-      fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Carré */}
+      <defs>
+        <mask id={maskId}>
+          <rect width="24" height="24" fill="white" />
+          <path
+            d="M10 8L16 12L10 16V8Z"
+            fill="black"
+          />
+        </mask>
+      </defs>
+
       <rect
         x="3"
         y="3"
         width="18"
         height="18"
         rx="5"
-        fill={isActive ? "#8b5cf6" : "none"}
+        fill={isActive ? '#8b5cf6' : 'none'}
         stroke="currentColor"
         strokeWidth="2.2"
-      />
-
-      {/* Triangle transparent */}
-      <path
-        d="M10 8L16 12L10 16V8Z"
-        fill="var(--surface-primary)"
+        mask={isActive ? `url(#${maskId})` : undefined}
       />
     </svg>
   )
@@ -58,7 +55,10 @@ export default function BottomNav() {
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-40 pb-safe border-t"
-      style={{ backgroundColor: 'var(--surface-primary)', borderColor: 'var(--border)' }}
+      style={{
+        backgroundColor: 'var(--surface-primary)',
+        borderColor: 'var(--border)',
+      }}
     >
       <div className="px-2 py-0.5">
         <div className="flex items-center justify-around">
@@ -92,12 +92,21 @@ export default function BottomNav() {
                   </span>
                 ) : (
                   <>
-                    <Icon
-                      size={24}
-                      isActive={isActive}
-                      strokeWidth={2.6}
-                      className={isActive ? 'text-violet-500' : ''}
-                    />
+                    {Icon === PlayIcon ? (
+                      <PlayIcon
+                        size={24}
+                        isActive={isActive}
+                        className="text-violet-500"
+                      />
+                    ) : (
+                      <Icon
+                        size={24}
+                        strokeWidth={2.6}
+                        fill={isActive ? '#8b5cf6' : 'none'}
+                        className={isActive ? 'text-violet-500' : ''}
+                      />
+                    )}
+
                     {dot && (
                       <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-violet-500" />
                     )}
