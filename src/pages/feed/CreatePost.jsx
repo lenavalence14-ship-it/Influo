@@ -215,9 +215,9 @@ export default function CreatePost() {
       </div>
 
       {/* preview zone */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden px-4 relative">
+      <div className="flex-1 flex items-center justify-center px-4 relative">
         {isStory && (
-          <div className="absolute right-3 top-4 flex flex-col items-center gap-5 z-20">
+          <div className="absolute right-3 top-6 flex flex-col items-center gap-7 z-20">
             {[
               { icon: Music, label: 'Audio', disabled: true },
               { icon: Type, label: 'Texte', disabled: false, onClick: () => setAddingText((a) => !a), active: addingText },
@@ -231,12 +231,10 @@ export default function CreatePost() {
                 onClick={onClick}
                 disabled={disabled}
                 aria-label={disabled ? `${label} — bientôt disponible` : label}
-                className={`flex flex-col items-center gap-1 ${disabled ? 'opacity-40' : ''}`}
+                className={`flex flex-col items-center gap-1 w-16 shrink-0 ${disabled ? 'opacity-40' : ''} ${active ? 'text-black' : 'text-white'}`}
               >
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center ${active ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
-                  <Icon size={17} />
-                </div>
-                <span className="text-white text-[10px] leading-none">{label}</span>
+                <Icon size={20} className={active ? 'bg-white rounded-full p-1 box-content' : ''} />
+                <span className="text-white text-[10px] leading-none text-center whitespace-nowrap">{label}</span>
               </button>
             ))}
           </div>
