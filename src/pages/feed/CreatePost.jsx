@@ -2,8 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { Image as ImageIcon, X, Type, Check, Music, Sticker, PenLine, Sparkles, Plus } from 'lucide-react'
+import {
+  Image as ImageIcon, X, Type, Check, Music, Sticker, Sparkles,
+  PenLine, AtSign, MoreHorizontal, ChevronDown, ChevronUp, Plus, Send,
+} from 'lucide-react'
 import { compressImage, compressVideo } from '../../lib/mediaCompression'
+import DrawCanvas from './editor/DrawCanvas'
+import FilterPicker, { getFilterCss } from './editor/FilterPicker'
+import StickerPicker from './editor/StickerPicker'
+import MentionPicker from './editor/MentionPicker'
+import DraggableElement from './editor/DraggableElement'
 
 const FORMATS = [
   { value: 'carre', label: '1:1', aspect: 'aspect-square' },
@@ -14,16 +22,20 @@ const FORMATS = [
 
 const TEXT_COLORS = ['#ffffff', '#000000', '#f43f5e', '#3b82f6', '#22c55e', '#eab308']
 
-// Boutons de la sidebar façon Instagram. Seul "texte" a un vrai onClick câblé plus bas ;
-// les autres sont volontairement inertes (enabled: false) tant que la fonctionnalité n'existe pas.
-const SIDEBAR_ITEMS = [
-  { key: 'audio', icon: Music, label: 'Audio', enabled: false },
-  { key: 'texte', icon: Type, label: 'Texte', enabled: true },
-  { key: 'superposition', icon: Sticker, label: 'Superposition', enabled: false },
-  { key: 'filtre', icon: Sparkles, label: 'Filtre', enabled: false },
-  { key: 'modifier', icon: PenLine, label: 'Modifier', enabled: false },
-  { key: 'ratio', icon: ImageIcon, label: 'Ratio', enabled: false },
+const PRIMARY_TOOLS = [
+  { key: 'audio', icon: Music, label: 'Audio' },
+  { key: 'texte', icon: Type, label: 'Texte' },
+  { key: 'stickers', icon: Sticker, label: 'Superposition' },
+  { key: 'filtre', icon: Sparkles, label: 'Filtre' },
 ]
+
+const MORE_TOOLS = [
+  { key: 'dessiner', icon: PenLine, label: 'Dessiner' },
+  { key: 'mentionner', icon: AtSign, label: 'Mentionner' },
+]
+
+let uid = 0
+const nextId = () => `el_${Date.now()}_${uid++}`
 
 export default function CreatePost() {
   const [searchParams] = useSearchParams()
@@ -31,7 +43,6 @@ export default function CreatePost() {
   const isEditing = Boolean(postId)
   const { influencerProfile } = useAuth()
   const navigate = useNavigate()
-  const fileInputRef = useRef(null)
 
   const [isStory, setIsStory] = useState(searchParams.get('type') === 'story')
   const [loadingExisting, setLoadingExisting] = useState(isEditing)
@@ -45,10 +56,23 @@ export default function CreatePost() {
   const [format, setFormat] = useState(isStory ? 'vertical' : 'carre')
   const [loading, setLoading] = useState(false)
 
-  const [addingText, setAddingText] = useState(false)
-  const [texteOverlay, setTexteOverlay] = useState('')
-  const [textePos, setTextePos] = useState({ x: 50, y: 50 })
-  const [texteCouleur, setTexteCouleur] = useState('#ffffff')
+  // outils actifs
+  const [activeTool, setActiveTool] = useState(null) // 'texte' | 'stickers' | 'filtre' | 'dessiner' | 'mentionner' | null
+  const [showMore, setShowMore] = useState(false)
+
+  // éléments superposés multiples (texte, sticker, mention)
+  const [elements, setElements] = useState([])
+  const [editingTextId, setEditingTextId] = useState(null)
+  const [textDraft, setTextDraft] = useState('')
+  const [textColor, setTextColor] = useState('#ffffff')
+
+  // filtre + dessin
+  const [filtre, setFiltre] = useState(null)
+  const [dessinDataUrl, setDessinDataUrl] = useState(null)
+  const [dessinFile, setDessinFile] = useState(null)
+
+  const canvasRef = useRef(null)
+  const [canvasSize, setCanvasSize] = useState({ width: 400, height: 700 })
 
   useEffect(() => {
     if (!isEditing) return
@@ -63,9 +87,19 @@ export default function CreatePost() {
         setIsStory(data.type === 'story')
         setLegende(data.legende || '')
         setFormat(data.crop_format || (data.type === 'story' ? 'vertical' : 'carre'))
-        setTexteOverlay(data.texte_overlay || '')
-        setTextePos({ x: data.texte_x ?? 50, y: data.texte_y ?? 50 })
-        setTexteCouleur(data.texte_couleur || '#ffffff')
+        setFiltre(data.filtre || null)
+        setElements(Array.isArray(data.elements) ? data.elements : [])
+        // rétrocompatibilité : ancien texte simple -> élément
+        if (data.texte_overlay && (!data.elements || data.elements.length === 0)) {
+          setElements([{
+            id: nextId(),
+            type: 'texte',
+            x: data.texte_x ?? 50,
+            y: data.texte_y ?? 50,
+            contenu: data.texte_overlay,
+            couleur: data.texte_couleur || '#ffffff',
+          }])
+        }
         const sorted = [...(data.post_medias || [])].sort((a, b) => a.position - b.position)
         setExistingMediaUrls(sorted.map((m) => m.media_url))
         setExistingMediaTypes(sorted.map((m) => m.media_type || 'image'))
@@ -88,35 +122,86 @@ export default function CreatePost() {
   const displayMedias = isEditing ? existingMediaUrls : previews
   const mainPreview = displayMedias[0]
 
-  const handleMediaTap = (e) => {
-    if (!isStory || !addingText) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = ((e.clientX - rect.left) / rect.width) * 100
-    const y = ((e.clientY - rect.top) / rect.height) * 100
-    setTextePos({ x, y })
+  // --- gestion des éléments ---
+  const addTextElement = () => {
+    setTextDraft('')
+    setTextColor('#ffffff')
+    const id = nextId()
+    setElements((els) => [...els, { id, type: 'texte', x: 50, y: 50, contenu: '', couleur: '#ffffff' }])
+    setEditingTextId(id)
+    setActiveTool('texte')
   }
 
-  const handleSidebarClick = (key) => {
-    if (key === 'texte') setAddingText((a) => !a)
+  const commitTextEdit = () => {
+    if (!editingTextId) return
+    setElements((els) =>
+      textDraft.trim()
+        ? els.map((el) => (el.id === editingTextId ? { ...el, contenu: textDraft, couleur: textColor } : el))
+        : els.filter((el) => el.id !== editingTextId)
+    )
+    setEditingTextId(null)
+    setActiveTool(null)
   }
 
+  const addSticker = (emoji) => {
+    setElements((els) => [...els, { id: nextId(), type: 'sticker', x: 50, y: 40, contenu: emoji }])
+  }
+
+  const addMention = (user) => {
+    setElements((els) => [...els, { id: nextId(), type: 'mention', x: 50, y: 30, contenu: user.nom_complet, userId: user.id }])
+    setActiveTool(null)
+  }
+
+  const moveElement = (id, x, y) => {
+    setElements((els) => els.map((el) => (el.id === id ? { ...el, x, y } : el)))
+  }
+
+  const handleElementTap = (el) => {
+    if (el.type === 'texte') {
+      setTextDraft(el.contenu)
+      setTextColor(el.couleur || '#ffffff')
+      setEditingTextId(el.id)
+      setActiveTool('texte')
+    }
+  }
+
+  const handleToolClick = (key) => {
+    setShowMore(false)
+    if (key === 'texte') {
+      addTextElement()
+      return
+    }
+    setActiveTool((cur) => (cur === key ? null : key))
+  }
+
+  // --- publication ---
   const handlePublish = async () => {
     if (!isEditing && files.length === 0) return
     setLoading(true)
 
-    if (isEditing) {
-      await supabase
-        .from('posts')
-        .update({
-          legende: isStory ? null : legende,
-          crop_format: format,
-          texte_overlay: isStory && texteOverlay ? texteOverlay : null,
-          texte_x: isStory ? textePos.x : null,
-          texte_y: isStory ? textePos.y : null,
-          texte_couleur: isStory ? texteCouleur : null,
-        })
-        .eq('id', postId)
+    let dessinUrl = null
+    if (dessinFile) {
+      const fileName = `${influencerProfile.id}/dessin-${Date.now()}.png`
+      await supabase.storage.from('posts').upload(fileName, dessinFile)
+      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
+      dessinUrl = urlData.publicUrl
+    }
 
+    const commonFields = {
+      legende: isStory ? null : legende,
+      crop_format: format,
+      elements,
+      filtre,
+      dessin_url: dessinUrl,
+      // rétrocompat : on garde aussi le premier élément texte dans les anciennes colonnes
+      texte_overlay: elements.find((e) => e.type === 'texte')?.contenu || null,
+      texte_x: elements.find((e) => e.type === 'texte')?.x ?? null,
+      texte_y: elements.find((e) => e.type === 'texte')?.y ?? null,
+      texte_couleur: elements.find((e) => e.type === 'texte')?.couleur || null,
+    }
+
+    if (isEditing) {
+      await supabase.from('posts').update(commonFields).eq('id', postId)
       setLoading(false)
       navigate(-1)
       return
@@ -128,13 +213,8 @@ export default function CreatePost() {
       .insert({
         influenceur_id: influencerProfile.id,
         type: isStory ? 'story' : hasVideo ? 'video' : files.length > 1 ? 'carrousel' : 'photo',
-        legende: isStory ? null : legende,
-        crop_format: format,
         expire_at: isStory ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null,
-        texte_overlay: isStory && texteOverlay ? texteOverlay : null,
-        texte_x: isStory ? textePos.x : null,
-        texte_y: isStory ? textePos.y : null,
-        texte_couleur: isStory ? texteCouleur : null,
+        ...commonFields,
       })
       .select()
       .single()
@@ -160,6 +240,17 @@ export default function CreatePost() {
 
     setLoading(false)
     navigate('/')
+  }
+
+  const handleDessinExport = async (dataUrl) => {
+    setDessinDataUrl(dataUrl)
+    if (!dataUrl) {
+      setDessinFile(null)
+      return
+    }
+    const res = await fetch(dataUrl)
+    const blob = await res.blob()
+    setDessinFile(new File([blob], 'dessin.png', { type: 'image/png' }))
   }
 
   if (loadingExisting) {
@@ -195,7 +286,6 @@ export default function CreatePost() {
             Ouvre la galerie de ton téléphone{!isStory ? ' — tu peux sélectionner plusieurs fichiers' : ''}
           </span>
           <input
-            ref={fileInputRef}
             type="file"
             accept="image/*,video/*"
             multiple={!isStory}
@@ -208,71 +298,122 @@ export default function CreatePost() {
   }
 
   // ============================================================
-  // ÉCRAN 2 — ÉDITION (structure neuve, calquée sur Instagram)
+  // ÉCRAN 2 — ÉDITION
   // ============================================================
+  const filterCss = getFilterCss(filtre)
+
   return (
     <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col">
-      <header className="flex items-center justify-between px-4 pt-3 pb-2 h-14 shrink-0">
+      {/* barre du haut : miniature + nom + bouton + */}
+      <header className="flex items-center gap-3 px-4 pt-3 pb-2 h-14 shrink-0">
         <button
           onClick={() => (isEditing ? navigate(-1) : setStep('select'))}
-          aria-label="Fermer"
-          className="w-9 h-9 flex items-center justify-center"
+          aria-label="Retour"
+          className="w-9 h-9 -ml-1 flex items-center justify-center shrink-0"
         >
           <X size={22} />
         </button>
-        <span className="text-body-medium">
-          {isEditing ? 'Modifier' : isStory ? 'Nouvelle story' : 'Nouvelle publication'}
-        </span>
-        <div className="w-9" />
+        <div className="flex items-center gap-2 flex-1 min-w-0 bg-white/10 rounded-full pl-1 pr-3 py-1">
+          <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-neutral-800">
+            {mainIsVideo ? (
+              <video src={mainPreview} className="w-full h-full object-cover" muted />
+            ) : (
+              <img src={mainPreview} alt="" className="w-full h-full object-cover" />
+            )}
+          </div>
+          <span className="text-[13px] text-white/90 truncate">
+            {isStory ? 'Nouvelle story' : 'Nouvelle publication'}
+          </span>
+        </div>
+        <button
+          disabled
+          aria-label="Ajouter un média — bientôt disponible"
+          className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center text-white/30 shrink-0"
+        >
+          <Plus size={16} />
+        </button>
       </header>
 
-      {/* zone médiane : photo + sidebar, hauteur flexible mais jamais rognée */}
-      <main className="flex-1 min-h-0 relative">
+      {/* zone médiane : canvas photo avec tous les overlays */}
+      <main className="flex-1 min-h-0 relative overflow-hidden">
         {isStory ? (
           <div
+            ref={canvasRef}
             className="absolute inset-0"
-            onClick={handleMediaTap}
+            onClick={() => activeTool === 'texte' && editingTextId && commitTextEdit()}
           >
             <img
               src={mainPreview}
               alt=""
               className="w-full h-full object-cover select-none"
               draggable={false}
+              style={{ filter: filterCss }}
             />
-            {texteOverlay && (
-              <div
-                className="absolute -translate-x-1/2 -translate-y-1/2 text-center font-semibold px-4 max-w-[90%] whitespace-pre-wrap pointer-events-none"
-                style={{
-                  left: `${textePos.x}%`,
-                  top: `${textePos.y}%`,
-                  color: texteCouleur,
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-                  fontSize: '28px',
-                  textShadow: '0 1px 6px rgba(0,0,0,0.5)',
-                }}
-              >
-                {texteOverlay}
-              </div>
+
+            {dessinDataUrl && (
+              <img src={dessinDataUrl} alt="" className="absolute inset-0 w-full h-full pointer-events-none" />
             )}
 
-            {/* boutons flottant par-dessus la photo, en haut à droite, exactement comme Instagram */}
-            <div className="absolute top-3 right-3 flex flex-col items-end gap-6">
-              {SIDEBAR_ITEMS.map(({ key, icon: Icon, label, enabled }) => {
-                const isActive = key === 'texte' && addingText
-                return (
-                  <button
-                    key={key}
-                    onClick={(e) => { e.stopPropagation(); enabled && handleSidebarClick(key) }}
-                    aria-label={enabled ? label : `${label} — bientôt disponible`}
-                    className={`flex items-center gap-2 ${enabled ? '' : 'opacity-40 pointer-events-none'}`}
+            {elements.map((el) => (
+              <DraggableElement key={el.id} element={el} onMove={moveElement} onTap={handleElementTap}>
+                {el.type === 'texte' && el.id !== editingTextId && (
+                  <p
+                    className="text-center font-semibold px-2 max-w-[80vw] whitespace-pre-wrap"
+                    style={{ color: el.couleur, fontSize: '26px', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}
                   >
-                    <span className="text-[13px] text-white whitespace-nowrap">{label}</span>
-                    <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${isActive ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
-                      <Icon size={17} />
-                    </span>
-                  </button>
-                )
-              })}
+                    {el.contenu}
+                  </p>
+                )}
+                {el.type === 'sticker' && <span className="text-5xl">{el.contenu}</span>}
+                {el.type === 'mention' && (
+                  <span className="bg-black/40 backdrop-blur px-3 py-1.5 rounded-full text-body-medium text-white">
+                    @{el.contenu}
+                  </span>
+                )}
+              </DraggableElement>
+            ))}
+
+            <DrawCanvas
+              active={activeTool === 'dessiner'}
+              width={canvasSize.width}
+              height={canvasSize.height}
+              onExport={handleDessinExport}
+            />
+
+            {/* barre d'icônes horizontale sous la zone photo, style Instagram (verticale à droite ici car format story plein écran) */}
+            <div className="absolute top-3 right-3 flex flex-col items-end gap-5 z-10">
+              {PRIMARY_TOOLS.map(({ key, icon: Icon, label }) => (
+                <button
+                  key={key}
+                  onClick={(e) => { e.stopPropagation(); handleToolClick(key) }}
+                  className="flex items-center gap-2"
+                >
+                  <span className="text-[13px] text-white whitespace-nowrap">{label}</span>
+                  <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${activeTool === key ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
+                    <Icon size={17} />
+                  </span>
+                </button>
+              ))}
+
+              <button onClick={(e) => { e.stopPropagation(); setShowMore((s) => !s) }} className="flex items-center gap-2">
+                <span className="text-[13px] text-white whitespace-nowrap">Plus</span>
+                <span className="w-9 h-9 rounded-full bg-black/40 text-white flex items-center justify-center shrink-0">
+                  <MoreHorizontal size={17} />
+                </span>
+              </button>
+
+              {showMore && MORE_TOOLS.map(({ key, icon: Icon, label }) => (
+                <button
+                  key={key}
+                  onClick={(e) => { e.stopPropagation(); handleToolClick(key) }}
+                  className="flex items-center gap-2"
+                >
+                  <span className="text-[13px] text-white whitespace-nowrap">{label}</span>
+                  <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${activeTool === key ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
+                    <Icon size={17} />
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         ) : (
@@ -285,12 +426,12 @@ export default function CreatePost() {
                   <div className="grid grid-cols-3 gap-1 w-full h-full">
                     {displayMedias.map((p, i) => (
                       <div key={i} className="aspect-square overflow-hidden">
-                        <img src={p} alt="" className="w-full h-full object-cover" />
+                        <img src={p} alt="" className="w-full h-full object-cover" style={{ filter: filterCss }} />
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <img src={mainPreview} alt="" className="w-full h-full object-cover" />
+                  <img src={mainPreview} alt="" className="w-full h-full object-cover" style={{ filter: filterCss }} />
                 )}
               </div>
               {isEditing && (
@@ -303,85 +444,59 @@ export default function CreatePost() {
         )}
       </main>
 
-      {/* popover saisie texte (story) */}
-      {isStory && addingText && (
+      {/* panneau d'outil actif (texte, stickers, filtre, mentionner) */}
+      {activeTool === 'texte' && editingTextId && (
         <div className="px-4 pb-3 shrink-0">
           <div className="flex items-center gap-2 mb-2">
             {TEXT_COLORS.map((c) => (
               <button
                 key={c}
-                onClick={() => setTexteCouleur(c)}
-                className={`w-7 h-7 rounded-full border-2 ${texteCouleur === c ? 'border-white' : 'border-transparent'}`}
+                onClick={() => setTextColor(c)}
+                className={`w-7 h-7 rounded-full border-2 ${textColor === c ? 'border-white' : 'border-transparent'}`}
                 style={{ backgroundColor: c }}
               />
             ))}
           </div>
           <input
-            value={texteOverlay}
-            onChange={(e) => setTexteOverlay(e.target.value)}
+            value={textDraft}
+            onChange={(e) => setTextDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && commitTextEdit()}
             placeholder="Ajouter du texte..."
             autoFocus
             className="w-full h-12 rounded-2xl px-4 bg-white/10 text-white outline-none text-body placeholder:text-white/50"
           />
-          <p className="text-white/50 text-caption mt-2">Touche l'image pour repositionner le texte</p>
+          <div className="flex justify-end mt-2">
+            <button onClick={commitTextEdit} className="text-white text-body-medium px-3 py-1.5">Terminé</button>
+          </div>
         </div>
       )}
 
-      {/* pied : miniature + ratio + légende + publier */}
-      <footer className="shrink-0 px-4 pb-6 pt-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-11 h-11 rounded-lg overflow-hidden border-2 border-white shrink-0 bg-neutral-800">
-            {mainIsVideo ? (
-              <video src={mainPreview} className="w-full h-full object-cover" muted />
-            ) : (
-              <img src={mainPreview} alt="" className="w-full h-full object-cover" />
-            )}
-          </div>
-          <button
-            disabled
-            aria-label="Ajouter un média — bientôt disponible"
-            className="w-11 h-11 rounded-lg border border-white/20 flex items-center justify-center text-white/30 shrink-0"
-          >
-            <Plus size={18} />
-          </button>
+      {activeTool === 'stickers' && (
+        <div className="shrink-0 border-t border-white/10">
+          <StickerPicker onPick={addSticker} />
         </div>
+      )}
 
-        <div className="flex gap-2 mb-3">
-          {FORMATS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setFormat(f.value)}
-              className={`flex-1 rounded-2xl py-3 text-caption-medium transition-colors ${
-                format === f.value ? 'bg-white text-black' : 'bg-white/10 text-white'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+      {activeTool === 'filtre' && (
+        <div className="shrink-0 border-t border-white/10">
+          <FilterPicker imageUrl={mainPreview} value={filtre} onChange={setFiltre} />
         </div>
+      )}
 
-        {!isStory && (
-          <textarea
-            value={legende}
-            onChange={(e) => setLegende(e.target.value)}
-            rows={2}
-            placeholder="Écris une légende..."
-            className="w-full rounded-2xl px-4 py-3 bg-white/10 text-white outline-none resize-none text-body placeholder:text-white/50 mb-3"
-          />
-        )}
+      {activeTool === 'mentionner' && (
+        <div className="shrink-0 border-t border-white/10">
+          <MentionPicker onPick={addMention} />
+        </div>
+      )}
 
-        <button
-          onClick={handlePublish}
-          disabled={loading}
-          className="w-full h-12 rounded-full bg-white text-black text-body-medium disabled:opacity-40 flex items-center justify-center gap-2"
-        >
-          {loading ? 'Enregistrement...' : (
-            <>
-              <Check size={18} strokeWidth={2.5} /> {isEditing ? 'Enregistrer' : 'Publier'}
-            </>
-          )}
-        </button>
-      </footer>
-    </div>
-  )
-}
+      {/* pied : ratio (post uniquement) + légende + publier */}
+      {!isStory && (
+        <footer className="shrink-0 px-4 pb-6 pt-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+          <div className="flex gap-2 mb-3">
+            {FORMATS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setFormat(f.value)}
+                className={`flex-1 rounded-2xl py-3 text-caption-medium transition-colors ${
+                  format === f.value ? 'bg-white text-black' : 'bg-white/10 text-white'
+   
