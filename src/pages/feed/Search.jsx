@@ -1,30 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { Search as SearchIcon } from 'lucide-react'
 import { useActiveStories } from '../../hooks/useActiveStories'
 
+async function fetchInfluencers() {
+  const { data } = await supabase
+    .from('profils_influenceur')
+    .select('id, bio, verifie, users(nom_complet, photo_url)')
+    .limit(30)
+  return data || []
+}
+
 export default function Search() {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState([])
-  const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
   const activeStoryIds = useActiveStories()
 
-  useEffect(() => {
-    const load = async () => {
-      let q = supabase
-        .from('profils_influenceur')
-        .select('id, bio, verifie, users(nom_complet, photo_url)')
-        .limit(30)
-
-      const { data } = await q
-      setResults(data || [])
-      setLoading(false)
-    }
-    load()
-  }, [])
+  const { data: results = [], isLoading: loading } = useQuery({
+    queryKey: ['influenceurs-search'],
+    queryFn: fetchInfluencers,
+  })
 
   const filtered = results.filter((r) =>
     r.users?.nom_complet?.toLowerCase().includes(query.toLowerCase())
