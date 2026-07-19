@@ -22,7 +22,7 @@ export default function Feed() {
       const { data, error } = await supabase
         .from('posts')
         .select(`
-          id, legende, crop_format, type, created_at, commande_id,
+          id, legende, crop_format, type, created_at, commande_id, filtre,
           post_medias(media_url, media_type, position),
           profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
           client:client_id(nom_complet, photo_url),
