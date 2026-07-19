@@ -10,6 +10,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import CommentsSheet from './CommentsSheet'
 import { useActiveStories } from '../../hooks/useActiveStories'
 import { timeAgo } from '../../lib/time'
+import { getFilterCss } from './editor/FilterPicker'
 
 const cropClasses = {
   carre: 'aspect-square',
@@ -135,6 +136,7 @@ export default function PostCard({ post, onDeleted, autoOpenComments = false }) 
                     ref={videoRef}
                     src={mediaUrl}
                     className="w-full h-full object-cover"
+                    style={{ filter: getFilterCss(post.filtre) }}
                     muted={muted}
                     loop
                     playsInline
@@ -150,7 +152,7 @@ export default function PostCard({ post, onDeleted, autoOpenComments = false }) 
                 </button>
               </>
             ) : (
-              <img src={mediaUrl} alt="" className="w-full h-full object-cover" />
+              <img src={mediaUrl} alt="" className="w-full h-full object-cover" style={{ filter: getFilterCss(post.filtre) }} />
             )}
           </div>
         )}
