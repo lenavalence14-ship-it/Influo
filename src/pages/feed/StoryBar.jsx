@@ -16,7 +16,7 @@ export default function StoryBar() {
     const { data } = await supabase
       .from('posts')
       .select(
-        'id, influenceur_id, crop_format, media_url:post_medias(media_url), texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille, created_at, profils_influenceur(id, user_id, verifie, users(nom_complet, photo_url))'
+        'id, influenceur_id, crop_format, media_url:post_medias(media_url), texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille, elements, filtre, dessin_url, created_at, profils_influenceur(id, user_id, verifie, users(nom_complet, photo_url))'
       )
       .eq('type', 'story')
       .gt('expire_at', new Date().toISOString())
@@ -49,6 +49,9 @@ export default function StoryBar() {
       texte_x: s.texte_x,
       texte_y: s.texte_y,
       texte_couleur: s.texte_couleur,
+      elements: Array.isArray(s.elements) ? s.elements : [],
+      filtre: s.filtre,
+      dessin_url: s.dessin_url,
       texte_police: s.texte_police,
       texte_taille: s.texte_taille,
       created_at: s.created_at,
