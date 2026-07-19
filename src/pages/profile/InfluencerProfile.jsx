@@ -58,7 +58,7 @@ export default function InfluencerProfile() {
         .from('posts')
         .select(`
           id, legende, crop_format, created_at, type, filtre,
-          post_medias(media_url, media_type, position),
+          post_medias(media_url, media_type, thumbnail_url, position),
           profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
         `)
         .eq('influenceur_id', targetId)
@@ -306,7 +306,11 @@ export default function InfluencerProfile() {
                   >
                     {p.post_medias?.[0]?.media_url && (
                       p.type === 'video' ? (
-                        <video src={p.post_medias[0].media_url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                        p.post_medias[0].thumbnail_url ? (
+                          <img src={p.post_medias[0].thumbnail_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <video src={p.post_medias[0].media_url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                        )
                       ) : (
                         <img src={p.post_medias[0].media_url} alt="" className="w-full h-full object-cover" />
                       )
