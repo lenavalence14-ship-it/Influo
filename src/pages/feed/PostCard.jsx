@@ -18,14 +18,14 @@ const cropClasses = {
   vertical_45: 'aspect-[4/5]',
 }
 
-export default function PostCard({ post, onDeleted }) {
+export default function PostCard({ post, onDeleted, autoOpenComments = false }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const activeStoryIds = useActiveStories()
   const [liked, setLiked] = useState(post.liked_by_me)
   const [likeCount, setLikeCount] = useState(post.like_count || 0)
   const [commentCount, setCommentCount] = useState(post.comment_count || 0)
-  const [showComments, setShowComments] = useState(false)
+  const [showComments, setShowComments] = useState(autoOpenComments)
   const [showMenu, setShowMenu] = useState(false)
   const [deleted, setDeleted] = useState(false)
   const [muted, setMuted] = useState(true)
