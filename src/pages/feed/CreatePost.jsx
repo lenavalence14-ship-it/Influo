@@ -182,3 +182,187 @@ export default function CreatePost() {
     let dessinUrl = null
     if (dessinFile) {
       const fileName = `${influencerProfile.id}/dessin-${Date.now()}.png`
+      await supabase.storage.from('posts').upload(fileName, dessinFile)
+      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
+      dessinUrl = urlData.publicUrl
+    }
+
+    const commonFields = {
+      legende: isStory ? null : legende,
+      crop_format: format,
+      elements,
+      filtre,
+      dessin_url: dessinUrl,
+      // rétrocompat : on garde aussi le premier élément texte dans les anciennes colonnes
+      texte_overlay: elements.find((e) => e.type === 'texte')?.contenu || null,
+      texte_x: elements.find((e) => e.type === 'texte')?.x ?? null,
+      texte_y: elements.find((e) => e.type === 'texte')?.y ?? null,
+      texte_couleur: elements.find((e) => e.type === 'texte')?.couleur || null,
+    }
+
+    if (isEditing) {
+      await supabase.from('posts').update(commonFields).eq('id', postId)
+      setLoading(false)
+      navigate(-1)
+      return
+    }
+
+    const hasVideo = files.some(isVideoFile)
+    const { data: post, error } = await supabase
+      .from('posts')
+      .insert({
+        influenceur_id: influencerProfile.id,
+        type: isStory ? 'story' : hasVideo ? 'video' : files.length > 1 ? 'carrousel' : 'photo',
+        expire_at: isStory ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null,
+        ...commonFields,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      setLoading(false)
+      return
+    }
+
+    for (let i = 0; i < files.length; i++) {
+      const rawFile = files[i]
+      const file = isVideoFile(rawFile) ? await compressVideo(rawFile) : await compressImage(rawFile)
+      const fileName = `${influencerProfile.id}/${post.id}/${i}-${file.name}`
+      await supabase.storage.from('posts').upload(fileName, file)
+      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
+      await supabase.from('post_medias').insert({
+        post_id: post.id,
+        media_url: urlData.publicUrl,
+        media_type: isVideoFile(rawFile) ? 'video' : 'image',
+        position: i,
+      })
+    }
+
+    setLoading(false)
+    navigate('/')
+  }
+
+  const handleDessinExport = async (dataUrl) => {
+    setDessinDataUrl(dataUrl)
+    if (!dataUrl) {
+      setDessinFile(null)
+      return
+    }
+    const res = await fetch(dataUrl)
+    const blob = await res.blob()
+    setDessinFile(new File([blob], 'dessin.png', { type: 'image/png' }))
+  }
+
+  if (loadingExisting) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+      </div>
+    )
+  }
+
+  // ============================================================
+  // ÉCRAN 1 — SÉLECTION
+  // ============================================================
+  if (step === 'select') {
+    return (
+      <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col">
+        <header className="flex items-center justify-between px-4 pt-3 pb-2 h-14 shrink-0">
+          <button onClick={() => navigate(-1)} aria-label="Fermer" className="w-9 h-9 flex items-center justify-center">
+            <X size={22} />
+          </button>
+          <span className="text-body-medium">{isStory ? 'Nouvelle story' : 'Nouvelle publication'}</span>
+          <div className="w-9" />
+        </header>
+
+        <label className="flex-1 flex flex-col items-center justify-center px-6 gap-4 cursor-pointer">
+          <div className={`${isStory ? 'aspect-[9/16] max-h-[55vh]' : 'aspect-square'} w-full max-w-[380px] rounded-2xl border-2 border-dashed border-white/15 bg-white/[0.04] flex flex-col items-center justify-center gap-3 text-white/50`}>
+            <ImageIcon size={30} />
+            <span className="text-body text-center px-6">
+              Choisir {isStory ? 'une photo ou vidéo' : 'des photos ou vidéos'}
+            </span>
+          </div>
+          <span className="text-caption text-white/40 text-center max-w-[280px]">
+            Ouvre la galerie de ton téléphone{!isStory ? ' — tu peux sélectionner plusieurs fichiers' : ''}
+          </span>
+          <input
+            type="file"
+            accept="image/*,video/*"
+            multiple={!isStory}
+            onChange={handleFilesChange}
+            className="hidden"
+          />
+        </label>
+      </div>
+    )
+  }
+
+  // ============================================================
+  // ÉCRAN 2 — ÉDITION
+  // ============================================================
+  const filterCss = getFilterCss(filtre)
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col">
+      {/* barre du haut : miniature + nom + bouton + */}
+      <header className="flex items-center gap-3 px-4 pt-3 pb-2 h-14 shrink-0">
+        <button
+          onClick={() => (isEditing ? navigate(-1) : setStep('select'))}
+          aria-label="Retour"
+          className="w-9 h-9 -ml-1 flex items-center justify-center shrink-0"
+        >
+          <X size={22} />
+        </button>
+        <div className="flex items-center gap-2 flex-1 min-w-0 bg-white/10 rounded-full pl-1 pr-3 py-1">
+          <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-neutral-800">
+            {mainIsVideo ? (
+              <video src={mainPreview} className="w-full h-full object-cover" muted />
+            ) : (
+              <img src={mainPreview} alt="" className="w-full h-full object-cover" />
+            )}
+          </div>
+          <span className="text-[13px] text-white/90 truncate">
+            {isStory ? 'Nouvelle story' : 'Nouvelle publication'}
+          </span>
+        </div>
+        <button
+          disabled
+          aria-label="Ajouter un média — bientôt disponible"
+          className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center text-white/30 shrink-0"
+        >
+          <Plus size={16} />
+        </button>
+      </header>
+
+      {/* zone médiane : canvas photo avec tous les overlays */}
+      <main className="flex-1 min-h-0 relative overflow-hidden">
+        {isStory ? (
+          <div
+            ref={canvasRef}
+            className="absolute inset-0"
+            onClick={() => activeTool === 'texte' && editingTextId && commitTextEdit()}
+          >
+            <img
+              src={mainPreview}
+              alt=""
+              className="w-full h-full object-cover select-none"
+              draggable={false}
+              style={{ filter: filterCss }}
+            />
+
+            {dessinDataUrl && (
+              <img src={dessinDataUrl} alt="" className="absolute inset-0 w-full h-full pointer-events-none" />
+            )}
+
+            {elements.map((el) => (
+              <DraggableElement key={el.id} element={el} onMove={moveElement} onTap={handleElementTap}>
+                {el.type === 'texte' && el.id !== editingTextId && (
+                  <p
+                    className="text-center font-semibold px-2 max-w-[80vw] whitespace-pre-wrap"
+                    style={{ color: el.couleur, fontSize: '26px', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}
+                  >
+                    {el.contenu}
+                  </p>
+                )}
+                {el.type === 'sticker' && <span className="text-5xl">{el.contenu}</span>}
+                {el.type === 'mention' && (
