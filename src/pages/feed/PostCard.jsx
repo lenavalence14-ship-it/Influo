@@ -62,6 +62,7 @@ export default function PostCard({ post, onDeleted, autoOpenComments = false }) 
   }
 
   const mediaUrl = post.post_medias?.[0]?.media_url
+  const thumbnailUrl = post.post_medias?.[0]?.thumbnail_url
   const isVideo = post.type === 'video' || post.post_medias?.[0]?.media_type === 'video'
 
   // autoplay muet quand la vidéo est bien visible à l'écran, pause sinon (comme Instagram)
@@ -135,6 +136,7 @@ export default function PostCard({ post, onDeleted, autoOpenComments = false }) 
                   <video
                     ref={videoRef}
                     src={mediaUrl}
+                    poster={thumbnailUrl || undefined}
                     className="w-full h-full object-cover"
                     style={{ filter: getFilterCss(post.filtre) }}
                     muted={muted}
