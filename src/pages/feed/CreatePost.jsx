@@ -226,7 +226,7 @@ export default function CreatePost() {
 
     for (let i = 0; i < files.length; i++) {
       const rawFile = files[i]
-      const file = isVideoFile(rawFile) ? await compressVideo(rawFile) : await compressImage(rawFile)
+      const file = isVideoFile(rawFile) ? rawFile : await compressImage(rawFile)
       const fileName = `${influencerProfile.id}/${post.id}/${i}-${file.name}`
       await supabase.storage.from('posts').upload(fileName, file)
       const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
