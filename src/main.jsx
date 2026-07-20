@@ -27,7 +27,7 @@ registerSW({
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60_000, // les données restent "fraîches" 60s : pas de refetch ni de loading en revenant sur une page déjà visitée
+      staleTime: 60_000,
       refetchOnWindowFocus: false,
     },
   },
