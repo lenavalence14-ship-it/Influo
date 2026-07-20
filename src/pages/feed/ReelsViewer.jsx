@@ -10,6 +10,17 @@ import { getFilterCss } from './editor/FilterPicker'
 
 const REELS_PAGE_SIZE = 20
 
+// Fond noir + spinner violet (couleur de marque), affiché à la place de l'icône
+// play grise moche que le navigateur montre par défaut quand une vidéo n'a pas
+// encore de première image ni de miniature à afficher.
+function ReelLoadingOverlay() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-black">
+      <div className="w-10 h-10 rounded-full border-2 border-white/20 animate-spin" style={{ borderTopColor: '#4f0c2d' }} />
+    </div>
+  )
+}
+
 async function fetchReels(userId) {
   const { data } = await supabase
     .from('posts')
@@ -179,6 +190,14 @@ export default function ReelsViewer() {
           // Le reste du flux n'affiche que sa miniature (poster), donc pas de téléchargement
           // vidéo tant que le slide n'est pas sur le point d'être atteint.
           shouldMount={Math.abs(i - activeIndex) <= 1}
+          // La vidéo active ET la suivante (i === activeIndex + 1) préchargent leur contenu
+          // en entier pendant que tu regardes la vidéo courante — comme TikTok, qui télécharge
+          // la vidéo suivante en avance pour qu'elle soit prête instantanément au swipe.
+          // Une fois chargée par le navigateur, elle reste en cache mémoire tant que la balise
+          // <video> reste montée avec la même URL (garanti par shouldMount ci-dessus) : swiper
+          // dessus ne redéclenche donc aucun nouveau téléchargement.
+          shouldPreload={i === activeIndex || i === activeIndex + 1}
+          isActive={i === activeIndex}
           setVideoRef={(el) => (videoRefs.current[i] = el)}
           muted={muted}
           onToggleMute={() => setMuted((m) => !m)}
@@ -188,12 +207,16 @@ export default function ReelsViewer() {
   )
 }
 
-const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, setVideoRef, muted, onToggleMute }) {
+const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPreload, isActive, setVideoRef, muted, onToggleMute }) {
   const { user } = useAuth()
   const [liked, setLiked] = useState(reel.liked_by_me)
   const [likeCount, setLikeCount] = useState(reel.like_count || 0)
   const [showComments, setShowComments] = useState(false)
   const [commentCount, setCommentCount] = useState(reel.comment_count || 0)
+  // Devient true dès que le navigateur a chargé assez de données pour peindre la
+  // première image de la vidéo (événement natif "loadeddata") : à ce moment-là,
+  // le spinner de secours (utilisé quand thumbnailUrl est vide) n'a plus lieu d'être.
+  const [videoReady, setVideoReady] = useState(false)
 
   const influencer = reel.profils_influenceur
   const mediaUrl = reel.post_medias?.[0]?.media_url
@@ -237,10 +260,21 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, setVideoRe
           loop
           muted={muted}
           playsInline
-          preload="metadata"
+          // La vidéo active ET la suivante téléchargent leur contenu dès maintenant.
+          // Les autres vidéos montées (celle qu'on vient de quitter, en N-1) restent en
+          // "metadata" seul : pas besoin de re-précharger une vidéo déjà vue en arrière.
+          preload={shouldPreload ? 'auto' : 'metadata'}
+          onLoadedData={() => setVideoReady(true)}
           style={{ filter: getFilterCss(reel.filtre) }}
         />
       )}
+
+      {/* Si aucune miniature n'existe en base (vidéos publiées avant la génération
+          automatique de thumbnail), le navigateur affiche par défaut une grosse icône
+          play floue tant que la vidéo n'a pas assez chargé pour peindre sa première
+          image. On masque ça avec un fond uni + spinner, nettement plus propre, jusqu'à
+          ce que la vidéo ait sa première image prête. */}
+      {shouldMount && !thumbnailUrl && !videoReady && <ReelLoadingOverlay />}
 
       {/* dégradés pour lisibilité de l'UI */}
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />

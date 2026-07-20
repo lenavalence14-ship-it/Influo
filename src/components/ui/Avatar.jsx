@@ -18,7 +18,7 @@ export default function Avatar({ src, seed, size = 'md', className = '', ring = 
 
   if (ring) {
     return (
-      <div className={`${SIZES[size]} rounded-full p-[2.5px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400 shrink-0 ${className}`}>
+      <div className={`${SIZES[size]} rounded-full p-[2.5px] shrink-0 ${className}`} style={{ background: 'linear-gradient(to bottom right, #4f0c2d, #7a1240)' }}>
         <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
           <img src={src || fallback} alt="" loading={loading} decoding="async" className="w-full h-full rounded-full object-cover" />
         </div>

@@ -131,7 +131,7 @@ export default function InfluencerProfile() {
           </button>
           <h1
             className="text-xl"
-            style={{ fontFamily: 'var(--font-logo)', color: '#a855f7' }}
+            style={{ fontFamily: 'var(--font-logo)', color: '#4f0c2d' }}
           >
             Influo
           </h1>
@@ -150,7 +150,7 @@ export default function InfluencerProfile() {
         <div className="flex items-center gap-5">
           <div className="relative shrink-0">
             {activeStoryIds.has(target.id) ? (
-              <div className="w-20 h-20 rounded-full p-[2.5px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400">
+              <div className="w-20 h-20 rounded-full p-[2.5px]" style={{ background: 'linear-gradient(to bottom right, #4f0c2d, #7a1240)' }}>
                 <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
                   <img
                     src={target.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${target.id}`}

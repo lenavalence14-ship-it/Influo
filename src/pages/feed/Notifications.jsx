@@ -181,7 +181,7 @@ else if (n.type === 'comment') navigate(`/post/${n.lien_ref_id}?comments=1`)
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {!n.lu && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#a855f7' }} />}
+                      {!n.lu && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#4f0c2d' }} />}
                       {n.post_thumbnail?.url && (
                         n.post_thumbnail.type === 'video' ? (
                           n.post_thumbnail.thumbnailUrl ? (

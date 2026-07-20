@@ -10,6 +10,7 @@ import { Sun, Moon, MessageCircle, Plus, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useUnreadCounts } from '../../hooks/useUnreadCounts'
 import { usePullToRefresh } from '../../hooks/usePullToRefresh'
+import Logo from '../../components/ui/Logo'
 
 const PAGE_SIZE = 10
 
@@ -118,12 +119,7 @@ export default function Feed() {
           <div className="w-9 h-9" />
         )}
 
-        <h1
-          className="text-3xl"
-          style={{ fontFamily: 'var(--font-logo)', color: '#a855f7' }}
-        >
-          Influo
-        </h1>
+        <Logo size={30} />
 
         <div className="flex items-center gap-2">
           <button
@@ -133,7 +129,7 @@ export default function Feed() {
           >
             <MessageCircle size={19} />
             {hasUnreadMessages && (
-              <span className="absolute top-2 right-2.5 w-2 h-2 rounded-full bg-violet-500" />
+              <span className="absolute top-2 right-2.5 w-2 h-2 rounded-full" style={{ backgroundColor: '#4f0c2d' }} />
             )}
           </button>
           <button
@@ -153,7 +149,8 @@ export default function Feed() {
         >
           <RefreshCw
             size={20}
-            className={refreshing ? 'animate-spin text-violet-500' : 'text-[var(--text-secondary)]'}
+            className={refreshing ? 'animate-spin' : 'text-[var(--text-secondary)]'}
+            style={refreshing ? { color: '#4f0c2d' } : undefined}
             style={
               refreshing
                 ? undefined
