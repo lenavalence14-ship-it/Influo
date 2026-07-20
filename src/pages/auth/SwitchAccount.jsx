@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
 import { saveAccount } from '../../lib/accountSwitcher'
 import { ArrowLeft } from 'lucide-react'
 import appIcon from '../../assets/app-icon.png'
@@ -30,9 +31,19 @@ export default function SwitchAccount() {
       return
     }
     if (data?.session?.refresh_token) {
+      // On va chercher le vrai nom et la vraie photo dans public.users : sans ça,
+      // le sélecteur de profils affiche l'email à la place de l'avatar habituel.
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('nom_complet, photo_url')
+        .eq('id', data.user.id)
+        .maybeSingle()
+
       setPendingSession({
         userId: data.user.id,
         email,
+        nomComplet: userRow?.nom_complet || email,
+        photoUrl: userRow?.photo_url || null,
         refreshToken: data.session.refresh_token,
       })
       setShowConsent(true)
@@ -45,9 +56,9 @@ export default function SwitchAccount() {
     if (remember && pendingSession) {
       await saveAccount({
         userId: pendingSession.userId,
-        nomComplet: pendingSession.email,
+        nomComplet: pendingSession.nomComplet,
         email: pendingSession.email,
-        photoUrl: null,
+        photoUrl: pendingSession.photoUrl,
         refreshToken: pendingSession.refreshToken,
       })
     }
@@ -113,7 +124,7 @@ export default function SwitchAccount() {
         </Link>
 
         <p
-          className="text-center mt-10 text-[var(--text-secondary)] text-2xl"
+          className="text-center mt-10 text-[var(--accent)] text-2xl"
           style={{ fontFamily: 'var(--font-logo)' }}
         >
           Influo
@@ -122,21 +133,29 @@ export default function SwitchAccount() {
 
       {showConsent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-6 bg-black/60">
-          <div className="w-full max-w-sm rounded-2xl glass-strong p-6 text-center">
-            <p className="text-body-medium mb-2">Enregistrer ce profil sur cet appareil ?</p>
-            <p className="text-caption text-[var(--text-secondary)] mb-6">
+          <div
+            className="w-full max-w-sm rounded-2xl p-6 text-center border"
+            style={{
+              background: 'linear-gradient(135deg, rgba(79,12,45,0.55), rgba(79,12,45,0.25))',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              borderColor: 'rgba(255,255,255,0.18)',
+            }}
+          >
+            <p className="text-body-medium mb-2 text-white">Enregistrer ce profil sur cet appareil ?</p>
+            <p className="text-caption text-white/70 mb-6">
               Tu pourras te reconnecter en un tap la prochaine fois, sans ressaisir ton mot de passe.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => handleConsent(false)}
-                className="flex-1 h-12 rounded-full glass text-body-medium active:scale-[0.98] transition-all"
+                className="flex-1 h-12 rounded-full border border-white/25 text-white text-body-medium active:scale-[0.98] transition-all"
               >
                 Non merci
               </button>
               <button
                 onClick={() => handleConsent(true)}
-                className="flex-1 h-12 rounded-full bg-[var(--accent)] text-white text-body-medium active:scale-[0.98] transition-all"
+                className="flex-1 h-12 rounded-full bg-white text-[var(--accent)] text-body-medium font-semibold active:scale-[0.98] transition-all"
               >
                 Enregistrer
               </button>
