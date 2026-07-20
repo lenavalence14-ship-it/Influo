@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null) // ligne public.users
   const [influencerProfile, setInfluencerProfile] = useState(null) // ligne profils_influenceur si role=influenceur
+  const [clientProfile, setClientProfile] = useState(null) // ligne profils_client si role=client
   const [loading, setLoading] = useState(true)
 
   usePushNotifications(session?.user?.id)
@@ -28,8 +29,18 @@ export function AuthProvider({ children }) {
         .eq('user_id', userId)
         .maybeSingle()
       setInfluencerProfile(infRow || null)
+      setClientProfile(null)
+    } else if (userRow?.role === 'client') {
+      const { data: cliRow } = await supabase
+        .from('profils_client')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle()
+      setClientProfile(cliRow || null)
+      setInfluencerProfile(null)
     } else {
       setInfluencerProfile(null)
+      setClientProfile(null)
     }
 
     return userRow
@@ -76,6 +87,10 @@ export function AuthProvider({ children }) {
           user_id: data.user.id,
         })
         // le wallet est créé par un trigger côté DB idéalement ; sinon on le crée ici en secours
+      } else if (role === 'client') {
+        await supabase.from('profils_client').insert({
+          user_id: data.user.id,
+        })
       }
       await loadProfile(data.user.id)
     }
@@ -94,6 +109,7 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
     setProfile(null)
     setInfluencerProfile(null)
+    setClientProfile(null)
   }
 
   const resetPassword = async (email) => {
@@ -107,6 +123,7 @@ export function AuthProvider({ children }) {
         user: session?.user || null,
         profile,
         influencerProfile,
+        clientProfile,
         loading,
         signUp,
         signIn,
