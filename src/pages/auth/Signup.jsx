@@ -6,7 +6,7 @@ import GlassCard from '../../components/ui/GlassCard'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import { Sun, Moon, User, Briefcase } from 'lucide-react'
-
+import appIcon from '../../assets/app-icon.png'
 export default function Signup() {
   const [role, setRole] = useState(null) // 'influenceur' | 'client'
   const [nomComplet, setNomComplet] = useState('')
