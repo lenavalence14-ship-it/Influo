@@ -42,8 +42,24 @@ export async function removeAccount(userId) {
 }
 
 // Tente de restaurer la session d'un compte enregistré à partir de son refresh_token.
-// Si le token a expiré ou a été révoqué, Supabase renvoie une erreur : dans ce cas
-// on retire l'entrée périmée de la liste locale pour ne pas la laisser trainer.
+// On ne retire l'entrée locale que si Supabase confirme que le token est invalide ou révoqué
+// (ex: mot de passe changé, déconnexion globale). Une simple coupure réseau ou une erreur
+// temporaire ne doit jamais faire disparaître le profil : sinon le bouton "Supprimer" dans
+// Gérer les profils devient le seul moyen de perdre un profil, ce qui est le but recherché.
+const INVALID_TOKEN_MESSAGES = [
+  'invalid refresh token',
+  'refresh token not found',
+  'refresh token already used',
+  'session not found',
+  'user not found',
+]
+
+function isTokenDefinitivelyInvalid(error) {
+  if (!error) return false
+  const msg = (error.message || '').toLowerCase()
+  return INVALID_TOKEN_MESSAGES.some((needle) => msg.includes(needle))
+}
+
 export async function switchToAccount(userId) {
   const accounts = await getSavedAccounts()
   const account = accounts.find((a) => a.userId === userId)
@@ -55,7 +71,12 @@ export async function switchToAccount(userId) {
   })
 
   if (error) {
-    await removeAccount(userId)
+    // Uniquement si Supabase dit explicitement que le token est mort : on nettoie.
+    // Toute autre erreur (réseau, timeout, serveur temporairement indisponible) laisse
+    // le profil intact pour un nouvel essai.
+    if (isTokenDefinitivelyInvalid(error)) {
+      await removeAccount(userId)
+    }
     return { error }
   }
 
