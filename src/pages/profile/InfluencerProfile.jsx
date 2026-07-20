@@ -45,51 +45,58 @@ export default function InfluencerProfile() {
 
   useEffect(() => {
     if (!targetId) { setLoading(false); return }
+    let cancelled = false
 
     const load = async () => {
-      const { data: prof } = await supabase
-        .from('profils_influenceur')
-        .select('*, users(nom_complet, photo_url, email)')
-        .eq('id', targetId)
-        .maybeSingle()
-      setTarget(prof)
+      // Toutes les requêtes indépendantes (profil, posts, offres, réseaux) partent
+      // en parallèle plutôt qu'en chaîne séquentielle : le temps total d'ouverture
+      // du profil devient le max des requêtes, pas leur somme.
+      const offresQuery = supabase.from('offres').select('*').eq('influenceur_id', targetId).order('created_at', { ascending: false })
 
-      const { data: postsData } = await supabase
-        .from('posts')
-        .select(`
-          id, legende, crop_format, created_at, type, filtre,
-          post_medias(media_url, media_type, position),
-          profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
-        `)
-        .eq('influenceur_id', targetId)
-        .in('type', ['photo', 'carrousel', 'video'])
-        .order('created_at', { ascending: false })
+      const [{ data: prof }, { data: postsData }, { data: offresData }, { data: reseauxData }] = await Promise.all([
+        supabase
+          .from('profils_influenceur')
+          .select('*, users(nom_complet, photo_url, email)')
+          .eq('id', targetId)
+          .maybeSingle(),
+        supabase
+          .from('posts')
+          .select(`
+            id, legende, crop_format, created_at, type, filtre,
+            post_medias(media_url, media_type, thumbnail_url, position),
+            profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
+          `)
+          .eq('influenceur_id', targetId)
+          .in('type', ['photo', 'carrousel', 'video'])
+          .order('created_at', { ascending: false })
+          .limit(60),
+        isMe ? offresQuery : offresQuery.eq('actif', true),
+        supabase.from('reseaux_sociaux').select('*').eq('influenceur_id', targetId),
+      ])
+
+      if (cancelled) return
 
       const postIds = (postsData || []).map((p) => p.id)
       const { data: likes } = postIds.length
         ? await supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds)
         : { data: [] }
 
+      if (cancelled) return
+
       const enrichedPosts = (postsData || []).map((p) => ({
         ...p,
         like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
         liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === user?.id) || false,
       }))
+
+      setTarget(prof)
       setPosts(enrichedPosts)
-
-      const offresQuery = supabase.from('offres').select('*').eq('influenceur_id', targetId).order('created_at', { ascending: false })
-      const { data: offresData } = isMe ? await offresQuery : await offresQuery.eq('actif', true)
       setOffres(offresData || [])
-
-      const { data: reseauxData } = await supabase
-        .from('reseaux_sociaux')
-        .select('*')
-        .eq('influenceur_id', targetId)
       setReseaux(reseauxData || [])
-
       setLoading(false)
     }
     load()
+    return () => { cancelled = true }
   }, [targetId])
 
   if (loading) {
@@ -124,7 +131,7 @@ export default function InfluencerProfile() {
           </button>
           <h1
             className="text-xl"
-            style={{ fontFamily: 'var(--font-logo)', color: '#a855f7' }}
+            style={{ fontFamily: 'var(--font-logo)', color: '#4f0c2d' }}
           >
             Influo
           </h1>
@@ -143,7 +150,7 @@ export default function InfluencerProfile() {
         <div className="flex items-center gap-5">
           <div className="relative shrink-0">
             {activeStoryIds.has(target.id) ? (
-              <div className="w-20 h-20 rounded-full p-[2.5px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400">
+              <div className="w-20 h-20 rounded-full p-[2.5px]" style={{ background: 'linear-gradient(to bottom right, #4f0c2d, #7a1240)' }}>
                 <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
                   <img
                     src={target.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${target.id}`}
@@ -306,9 +313,30 @@ export default function InfluencerProfile() {
                   >
                     {p.post_medias?.[0]?.media_url && (
                       p.type === 'video' ? (
-                        <video src={p.post_medias[0].media_url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                        p.post_medias[0].thumbnail_url ? (
+                          <img
+                            src={p.post_medias[0].thumbnail_url}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          // Pas de thumbnail générée (ancien post) : on n'affiche jamais le fichier
+                          // vidéo complet ici (ça téléchargerait toute la vidéo juste pour peupler
+                          // une case de grille). On garde le fond neutre avec une icône vidéo discrète.
+                          <div className="w-full h-full flex items-center justify-center bg-black/30">
+                            <Video size={20} className="text-white/40" />
+                          </div>
+                        )
                       ) : (
-                        <img src={p.post_medias[0].media_url} alt="" className="w-full h-full object-cover" />
+                        <img
+                          src={p.post_medias[0].media_url}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover"
+                        />
                       )
                     )}
                   </button>
@@ -396,7 +424,7 @@ function OfferCard({ offre, editable, onChange }) {
     >
       <div className="relative aspect-[4/3] bg-gradient-to-br from-white/10 to-transparent">
         {offre.photo_url ? (
-          <img src={offre.photo_url} alt="" className="w-full h-full object-cover" />
+          <img src={offre.photo_url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] text-body">
             Aucune image

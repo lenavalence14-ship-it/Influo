@@ -100,3 +100,46 @@ export async function compressVideo(file, { maxDimension = 1280, videoBitsPerSec
     return file
   }
 }
+
+// Capture une frame de la vidéo (par défaut à 0.5s, pour éviter un premier frame souvent noir/flou)
+// et la retourne comme fichier JPEG, utilisable comme miniature (poster) avant chargement de la vidéo.
+export async function generateVideoThumbnail(file, { seekTime = 0.5, quality = 0.8 } = {}) {
+  if (!file.type.startsWith('video/')) return null
+
+  try {
+    const videoUrl = URL.createObjectURL(file)
+    const video = document.createElement('video')
+    video.src = videoUrl
+    video.muted = true
+    video.playsInline = true
+
+    await new Promise((resolve, reject) => {
+      video.onloadedmetadata = resolve
+      video.onerror = reject
+    })
+
+    // ne pas viser plus loin que la durée réelle de la vidéo (cas des vidéos très courtes)
+    video.currentTime = Math.min(seekTime, video.duration / 2)
+
+    await new Promise((resolve, reject) => {
+      video.onseeked = resolve
+      video.onerror = reject
+    })
+
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    URL.revokeObjectURL(videoUrl)
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+    if (!blob) return null
+
+    return new File([blob], file.name.replace(/\.\w+$/, '-thumb.jpg'), { type: 'image/jpeg' })
+  } catch (err) {
+    console.warn('Génération de miniature vidéo échouée:', err)
+    return null
+  }
+}

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Plus } from 'lucide-react'
@@ -6,27 +7,32 @@ import { useNavigate } from 'react-router-dom'
 import StoryViewer from './StoryViewer'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 
+async function fetchStories() {
+  const { data } = await supabase
+    .from('posts')
+    .select(
+      'id, influenceur_id, crop_format, media_url:post_medias(media_url, media_type), texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille, elements, filtre, dessin_url, created_at, profils_influenceur(id, user_id, verifie, users(nom_complet, photo_url))'
+    )
+    .eq('type', 'story')
+    .gt('expire_at', new Date().toISOString())
+    .order('created_at', { ascending: true })
+  return data || []
+}
+
 export default function StoryBar() {
-  const [rawStories, setRawStories] = useState([])
   const [viewerGroupIndex, setViewerGroupIndex] = useState(null)
   const { profile, influencerProfile } = useAuth()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
-  const loadStories = async () => {
-    const { data } = await supabase
-      .from('posts')
-      .select(
-        'id, influenceur_id, crop_format, media_url:post_medias(media_url, media_type), texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille, elements, filtre, dessin_url, created_at, profils_influenceur(id, user_id, verifie, users(nom_complet, photo_url))'
-      )
-      .eq('type', 'story')
-      .gt('expire_at', new Date().toISOString())
-      .order('created_at', { ascending: true })
-    setRawStories(data || [])
-  }
-
-  useEffect(() => {
-    loadStories()
-  }, [])
+  // React Query : mis en cache et partagé avec useActiveStories via la même donnée sous-jacente
+  // n'est pas nécessaire ici (clés différentes), mais bénéficie du staleTime pour éviter un
+  // refetch à chaque navigation retour vers le feed.
+  const { data: rawStories = [] } = useQuery({
+    queryKey: ['stories'],
+    queryFn: fetchStories,
+    staleTime: 15_000,
+  })
 
   // grouper par influenceur, dans l'ordre chronologique de leurs stories
   const groupsMap = new Map()
@@ -82,14 +88,15 @@ export default function StoryBar() {
         {profile?.role === 'influenceur' && (
           <div className="flex flex-col items-center gap-2 shrink-0 cursor-pointer" onClick={handleClickMine}>
             <div
-              className={`relative w-[72px] h-[72px] rounded-full ${
-                hasMyStory ? 'p-[2.5px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400' : ''
-              }`}
+              className="relative w-[72px] h-[72px] rounded-full"
+              style={hasMyStory ? { padding: '2.5px', background: 'linear-gradient(to bottom right, #4f0c2d, #7a1240)' } : undefined}
             >
               <div className={`w-full h-full rounded-full ${hasMyStory ? 'bg-[var(--bg-primary)] p-[2px]' : ''}`}>
                 <img
                   src={myPhotoUrl || `https://api.dicebear.com/9.x/glass/svg?seed=${myInfluencerId}`}
                   alt=""
+                  loading="eager"
+                  decoding="async"
                   className="w-full h-full rounded-full object-cover"
                 />
               </div>
@@ -105,17 +112,19 @@ export default function StoryBar() {
           </div>
         )}
 
-        {otherGroups.map((g) => (
+        {otherGroups.map((g, i) => (
           <div
             key={g.influenceurId}
             className="flex flex-col items-center gap-2 shrink-0 cursor-pointer"
             onClick={() => setViewerGroupIndex(groups.findIndex((x) => x.influenceurId === g.influenceurId))}
           >
-            <div className="w-[72px] h-[72px] rounded-full p-[2.5px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400">
+            <div className="w-[72px] h-[72px] rounded-full p-[2.5px]" style={{ background: 'linear-gradient(to bottom right, #4f0c2d, #7a1240)' }}>
               <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
                 <img
                   src={g.photoUrl || `https://api.dicebear.com/9.x/glass/svg?seed=${g.influenceurId}`}
                   alt=""
+                  loading={i < 4 ? 'eager' : 'lazy'}
+                  decoding="async"
                   className="w-full h-full rounded-full object-cover"
                 />
               </div>
@@ -135,7 +144,7 @@ export default function StoryBar() {
           myInfluencerId={myInfluencerId}
           onClose={() => {
             setViewerGroupIndex(null)
-            loadStories()
+            queryClient.invalidateQueries({ queryKey: ['stories'] })
           }}
         />
       )}

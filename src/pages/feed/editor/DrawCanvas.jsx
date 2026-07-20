@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-const DRAW_COLORS = ['#ffffff', '#000000', '#f43f5e', '#3b82f6', '#22c55e', '#eab308', '#a855f7']
+const DRAW_COLORS = ['#ffffff', '#000000', '#f43f5e', '#3b82f6', '#22c55e', '#eab308', '#4f0c2d']
 
 /**
  * Canvas de dessin libre en overlay. `active` contrôle si le canvas capte les

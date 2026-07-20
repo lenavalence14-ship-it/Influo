@@ -57,7 +57,7 @@ export default function Search() {
                 className="glass-strong rounded-2xl p-4 cursor-pointer"
               >
                 {activeStoryIds.has(inf.id) ? (
-                  <div className="w-14 h-14 rounded-full p-[2.5px] bg-gradient-to-br from-purple-600 via-violet-500 to-fuchsia-400 mb-3">
+                  <div className="w-14 h-14 rounded-full p-[2.5px] mb-3" style={{ background: 'linear-gradient(to bottom right, #4f0c2d, #7a1240)' }}>
                     <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
                       <img
                         src={inf.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${inf.id}`}

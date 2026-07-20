@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { Heart, MessageCircle, Send, MoreHorizontal, X, Trash2, Pencil, Volume2, VolumeX } from 'lucide-react'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { InstagramIcon, TikTokIcon } from '../../components/ui/SocialIcons'
@@ -19,7 +19,7 @@ const cropClasses = {
   vertical_45: 'aspect-[4/5]',
 }
 
-export default function PostCard({ post, onDeleted, autoOpenComments = false }) {
+function PostCard({ post, onDeleted, autoOpenComments = false, priority = false }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const activeStoryIds = useActiveStories()
@@ -30,7 +30,12 @@ export default function PostCard({ post, onDeleted, autoOpenComments = false }) 
   const [showMenu, setShowMenu] = useState(false)
   const [deleted, setDeleted] = useState(false)
   const [muted, setMuted] = useState(true)
+  // le média (vidéo) n'est monté dans le DOM que quand la carte approche de l'écran.
+  // Pour les toutes premières cartes du feed (priority), on le monte immédiatement
+  // pour éviter un flash vide au premier affichage.
+  const [mediaMounted, setMediaMounted] = useState(priority)
   const videoRef = useRef(null)
+  const mediaContainerRef = useRef(null)
 
   const influencer = post.profils_influenceur
   const isOwner = influencer?.user_id === user?.id
@@ -62,15 +67,38 @@ export default function PostCard({ post, onDeleted, autoOpenComments = false }) 
   }
 
   const mediaUrl = post.post_medias?.[0]?.media_url
+  const thumbnailUrl = post.post_medias?.[0]?.thumbnail_url
   const isVideo = post.type === 'video' || post.post_medias?.[0]?.media_type === 'video'
+
+  // Monte le <video> dans le DOM dès que la carte est à moins de ~1 écran de distance
+  // du viewport (lazy loading + préchargement de "la vidéo visible et la suivante").
+  // Avant le montage, seule l'image poster (thumbnail réelle) est affichée : aucune
+  // requête réseau vidéo n'est émise tant que la carte n'approche pas de l'écran.
+  useEffect(() => {
+    if (!isVideo || mediaMounted) return
+    const container = mediaContainerRef.current
+    if (!container) return
+
+    const mountObserver = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setMediaMounted(true)
+          mountObserver.disconnect()
+        }
+      },
+      { rootMargin: '1000px 0px' }
+    )
+    mountObserver.observe(container)
+    return () => mountObserver.disconnect()
+  }, [isVideo, mediaMounted])
 
   // autoplay muet quand la vidéo est bien visible à l'écran, pause sinon (comme Instagram)
   useEffect(() => {
-    if (!isVideo) return
+    if (!isVideo || !mediaMounted) return
     const video = videoRef.current
     if (!video) return
 
-    const observer = new IntersectionObserver(
+    const playObserver = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
           video.play().catch(() => {})
@@ -80,9 +108,9 @@ export default function PostCard({ post, onDeleted, autoOpenComments = false }) 
       },
       { threshold: [0, 0.6, 1] }
     )
-    observer.observe(video)
-    return () => observer.disconnect()
-  }, [isVideo])
+    playObserver.observe(video)
+    return () => playObserver.disconnect()
+  }, [isVideo, mediaMounted])
 
   if (deleted) return null
 
@@ -124,7 +152,10 @@ export default function PostCard({ post, onDeleted, autoOpenComments = false }) 
 
         {/* media */}
         {mediaUrl && (
-          <div className={`w-full ${cropClasses[post.crop_format] || 'aspect-square'} bg-black/20 overflow-hidden relative`}>
+          <div
+            ref={mediaContainerRef}
+            className={`w-full ${cropClasses[post.crop_format] || 'aspect-square'} bg-black/20 overflow-hidden relative`}
+          >
             {isVideo ? (
               <>
                 <button
@@ -132,16 +163,33 @@ export default function PostCard({ post, onDeleted, autoOpenComments = false }) 
                   className="absolute inset-0 w-full h-full block"
                   aria-label="Voir le réel"
                 >
-                  <video
-                    ref={videoRef}
-                    src={mediaUrl}
-                    className="w-full h-full object-cover"
-                    style={{ filter: getFilterCss(post.filtre) }}
-                    muted={muted}
-                    loop
-                    playsInline
-                    preload="metadata"
-                  />
+                  {/* La miniature réelle (thumbnail_url) s'affiche immédiatement, y compris avant
+                      que la balise <video> ne soit montée. Jamais d'icône vidéo grise par défaut :
+                      s'il n'y a pas encore de thumbnail (post très ancien sans miniature générée),
+                      on affiche simplement le fond neutre, pas un pictogramme. */}
+                  {thumbnailUrl && !mediaMounted && (
+                    <img
+                      src={thumbnailUrl}
+                      alt=""
+                      loading={priority ? 'eager' : 'lazy'}
+                      decoding="async"
+                      className="w-full h-full object-cover"
+                      style={{ filter: getFilterCss(post.filtre) }}
+                    />
+                  )}
+                  {mediaMounted && (
+                    <video
+                      ref={videoRef}
+                      src={mediaUrl}
+                      poster={thumbnailUrl || undefined}
+                      className="w-full h-full object-cover"
+                      style={{ filter: getFilterCss(post.filtre) }}
+                      muted={muted}
+                      loop
+                      playsInline
+                      preload="metadata"
+                    />
+                  )}
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); setMuted((m) => !m) }}
@@ -152,7 +200,14 @@ export default function PostCard({ post, onDeleted, autoOpenComments = false }) 
                 </button>
               </>
             ) : (
-              <img src={mediaUrl} alt="" className="w-full h-full object-cover" style={{ filter: getFilterCss(post.filtre) }} />
+              <img
+                src={mediaUrl}
+                alt=""
+                loading={priority ? 'eager' : 'lazy'}
+                decoding="async"
+                className="w-full h-full object-cover"
+                style={{ filter: getFilterCss(post.filtre) }}
+              />
             )}
           </div>
         )}
@@ -242,3 +297,13 @@ export default function PostCard({ post, onDeleted, autoOpenComments = false }) 
     </article>
   )
 }
+
+// évite les re-renders de toutes les cartes du feed quand une seule change
+// (like, pagination qui ajoute des posts, etc.) : ne re-render que si les props
+// pertinentes de CETTE carte ont changé.
+export default memo(PostCard, (prev, next) => (
+  prev.post === next.post &&
+  prev.onDeleted === next.onDeleted &&
+  prev.autoOpenComments === next.autoOpenComments &&
+  prev.priority === next.priority
+))

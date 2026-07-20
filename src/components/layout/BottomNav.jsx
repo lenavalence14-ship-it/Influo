@@ -3,7 +3,7 @@ import { Home, Search, Heart } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useUnreadCounts } from '../../hooks/useUnreadCounts'
 
-function PlayIcon({ size = 24, className = '', isActive = false }) {
+function PlayIcon({ size = 24, className = '', style, isActive = false }) {
   const maskId = 'play-cutout-mask'
 
   return (
@@ -12,6 +12,7 @@ function PlayIcon({ size = 24, className = '', isActive = false }) {
       height={size}
       viewBox="0 0 24 24"
       className={className}
+      style={style}
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
@@ -31,7 +32,7 @@ function PlayIcon({ size = 24, className = '', isActive = false }) {
           width="18"
           height="18"
           rx="5"
-          fill="#8b5cf6"
+          fill="#4f0c2d"
           mask={`url(#${maskId})`}
         />
       ) : (
@@ -93,16 +94,16 @@ export default function BottomNav() {
               aria-label={label}
               className={({ isActive }) =>
                 `relative flex items-center justify-center w-11 h-10 rounded-2xl transition-opacity duration-200 ${
-                  isActive ? 'opacity-100 text-violet-500' : 'opacity-50'
+                  isActive ? 'opacity-100' : 'opacity-50'
                 }`
               }
+              style={({ isActive }) => (isActive ? { color: '#4f0c2d' } : undefined)}
             >
               {({ isActive }) =>
                 isAvatar ? (
                   <span
-                    className={`flex items-center justify-center rounded-full ${
-                      isActive ? 'ring-2 ring-violet-500 p-0.5' : ''
-                    }`}
+                    className="flex items-center justify-center rounded-full"
+                    style={isActive ? { boxShadow: '0 0 0 2px #4f0c2d', padding: '2px' } : undefined}
                   >
                     <img
                       src={
@@ -119,19 +120,19 @@ export default function BottomNav() {
                       <PlayIcon
                         size={24}
                         isActive={isActive}
-                        className="text-violet-500"
+                        style={{ color: '#4f0c2d' }}
                       />
                     ) : (
                       <Icon
                         size={24}
                         strokeWidth={2.6}
-                        fill={isActive ? '#8b5cf6' : 'none'}
-                        className={isActive ? 'text-violet-500' : ''}
+                        fill={isActive ? '#4f0c2d' : 'none'}
+                        style={isActive ? { color: '#4f0c2d' } : undefined}
                       />
                     )}
 
                     {dot && (
-                      <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-violet-500" />
+                      <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full" style={{ backgroundColor: '#4f0c2d' }} />
                     )}
                   </>
                 )

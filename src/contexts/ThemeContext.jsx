@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { StatusBar, Style } from '@capacitor/status-bar'
 
 const ThemeContext = createContext()
 
@@ -30,6 +32,12 @@ export function ThemeProvider({ children }) {
     let appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
     if (appleMeta) {
       appleMeta.setAttribute('content', theme === 'light' ? 'default' : 'black-translucent')
+    }
+
+    // Android natif (Capacitor) : la meta tag ci-dessus n'a aucun effet, il faut appeler le plugin directement
+    if (Capacitor.isNativePlatform()) {
+      StatusBar.setBackgroundColor({ color })
+      StatusBar.setStyle({ style: theme === 'light' ? Style.Light : Style.Dark })
     }
   }, [theme])
 
