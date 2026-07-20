@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePushNotifications } from '../hooks/usePushNotifications'
+import { saveAccount } from '../lib/accountSwitcher'
 
 const AuthContext = createContext()
 
@@ -56,13 +57,35 @@ export function AuthProvider({ children }) {
       }
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Le token stocké dans "profils enregistrés sur cet appareil" (accountSwitcher) doit être
+    // tenu à jour à chaque fois que Supabase le rafraîchit automatiquement en arrière-plan
+    // (autoRefreshToken: true). Sans ça, ce token devient obsolète dès le premier rafraîchissement,
+    // et le sélecteur de profils échoue en pensant que la session est morte alors qu'elle est
+    // juste désynchronisée de son côté.
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
       if (session?.user) {
         loadProfile(session.user.id)
+        if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+          supabase
+            .from('users')
+            .select('nom_complet, photo_url')
+            .eq('id', session.user.id)
+            .maybeSingle()
+            .then(({ data: userRow }) => {
+              saveAccount({
+                userId: session.user.id,
+                nomComplet: userRow?.nom_complet || session.user.email,
+                email: session.user.email,
+                photoUrl: userRow?.photo_url || null,
+                refreshToken: session.refresh_token,
+              })
+            })
+        }
       } else {
         setProfile(null)
         setInfluencerProfile(null)
+        setClientProfile(null)
       }
     })
 
