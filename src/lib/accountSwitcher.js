@@ -57,7 +57,12 @@ const INVALID_TOKEN_MESSAGES = [
 function isTokenDefinitivelyInvalid(error) {
   if (!error) return false
   const msg = (error.message || '').toLowerCase()
-  return INVALID_TOKEN_MESSAGES.some((needle) => msg.includes(needle))
+  const textMatch = INVALID_TOKEN_MESSAGES.some((needle) => msg.includes(needle))
+  // Supabase répond en 400/401 pour un refresh token mort ou révoqué, quel que soit le
+  // libellé exact du message (qui peut varier selon la version de gotrue). On se base
+  // aussi sur le code, pour ne pas dépendre uniquement d'un texte qui peut changer.
+  const statusMatch = error.status === 400 || error.status === 401
+  return textMatch || statusMatch
 }
 
 export async function switchToAccount(userId) {
