@@ -215,7 +215,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false 
         {/* actions */}
         <div className="flex items-center gap-3.5 px-3 pt-2 flex-wrap">
           <button onClick={toggleLike} className="active:scale-90 transition-transform duration-200">
-            <Heart size={23} className={liked ? 'fill-red-500 text-red-500' : ''} strokeWidth={1.75} />
+            <Heart size={23} className={liked ? 'fill-[var(--accent)] text-[var(--accent)]' : ''} strokeWidth={1.75} />
           </button>
           <button
             onClick={() => setShowComments((s) => !s)}
@@ -282,7 +282,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false 
           </button>
           <button
             onClick={handleDelete}
-            className="w-full flex items-center gap-3 px-5 py-3 text-body text-red-500"
+            className="w-full flex items-center gap-3 px-5 py-3 text-body text-[var(--accent)]"
           >
             <Trash2 size={18} /> Supprimer la publication
           </button>
