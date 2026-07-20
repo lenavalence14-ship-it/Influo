@@ -7,8 +7,10 @@ import AppLayout from './components/layout/AppLayout'
 import MyProfileRouter from './components/MyProfileRouter'
 import MyDashboardRouter from './components/MyDashboardRouter'
 
-// Login est la première chose qu'un utilisateur non connecté voit : reste en import statique
-// pour éviter un flash de chargement au tout premier écran de l'app.
+// ProfilePicker (sélecteur de profils façon Facebook) est la première chose qu'un
+// utilisateur non connecté voit désormais : reste en import statique pour éviter
+// un flash de chargement au tout premier écran de l'app.
+import ProfilePicker from './pages/auth/ProfilePicker'
 import Login from './pages/auth/Login'
 
 // Tout le reste est chargé à la demande (code-splitting par route) : le bundle initial
@@ -16,6 +18,7 @@ import Login from './pages/auth/Login'
 // Cela réduit fortement le JS à parser/exécuter au démarrage, donc le temps d'ouverture de l'app.
 const Signup = lazy(() => import('./pages/auth/Signup'))
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'))
+const ManageProfiles = lazy(() => import('./pages/auth/ManageProfiles'))
 
 const Feed = lazy(() => import('./pages/feed/Feed'))
 const Search = lazy(() => import('./pages/feed/Search'))
@@ -59,6 +62,8 @@ function AppRoutes() {
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         {/* Auth */}
+        <Route path="/profils" element={<ProfilePicker />} />
+        <Route path="/profils/gerer" element={<ManageProfiles />} />
         <Route path="/connexion" element={<Login />} />
         <Route path="/inscription" element={<Signup />} />
         <Route path="/mot-de-passe-oublie" element={<ForgotPassword />} />

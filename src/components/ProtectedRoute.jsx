@@ -13,7 +13,7 @@ export default function ProtectedRoute({ children, roleRequired }) {
   }
 
   if (!user) {
-    return <Navigate to="/connexion" replace />
+    return <Navigate to="/profils" replace />
   }
 
   if (roleRequired && profile?.role !== roleRequired) {

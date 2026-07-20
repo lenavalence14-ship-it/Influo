@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { usePushNotifications } from '../hooks/usePushNotifications'
+import { saveAccount } from '../lib/accountSwitcher'
 
 const AuthContext = createContext()
 
@@ -31,6 +32,8 @@ export function AuthProvider({ children }) {
     } else {
       setInfluencerProfile(null)
     }
+
+    return userRow
   }
 
   useEffect(() => {
@@ -76,6 +79,18 @@ export function AuthProvider({ children }) {
         // le wallet est créé par un trigger côté DB idéalement ; sinon on le crée ici en secours
       }
       await loadProfile(data.user.id)
+
+      // Enregistre ce compte sur l'appareil pour le sélecteur de profils (façon Facebook),
+      // seulement si l'inscription a directement ouvert une session (pas de confirmation email requise).
+      if (data.session?.refresh_token) {
+        await saveAccount({
+          userId: data.user.id,
+          nomComplet,
+          email,
+          photoUrl: null,
+          refreshToken: data.session.refresh_token,
+        })
+      }
     }
     return { data, error: null }
   }
@@ -83,7 +98,18 @@ export function AuthProvider({ children }) {
   const signIn = async ({ email, password }) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (!error && data.user) {
-      await loadProfile(data.user.id)
+      const userRow = await loadProfile(data.user.id)
+
+      // Enregistre/rafraîchit ce compte dans la liste des profils de cet appareil.
+      if (data.session?.refresh_token) {
+        await saveAccount({
+          userId: data.user.id,
+          nomComplet: userRow?.nom_complet || email,
+          email,
+          photoUrl: userRow?.photo_url || null,
+          refreshToken: data.session.refresh_token,
+        })
+      }
     }
     return { data, error }
   }
