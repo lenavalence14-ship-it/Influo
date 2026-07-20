@@ -16,7 +16,7 @@ const REELS_PAGE_SIZE = 20
 function ReelLoadingOverlay() {
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-black">
-      <div className="w-10 h-10 rounded-full border-2 border-white/20 border-t-purple-500 animate-spin" />
+      <div className="w-10 h-10 rounded-full border-2 border-white/20 animate-spin" style={{ borderTopColor: '#4f0c2d' }} />
     </div>
   )
 }
