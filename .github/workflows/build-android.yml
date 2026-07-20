@@ -8,6 +8,8 @@ on:
       - 'android/**'
       - 'capacitor.config.json'
       - 'package.json'
+      - 'src/**'
+      - 'index.html'
 
 jobs:
   build:
