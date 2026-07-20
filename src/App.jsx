@@ -11,7 +11,7 @@ import MyDashboardRouter from './components/MyDashboardRouter'
 // utilisateur non connecté voit désormais : reste en import statique pour éviter
 // un flash de chargement au tout premier écran de l'app.
 import ProfilePicker from './pages/auth/ProfilePicker'
-import Login from './pages/auth/Login'
+import SwitchAccount from './pages/auth/SwitchAccount'
 
 // Tout le reste est chargé à la demande (code-splitting par route) : le bundle initial
 // ne contient plus l'éditeur de post, l'admin, le wallet, la messagerie, etc.
@@ -64,7 +64,7 @@ function AppRoutes() {
         {/* Auth */}
         <Route path="/profils" element={<ProfilePicker />} />
         <Route path="/profils/gerer" element={<ManageProfiles />} />
-        <Route path="/connexion" element={<Login />} />
+        <Route path="/connexion" element={<SwitchAccount />} />
         <Route path="/inscription" element={<Signup />} />
         <Route path="/mot-de-passe-oublie" element={<ForgotPassword />} />
 

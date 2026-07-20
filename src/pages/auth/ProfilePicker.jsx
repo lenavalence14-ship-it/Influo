@@ -4,15 +4,11 @@ import { MoreHorizontal, ChevronRight } from 'lucide-react'
 import { getSavedAccounts, switchToAccount } from '../../lib/accountSwitcher'
 import { useTheme } from '../../contexts/ThemeContext'
 import Avatar from '../../components/ui/Avatar'
-import Logo from '../../components/ui/Logo'
+import appIcon from '../../assets/app-icon.png'
 import { Sun, Moon } from 'lucide-react'
 
-// Écran de sélection de profil, façon "changer de compte" Facebook : si des comptes
-// ont déjà été utilisés sur cet appareil, ils apparaissent ici et un tap suffit à
-// se reconnecter (restauration de session via refresh_token, pas de mot de passe).
-// S'il n'y a aucun compte enregistré, on saute directement vers l'écran de connexion.
 export default function ProfilePicker() {
-  const [accounts, setAccounts] = useState(null) // null = en cours de chargement
+  const [accounts, setAccounts] = useState(null)
   const [switchingId, setSwitchingId] = useState(null)
   const [error, setError] = useState('')
   const { theme, toggleTheme } = useTheme()
@@ -34,7 +30,7 @@ export default function ProfilePicker() {
     const { error } = await switchToAccount(userId)
     setSwitchingId(null)
     if (error) {
-      setError("Cette session a expiré, reconnecte-toi.")
+      setError('Cette session a expiré, reconnecte-toi.')
       const list = await getSavedAccounts()
       setAccounts(list)
       return
@@ -42,7 +38,7 @@ export default function ProfilePicker() {
     navigate('/')
   }
 
-  if (accounts === null) return null // évite un flash avant la redirection ou l'affichage
+  if (accounts === null) return null
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center px-6 py-10 relative overflow-hidden bg-[var(--bg-primary)]">
@@ -61,15 +57,15 @@ export default function ProfilePicker() {
 
       <button
         onClick={() => navigate('/profils/gerer')}
-        className="absolute top-6 right-6 glass rounded-full p-3 z-10"
+        className="absolute top-6 right-6 p-3 z-10"
         aria-label="Gérer les profils"
       >
-        <MoreHorizontal size={18} />
+        <MoreHorizontal size={20} />
       </button>
 
       <div className="w-full max-w-sm relative z-10 animate-fade-in mt-16">
         <div className="flex justify-center mb-8">
-          <Logo size={56} />
+          <img src={appIcon} alt="Influo" className="w-24 h-24 rounded-2xl" />
         </div>
 
         {error && (
@@ -108,7 +104,10 @@ export default function ProfilePicker() {
           </button>
         </div>
 
-        <p className="text-center mt-10 text-[var(--text-secondary)] text-2xl font-[family-name:--font-logo]">
+        <p
+          className="text-center mt-10 text-[var(--text-secondary)] text-2xl"
+          style={{ fontFamily: 'var(--font-logo)' }}
+        >
           Influo
         </p>
       </div>
