@@ -30,8 +30,13 @@ export default function ProfilePicker() {
     const { error } = await switchToAccount(userId)
     setSwitchingId(null)
     if (error) {
-      setError('Cette session a expiré, reconnecte-toi.')
       const list = await getSavedAccounts()
+      const stillThere = list.some((a) => a.userId === userId)
+      setError(
+        stillThere
+          ? 'Connexion impossible, vérifie ta connexion internet et réessaie.'
+          : 'Cette session a expiré, reconnecte-toi.'
+      )
       setAccounts(list)
       return
     }
