@@ -4,9 +4,9 @@ export default function VerifiedBadge({ size = 16 }) {
       <svg viewBox="0 0 40 40" width={size} height={size} fill="none">
         <defs>
           <linearGradient id="verifiedBadgeGradient" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#9333ea" />
-            <stop offset="50%" stopColor="#8b5cf6" />
-            <stop offset="100%" stopColor="#e879f9" />
+            <stop offset="0%" stopColor="#4f0c2d" />
+            <stop offset="50%" stopColor="#7a1240" />
+            <stop offset="100%" stopColor="#a8225c" />
           </linearGradient>
         </defs>
         <path
