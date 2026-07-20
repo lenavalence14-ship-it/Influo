@@ -105,7 +105,7 @@ export default function ProfilePicker() {
         </div>
 
         <p
-          className="text-center mt-10 text-[var(--text-secondary)] text-2xl"
+          className="text-center mt-10 text-[var(--accent)] text-2xl"
           style={{ fontFamily: 'var(--font-logo)' }}
         >
           Influo
