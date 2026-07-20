@@ -5,7 +5,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import GlassCard from '../../components/ui/GlassCard'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import { Sun, Moon, User, Briefcase } from 'lucide-react'
+import { Sun, Moon, User, Briefcase, ArrowLeft } from 'lucide-react'
 import appIcon from '../../assets/app-icon.png'
 export default function Signup() {
   const [role, setRole] = useState(null) // 'influenceur' | 'client'
@@ -47,6 +47,14 @@ export default function Signup() {
         <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-white/[0.04] blur-3xl" />
         <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-white/[0.03] blur-3xl" />
       </div>
+
+      <button
+        onClick={() => navigate(-1)}
+        className="absolute top-6 left-6 glass rounded-full p-3 z-10"
+        aria-label="Retour"
+      >
+        <ArrowLeft size={18} />
+      </button>
 
       <button
         onClick={toggleTheme}
@@ -160,4 +168,3 @@ export default function Signup() {
     </div>
   )
 }
-
