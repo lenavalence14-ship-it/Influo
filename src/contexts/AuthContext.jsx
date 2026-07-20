@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { usePushNotifications } from '../hooks/usePushNotifications'
 
 const AuthContext = createContext()
 
@@ -8,6 +9,8 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null) // ligne public.users
   const [influencerProfile, setInfluencerProfile] = useState(null) // ligne profils_influenceur si role=influenceur
   const [loading, setLoading] = useState(true)
+
+  usePushNotifications(session?.user?.id)
 
   const loadProfile = async (userId) => {
     const { data: userRow } = await supabase
