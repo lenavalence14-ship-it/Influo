@@ -35,6 +35,7 @@ export default function Chat() {
   const [deliverLienTiktok, setDeliverLienTiktok] = useState('')
   const [deliverFile, setDeliverFile] = useState(null)
   const [deliverPreview, setDeliverPreview] = useState(null)
+  const [deliverMediaType, setDeliverMediaType] = useState('image')
   const [deliverFormat, setDeliverFormat] = useState('carre')
   const [deliverLoading, setDeliverLoading] = useState(false)
   const deliverFileInputRef = useRef(null)
@@ -223,9 +224,34 @@ export default function Chat() {
   const handleDeliverFileChange = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
+    const isVideo = file.type.startsWith('video/')
     setDeliverFile(file)
+    setDeliverMediaType(isVideo ? 'video' : 'image')
     setDeliverPreview(URL.createObjectURL(file))
   }
+
+  // Génère une image (frame) à partir d'une vidéo, pour servir de miniature en base.
+  const generateVideoThumbnail = (file) =>
+    new Promise((resolve, reject) => {
+      const video = document.createElement('video')
+      video.preload = 'metadata'
+      video.muted = true
+      video.playsInline = true
+      video.src = URL.createObjectURL(file)
+      video.onloadeddata = () => {
+        video.currentTime = Math.min(0.5, (video.duration || 1) / 2)
+      }
+      video.onseeked = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        URL.revokeObjectURL(video.src)
+        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('thumbnail vide'))), 'image/jpeg', 0.8)
+      }
+      video.onerror = () => reject(new Error('lecture vidéo impossible'))
+    })
 
   const handleDeliverSubmit = async () => {
     if (!deliverLienInstagram && !deliverLienTiktok) return
@@ -242,6 +268,23 @@ export default function Chat() {
     const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
     const mediaUrl = urlData.publicUrl
 
+    // si c'est une vidéo, on génère et on upload aussi une miniature (nécessaire pour l'affichage
+    // en grille côté profils, une vidéo ne peut pas être posée directement dans une balise <img>)
+    let thumbnailUrl = null
+    if (deliverMediaType === 'video') {
+      try {
+        const thumbBlob = await generateVideoThumbnail(deliverFile)
+        const thumbName = `${influencerProfile.id}/livraisons/${commande.id}-${Date.now()}-thumb.jpg`
+        const { error: thumbError } = await supabase.storage.from('posts').upload(thumbName, thumbBlob)
+        if (!thumbError) {
+          const { data: thumbUrlData } = supabase.storage.from('posts').getPublicUrl(thumbName)
+          thumbnailUrl = thumbUrlData.publicUrl
+        }
+      } catch {
+        // pas bloquant : sans miniature, la vidéo reste livrée mais s'affichera sans aperçu en grille
+      }
+    }
+
     await supabase
       .from('commandes')
       .update({
@@ -251,6 +294,8 @@ export default function Chat() {
         lien_tiktok: deliverLienTiktok || null,
         media_livraison_url: mediaUrl,
         media_crop_format: deliverFormat,
+        media_type: deliverMediaType,
+        media_thumbnail_url: thumbnailUrl,
       })
       .eq('id', commande.id)
 
@@ -267,6 +312,8 @@ export default function Chat() {
       lien_tiktok: deliverLienTiktok || null,
       media_livraison_url: mediaUrl,
       media_crop_format: deliverFormat,
+      media_type: deliverMediaType,
+      media_thumbnail_url: thumbnailUrl,
     }))
 
     setDeliverLoading(false)
@@ -275,6 +322,7 @@ export default function Chat() {
     setDeliverLienTiktok('')
     setDeliverFile(null)
     setDeliverPreview(null)
+    setDeliverMediaType('image')
   }
 
   // --- Validation client : crée automatiquement le post "collaboration vérifiée" dans le feed ---
@@ -287,7 +335,7 @@ export default function Chat() {
         .from('posts')
         .insert({
           influenceur_id: commande.influenceur_id,
-          type: 'photo',
+          type: commande.media_type === 'video' ? 'video' : 'photo',
           crop_format: commande.media_crop_format || 'carre',
           commande_id: commande.id,
           client_id: commande.client_id,
@@ -299,6 +347,8 @@ export default function Chat() {
         await supabase.from('post_medias').insert({
           post_id: newPost.id,
           media_url: commande.media_livraison_url,
+          media_type: commande.media_type || 'image',
+          thumbnail_url: commande.media_thumbnail_url || null,
           position: 0,
         })
         await supabase.from('commandes').update({ post_id: newPost.id }).eq('id', commande.id)
@@ -559,18 +609,22 @@ if (!conversation) {
                   : deliverFormat === 'vertical_45' ? 'aspect-[4/5]'
                   : 'aspect-[2/3]'
                 } rounded-2xl overflow-hidden bg-black/20`}>
-                  <img src={deliverPreview} alt="" className="w-full h-full object-cover" />
+                  {deliverMediaType === 'video' ? (
+                    <video src={deliverPreview} className="w-full h-full object-cover" muted playsInline controls />
+                  ) : (
+                    <img src={deliverPreview} alt="" className="w-full h-full object-cover" />
+                  )}
                 </div>
               ) : (
                 <div className="w-full aspect-square rounded-2xl glass flex flex-col items-center justify-center gap-2 text-[var(--text-secondary)]">
                   <ImageIcon size={24} />
-                  <span className="text-caption">Choisir le média de la publication</span>
+                  <span className="text-caption">Choisir le média de la publication (photo ou vidéo)</span>
                 </div>
               )}
               <input
                 ref={deliverFileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,video/*"
                 onChange={handleDeliverFileChange}
                 className="hidden"
               />
