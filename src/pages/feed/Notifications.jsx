@@ -159,7 +159,7 @@ else if (n.type === 'comment') navigate(`/post/${n.lien_ref_id}?comments=1`)
                         className="w-16 h-16 rounded-full flex items-center justify-center shrink-0"
                         style={{ backgroundColor: 'var(--surface-secondary)' }}
                       >
-                        <Icon size={22} className={n.type === 'like' ? 'text-red-500' : 'text-[var(--text-secondary)]'} />
+                        <Icon size={22} className={n.type === 'like' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
