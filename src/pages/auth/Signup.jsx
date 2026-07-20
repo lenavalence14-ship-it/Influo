@@ -57,8 +57,14 @@ export default function Signup() {
       </button>
 
       <div className="w-full max-w-sm relative z-10 animate-fade-in">
-        <div className="mb-8 text-center">
-          <h1 className="text-display tracking-tight mb-2">Influo</h1>
+        <div className="mb-8 text-center flex flex-col items-center">
+          <img src={appIcon} alt="Influo" className="w-16 h-16 rounded-2xl mb-4" />
+          <h1
+            className="tracking-tight mb-2 text-3xl text-[var(--accent)]"
+            style={{ fontFamily: 'var(--font-logo)' }}
+          >
+            Influo
+          </h1>
           <p className="text-[var(--text-secondary)] text-body">
             Crée ton compte
           </p>
