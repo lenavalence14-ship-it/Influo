@@ -72,16 +72,34 @@ export default function ConversationsList() {
           .order('updated_at', { ascending: false })
       }
 
-      const [{ data: normalData }, proResult, bizResult] = await Promise.all([
+      // conversations_sociale = utilisateur_simple ↔ utilisateur_simple, même logique
+      // symétrique que conversations_biz mais référence users.id directement.
+      let socialeQuery = null
+      if (profile?.role === 'utilisateur_simple') {
+        socialeQuery = supabase
+          .from('conversations_sociale')
+          .select(`
+            id, updated_at, user_a_id, user_b_id, user_a_last_read_at, user_b_last_read_at,
+            user_a:user_a_id(id, nom_complet, photo_url),
+            user_b:user_b_id(id, nom_complet, photo_url),
+            messages_sociale(contenu, created_at, is_system, sender_id)
+          `)
+          .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
+          .order('updated_at', { ascending: false })
+      }
+
+      const [{ data: normalData }, proResult, bizResult, socialeResult] = await Promise.all([
         normalQuery,
         proQuery ? proQuery : Promise.resolve({ data: [] }),
         bizQuery ? bizQuery : Promise.resolve({ data: [] }),
+        socialeQuery ? socialeQuery : Promise.resolve({ data: [] }),
       ])
 
       const normalized = [
         ...(normalData || []).map((c) => ({ ...c, kind: 'normal' })),
         ...((proResult?.data) || []).map((c) => ({ ...c, kind: 'pro' })),
         ...((bizResult?.data) || []).map((c) => ({ ...c, kind: 'biz' })),
+        ...((socialeResult?.data) || []).map((c) => ({ ...c, kind: 'sociale' })),
       ].sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
 
       setConversations(normalized)
@@ -102,6 +120,10 @@ export default function ConversationsList() {
     if (c.kind === 'biz') {
       const isSideA = c.client_a_id === clientProfile?.id
       return isSideA ? c.client_b?.users : c.client_a?.users
+    }
+    if (c.kind === 'sociale') {
+      const isSideA = c.user_a_id === user?.id
+      return isSideA ? c.user_b : c.user_a
     }
     if (c.kind === 'pro') {
       return profile?.role === 'client' ? c.utilisateur : c.client?.users
@@ -143,10 +165,11 @@ export default function ConversationsList() {
           {filtered.map((c) => {
             const isPro = c.kind === 'pro'
             const isBiz = c.kind === 'biz'
+            const isSociale = c.kind === 'sociale'
             const isInfluencer = profile?.role === 'influenceur'
             const other = getOther(c)
 
-            const msgList = isBiz ? c.messages_biz : isPro ? c.messages_pro : c.messages
+            const msgList = isBiz ? c.messages_biz : isPro ? c.messages_pro : isSociale ? c.messages_sociale : c.messages
             const lastMsg = msgList?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
 
             let seenByOther = false
@@ -154,6 +177,11 @@ export default function ConversationsList() {
               const isSideA = c.client_a_id === clientProfile?.id
               const otherReadAt = isSideA ? c.client_b_last_read_at : c.client_a_last_read_at
               const lastMsgIsMine = lastMsg?.sender_id === clientProfile?.id
+              seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
+            } else if (isSociale) {
+              const isSideA = c.user_a_id === user?.id
+              const otherReadAt = isSideA ? c.user_b_last_read_at : c.user_a_last_read_at
+              const lastMsgIsMine = lastMsg?.sender_id === user?.id
               seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
             } else if (isPro) {
               const isUtilisateur = profile?.role === 'utilisateur_simple'
@@ -166,7 +194,13 @@ export default function ConversationsList() {
               seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
             }
 
-            const targetRoute = isBiz ? `/messages/biz/${c.id}` : isPro ? `/messages/pro/${c.id}` : `/messages/${c.id}`
+            const targetRoute = isBiz
+              ? `/messages/biz/${c.id}`
+              : isSociale
+              ? `/messages/sociale/${c.id}`
+              : isPro
+              ? `/messages/pro/${c.id}`
+              : `/messages/${c.id}`
 
             return (
               <div
@@ -182,10 +216,10 @@ export default function ConversationsList() {
                 <div className="flex-1 min-w-0">
                   <p className="text-body-medium flex items-center gap-1.5">
                     {other?.nom_complet}
-                    {!isBiz && !isPro && !isInfluencer && c.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
+                    {!isBiz && !isSociale && !isPro && !isInfluencer && c.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
                   </p>
                   <p className="text-caption truncate">
-                    {lastMsg?.contenu || (!isBiz && !isPro && c.offres?.titre && `Offre : ${c.offres.titre}`) || 'Nouvelle conversation'}
+                    {lastMsg?.contenu || (!isBiz && !isSociale && !isPro && c.offres?.titre && `Offre : ${c.offres.titre}`) || 'Nouvelle conversation'}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
