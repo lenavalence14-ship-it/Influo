@@ -1,112 +1,61 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Search } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import VerifiedBadge from '../../components/ui/VerifiedBadge'
-import { timeShort } from '../../lib/time'
-import StoryBar from '../feed/StoryBar'
+import Button from '../../components/ui/Button'
+import { X, Grid3x3, Video, ArrowLeft } from 'lucide-react'
+import PostCard from '../feed/PostCard'
+import { useFollow } from '../../hooks/useFollow'
 
-export default function ConversationsList() {
-  const [conversations, setConversations] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [query, setQuery] = useState('')
-  const { user, profile, influencerProfile, clientProfile } = useAuth()
+// Profil "utilisateur normal" vu par un visiteur.
+// Aujourd'hui un utilisateur_simple ne peut pas encore publier (décision produit :
+// "profil vide pour l'instant"), donc la grille sera vide tant que ce n'est pas
+// ajouté séparément — le composant est prêt à afficher du contenu dès que ce sera le cas.
+export default function SimpleUserProfileView() {
+  const { id } = useParams()
   const navigate = useNavigate()
+  const { profile } = useAuth()
+  const { followersCount, isFollowing, toggleFollow, pending: followPending } = useFollow(id)
+
+  const [utilisateur, setUtilisateur] = useState(null)
+  const [subTab, setSubTab] = useState('grille')
+  const [posts, setPosts] = useState([])
+  const [selectedPost, setSelectedPost] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!id) return
+    let cancelled = false
+
     const load = async () => {
-      let normalQuery = supabase
-        .from('conversations')
-        .select(`
-          id, updated_at, client_last_read_at, influenceur_last_read_at,
-          client:client_id(nom_complet, photo_url),
-          profils_influenceur(id, verifie, users(nom_complet, photo_url)),
-          offres(titre),
-          messages(contenu, created_at, is_system, sender_id)
-        `)
-        .order('updated_at', { ascending: false })
-
-      if (profile?.role === 'influenceur' && influencerProfile) {
-        normalQuery = normalQuery.eq('influenceur_id', influencerProfile.id)
-      } else {
-        normalQuery = normalQuery.eq('client_id', user.id)
-      }
-
-      let proQuery = null
-      if (profile?.role === 'utilisateur_simple') {
-        proQuery = supabase
-          .from('conversations_pro')
+      const [{ data: userRow }, { data: postsData }] = await Promise.all([
+        supabase.from('users').select('id, nom_complet, photo_url').eq('id', id).maybeSingle(),
+        supabase
+          .from('posts')
           .select(`
-            id, updated_at, utilisateur_last_read_at, client_last_read_at,
-            client:client_id(id, users(nom_complet, photo_url)),
-            messages_pro(contenu, created_at, is_system, sender_id)
+            id, legende, crop_format, created_at, type, filtre, commande_id,
+            post_medias(media_url, media_type, thumbnail_url, position),
+            profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
+            client:client_id(id, nom_complet, photo_url),
+            commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)
           `)
-          .eq('utilisateur_id', user.id)
-          .order('updated_at', { ascending: false })
-      } else if (profile?.role === 'client' && clientProfile?.id) {
-        proQuery = supabase
-          .from('conversations_pro')
-          .select(`
-            id, updated_at, utilisateur_last_read_at, client_last_read_at,
-            utilisateur:utilisateur_id(nom_complet, photo_url),
-            messages_pro(contenu, created_at, is_system, sender_id)
-          `)
-          .eq('client_id', clientProfile.id)
-          .order('updated_at', { ascending: false })
-      }
-
-      // conversations_biz = entreprise ↔ entreprise (nouveau système, symétrique :
-      // le compte peut être client_a ou client_b selon qui a démarré la conversation).
-      let bizQuery = null
-      if (profile?.role === 'client' && clientProfile?.id) {
-        bizQuery = supabase
-          .from('conversations_biz')
-          .select(`
-            id, updated_at, client_a_id, client_b_id, client_a_last_read_at, client_b_last_read_at,
-            client_a:client_a_id(id, users(nom_complet, photo_url)),
-            client_b:client_b_id(id, users(nom_complet, photo_url)),
-            messages_biz(contenu, created_at, is_system, sender_id)
-          `)
-          .or(`client_a_id.eq.${clientProfile.id},client_b_id.eq.${clientProfile.id}`)
-          .order('updated_at', { ascending: false })
-      }
-
-      // conversations_sociale = utilisateur_simple ↔ utilisateur_simple, même logique
-      // symétrique que conversations_biz mais référence users.id directement.
-      let socialeQuery = null
-      if (profile?.role === 'utilisateur_simple') {
-        socialeQuery = supabase
-          .from('conversations_sociale')
-          .select(`
-            id, updated_at, user_a_id, user_b_id, user_a_last_read_at, user_b_last_read_at,
-            user_a:user_a_id(id, nom_complet, photo_url),
-            user_b:user_b_id(id, nom_complet, photo_url),
-            messages_sociale(contenu, created_at, is_system, sender_id)
-          `)
-          .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
-          .order('updated_at', { ascending: false })
-      }
-
-      const [{ data: normalData }, proResult, bizResult, socialeResult] = await Promise.all([
-        normalQuery,
-        proQuery ? proQuery : Promise.resolve({ data: [] }),
-        bizQuery ? bizQuery : Promise.resolve({ data: [] }),
-        socialeQuery ? socialeQuery : Promise.resolve({ data: [] }),
+          .eq('client_id', id)
+          .in('type', ['photo', 'carrousel', 'video'])
+          .order('created_at', { ascending: false })
+          .limit(60),
       ])
 
-      const normalized = [
-        ...(normalData || []).map((c) => ({ ...c, kind: 'normal' })),
-        ...((proResult?.data) || []).map((c) => ({ ...c, kind: 'pro' })),
-        ...((bizResult?.data) || []).map((c) => ({ ...c, kind: 'biz' })),
-        ...((socialeResult?.data) || []).map((c) => ({ ...c, kind: 'sociale' })),
-      ].sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
+      if (cancelled) return
 
-      setConversations(normalized)
+      setUtilisateur(userRow || null)
+      setPosts(
+        (postsData || []).map((p) => ({ ...p, like_count: 0, liked_by_me: false }))
+      )
       setLoading(false)
     }
-    if (user) load()
-  }, [user, profile, influencerProfile, clientProfile])
+    load()
+    return () => { cancelled = true }
+  }, [id])
 
   if (loading) {
     return (
@@ -116,129 +65,144 @@ export default function ConversationsList() {
     )
   }
 
-  const getOther = (c) => {
-    if (c.kind === 'biz') {
-      const isSideA = c.client_a_id === clientProfile?.id
-      return isSideA ? c.client_b?.users : c.client_a?.users
-    }
-    if (c.kind === 'sociale') {
-      const isSideA = c.user_a_id === user?.id
-      return isSideA ? c.user_b : c.user_a
-    }
-    if (c.kind === 'pro') {
-      return profile?.role === 'client' ? c.utilisateur : c.client?.users
-    }
-    const isInfluencer = profile?.role === 'influenceur'
-    return isInfluencer ? c.client : c.profils_influenceur?.users
+  if (!utilisateur) {
+    return (
+      <div className="px-5 pt-6 text-center text-[var(--text-secondary)]">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-caption mb-6">
+          <ArrowLeft size={16} /> Retour
+        </button>
+        Profil introuvable.
+      </div>
+    )
   }
 
-  const filtered = conversations.filter((c) => {
-    if (!query.trim()) return true
-    return getOther(c)?.nom_complet?.toLowerCase().includes(query.trim().toLowerCase())
-  })
+  const filteredPosts = posts.filter((p) => (subTab === 'video' ? p.type === 'video' : p.type !== 'video'))
 
   return (
     <div>
-      <header className="px-5 pt-6 pb-4">
-        <h1 className="text-h1 mb-4">Discussion</h1>
-        <div className="glass rounded-full flex items-center gap-2 px-4 h-11">
-          <Search size={16} className="text-[var(--text-secondary)] shrink-0" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher"
-            className="flex-1 bg-transparent outline-none text-body placeholder:text-[var(--text-secondary)]"
-          />
+      <div className="flex items-center px-3 pt-4 pb-1">
+        <button onClick={() => navigate(-1)} aria-label="Retour" className="w-9 h-9 flex items-center justify-center">
+          <ArrowLeft size={20} />
+        </button>
+      </div>
+
+      <div className="px-5 pt-2 pb-4 flex flex-col items-center text-center">
+        <img
+          src={utilisateur.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${utilisateur.id}`}
+          alt=""
+          className="w-20 h-20 rounded-full object-cover mb-3"
+        />
+        <h1 className="text-h2 font-bold mb-1">{utilisateur.nom_complet}</h1>
+        <div className="flex gap-4 justify-center mb-4">
+          <span className="text-small">
+            <span className="font-bold text-[var(--text-primary)]">{posts.length}</span>{' '}
+            <span className="text-[var(--text-secondary)]">publications</span>
+          </span>
+          <span className="text-small">
+            <span className="font-bold text-[var(--text-primary)]">{followersCount.toLocaleString()}</span>{' '}
+            <span className="text-[var(--text-secondary)]">abonnés</span>
+          </span>
         </div>
-      </header>
 
-      <StoryBar />
-
-      {filtered.length === 0 ? (
-        <div className="glass rounded-2xl p-8 text-center mx-4">
-          <p className="text-[var(--text-secondary)]">
-            {conversations.length === 0 ? 'Aucune conversation pour le moment.' : 'Aucun résultat.'}
-          </p>
+        {/* La messagerie utilisateur_simple <-> utilisateur_simple n'a de sens qu'entre
+            deux comptes de ce rôle (même logique que conversations_biz entre deux
+            entreprises) : le bouton Message n'apparaît que dans ce cas. */}
+        <div className="flex gap-2 w-full max-w-xs">
+          <Button
+            shape="rect"
+            variant={isFollowing ? 'glass' : 'primary'}
+            disabled={followPending}
+            onClick={toggleFollow}
+            fullWidth
+          >
+            {isFollowing ? 'Abonné' : 'Suivre'}
+          </Button>
+          {profile?.role === 'utilisateur_simple' && (
+            <Button
+              shape="rect"
+              variant="glass"
+              fullWidth
+              onClick={() => navigate(`/messages/sociale/nouveau?utilisateur=${utilisateur.id}`)}
+            >
+              Message
+            </Button>
+          )}
         </div>
-      ) : (
-        <div className="px-2">
-          {filtered.map((c) => {
-            const isPro = c.kind === 'pro'
-            const isBiz = c.kind === 'biz'
-            const isSociale = c.kind === 'sociale'
-            const isInfluencer = profile?.role === 'influenceur'
-            const other = getOther(c)
+      </div>
 
-            const msgList = isBiz ? c.messages_biz : isPro ? c.messages_pro : isSociale ? c.messages_sociale : c.messages
-            const lastMsg = msgList?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+      <div className="flex border-t border-b border-[var(--border)]">
+        <button
+          onClick={() => setSubTab('grille')}
+          aria-label="Grille"
+          className={`flex-1 py-2.5 flex items-center justify-center ${
+            subTab === 'grille' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
+          }`}
+        >
+          <Grid3x3 size={20} />
+        </button>
+        <button
+          onClick={() => setSubTab('video')}
+          aria-label="Vidéo"
+          className={`flex-1 py-2.5 flex items-center justify-center ${
+            subTab === 'video' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
+          }`}
+        >
+          <Video size={20} />
+        </button>
+      </div>
 
-            let seenByOther = false
-            if (isBiz) {
-              const isSideA = c.client_a_id === clientProfile?.id
-              const otherReadAt = isSideA ? c.client_b_last_read_at : c.client_a_last_read_at
-              const lastMsgIsMine = lastMsg?.sender_id === clientProfile?.id
-              seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
-            } else if (isSociale) {
-              const isSideA = c.user_a_id === user?.id
-              const otherReadAt = isSideA ? c.user_b_last_read_at : c.user_a_last_read_at
-              const lastMsgIsMine = lastMsg?.sender_id === user?.id
-              seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
-            } else if (isPro) {
-              const isUtilisateur = profile?.role === 'utilisateur_simple'
-              const otherReadAt = isUtilisateur ? c.client_last_read_at : c.utilisateur_last_read_at
-              const lastMsgIsMine = lastMsg?.sender_id === user.id
-              seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
-            } else {
-              const otherReadAt = isInfluencer ? c.client_last_read_at : c.influenceur_last_read_at
-              const lastMsgIsMine = lastMsg?.sender_id === user.id
-              seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
-            }
-
-            const targetRoute = isBiz
-              ? `/messages/biz/${c.id}`
-              : isSociale
-              ? `/messages/sociale/${c.id}`
-              : isPro
-              ? `/messages/pro/${c.id}`
-              : `/messages/${c.id}`
-
-            return (
-              <div
-                key={`${c.kind}-${c.id}`}
-                onClick={() => navigate(targetRoute)}
-                className="flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-white/5 cursor-pointer transition-colors"
-              >
-                <img
-                  src={other?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${c.id}`}
-                  alt=""
-                  className="w-14 h-14 rounded-full object-cover"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-body-medium flex items-center gap-1.5">
-                    {other?.nom_complet}
-                    {!isBiz && !isSociale && !isPro && !isInfluencer && c.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
-                  </p>
-                  <p className="text-caption truncate">
-                    {lastMsg?.contenu || (!isBiz && !isSociale && !isPro && c.offres?.titre && `Offre : ${c.offres.titre}`) || 'Nouvelle conversation'}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  {lastMsg?.created_at && (
-                    <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                      {timeShort(lastMsg.created_at)}
-                    </span>
-                  )}
-                  {seenByOther && (
+      <div className="grid grid-cols-3 gap-0.5 p-0.5">
+        {filteredPosts.length === 0 ? (
+          <div className="col-span-3 py-16 text-center text-[var(--text-secondary)] text-body">
+            {subTab === 'video' ? 'Aucune vidéo.' : 'Aucune publication.'}
+          </div>
+        ) : (
+          filteredPosts.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => (p.type === 'video' ? navigate(`/video/${p.id}`) : setSelectedPost(p))}
+              className="aspect-[4/5] bg-black/20 relative"
+            >
+              {p.post_medias?.[0]?.media_url && (
+                p.type === 'video' ? (
+                  p.post_medias[0].thumbnail_url ? (
                     <img
-                      src={other?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${c.id}`}
-                      alt="Vu"
-                      className="w-4 h-4 rounded-full object-cover"
+                      src={p.post_medias[0].thumbnail_url}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover"
                     />
-                  )}
-                </div>
-              </div>
-            )
-          })}
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-black/30">
+                      <Video size={20} className="text-white/40" />
+                    </div>
+                  )
+                ) : (
+                  <img
+                    src={p.post_medias[0].media_url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-full object-cover"
+                  />
+                )
+              )}
+            </button>
+          ))
+        )}
+      </div>
+
+      {selectedPost && (
+        <div className="fixed inset-0 z-[100] bg-[var(--bg-primary)] overflow-y-auto">
+          <div className="flex items-center px-4 py-3 sticky top-0 bg-[var(--bg-primary)]/90 backdrop-blur-xl z-10">
+            <button onClick={() => setSelectedPost(null)} aria-label="Fermer" className="w-11 h-11 -ml-2 flex items-center justify-center">
+              <X size={22} />
+            </button>
+          </div>
+          <div className="px-4 pb-6">
+            <PostCard post={selectedPost} onDeleted={() => setSelectedPost(null)} />
+          </div>
         </div>
       )}
     </div>
