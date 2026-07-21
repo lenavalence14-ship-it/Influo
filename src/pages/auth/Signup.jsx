@@ -8,7 +8,7 @@ import Input from '../../components/ui/Input'
 import { Sun, Moon, User, Briefcase, Users, ArrowLeft } from 'lucide-react'
 import appIcon from '../../assets/app-icon.png'
 export default function Signup() {
-  const [role, setRole] = useState(null) // 'influenceur' | 'client' | 'utilisateur_simple'
+  const [role, setRole] = useState(null) // 'influenceur/créateur de contenu' | 'client' | 'utilisateur_simple'
   const [nomComplet, setNomComplet] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
