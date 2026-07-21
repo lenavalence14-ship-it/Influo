@@ -8,10 +8,9 @@ import PostCard from '../feed/PostCard'
 import { useFollow } from '../../hooks/useFollow'
 
 // Profil "utilisateur normal" (role = utilisateur_simple) : volontairement minimal.
-// Pas de bio/ville (ce rôle n'a pas de table de profil dédiée en base), pas de badge
-// vérifié, pas de "collaboration vérifiée" (ça n'a de sens que pour une entreprise qui
-// commande une prestation). Seule chose affichée : les publications de l'utilisateur,
-// en grille photo/carrousel ou en grille vidéo, centrées au milieu de l'écran.
+// Pas de badge vérifié, pas de "collaboration vérifiée" (ça n'a de sens que pour une
+// entreprise qui commande une prestation). Bio/pays/ville existent bien pour ce rôle
+// (colonnes sur users), et sont affichées ci-dessous comme pour les autres profils.
 export default function SimpleUserProfile() {
   const { user, profile, signOut } = useAuth()
   const { followersCount } = useFollow(user?.id)
@@ -98,7 +97,7 @@ export default function SimpleUserProfile() {
         </button>
       </div>
 
-      {/* header profil : photo + nom + nombre de publications centrés, pas de bio/ville */}
+      {/* header profil : photo + nom + bio + localisation + nombre de publications */}
       <div className="px-5 pt-4 pb-4 flex flex-col items-center text-center">
         <img
           src={profile?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${user?.id}`}
@@ -106,6 +105,14 @@ export default function SimpleUserProfile() {
           className="w-24 h-24 rounded-full object-cover mb-3"
         />
         <h1 className="text-h2 font-bold mb-1">{profile?.nom_complet}</h1>
+        {profile?.bio && (
+          <p className="text-body text-[var(--text-secondary)] mb-2 max-w-xs">{profile.bio}</p>
+        )}
+        {(profile?.ville || profile?.pays) && (
+          <p className="text-small text-[var(--text-secondary)] mb-2">
+            {[profile?.ville, profile?.pays].filter(Boolean).join(', ')}
+          </p>
+        )}
         <div className="flex gap-4 justify-center mb-4">
           <span className="text-small">
             <span className="font-bold text-[var(--text-primary)]">{posts.length}</span>{' '}
