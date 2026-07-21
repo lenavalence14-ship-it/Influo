@@ -40,6 +40,8 @@ const NewConversation = lazy(() => import('./pages/messages/NewConversation'))
 const Chat = lazy(() => import('./pages/messages/Chat'))
 const ChatPro = lazy(() => import('./pages/messages/ChatPro'))
 const NewConversationPro = lazy(() => import('./pages/messages/NewConversationPro'))
+const ChatBiz = lazy(() => import('./pages/messages/ChatBiz'))
+const NewConversationBiz = lazy(() => import('./pages/messages/NewConversationBiz'))
 
 const Wallet = lazy(() => import('./pages/wallet/Wallet'))
 
@@ -91,6 +93,24 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <ChatPro />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Chat entreprise <-> entreprise : même raisonnement, placé avant /messages/:id */}
+        <Route
+          path="/messages/biz/nouveau"
+          element={
+            <ProtectedRoute>
+              <NewConversationBiz />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages/biz/:id"
+          element={
+            <ProtectedRoute>
+              <ChatBiz />
             </ProtectedRoute>
           }
         />

@@ -56,14 +56,32 @@ export default function ConversationsList() {
           .order('updated_at', { ascending: false })
       }
 
-      const [{ data: normalData }, proResult] = await Promise.all([
+      // conversations_biz = entreprise ↔ entreprise (nouveau système, symétrique :
+      // le compte peut être client_a ou client_b selon qui a démarré la conversation).
+      let bizQuery = null
+      if (profile?.role === 'client' && clientProfile?.id) {
+        bizQuery = supabase
+          .from('conversations_biz')
+          .select(`
+            id, updated_at, client_a_id, client_b_id, client_a_last_read_at, client_b_last_read_at,
+            client_a:client_a_id(id, users(nom_complet, photo_url)),
+            client_b:client_b_id(id, users(nom_complet, photo_url)),
+            messages_biz(contenu, created_at, is_system, sender_id)
+          `)
+          .or(`client_a_id.eq.${clientProfile.id},client_b_id.eq.${clientProfile.id}`)
+          .order('updated_at', { ascending: false })
+      }
+
+      const [{ data: normalData }, proResult, bizResult] = await Promise.all([
         normalQuery,
         proQuery ? proQuery : Promise.resolve({ data: [] }),
+        bizQuery ? bizQuery : Promise.resolve({ data: [] }),
       ])
 
       const normalized = [
         ...(normalData || []).map((c) => ({ ...c, kind: 'normal' })),
         ...((proResult?.data) || []).map((c) => ({ ...c, kind: 'pro' })),
+        ...((bizResult?.data) || []).map((c) => ({ ...c, kind: 'biz' })),
       ].sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
 
       setConversations(normalized)
@@ -81,6 +99,10 @@ export default function ConversationsList() {
   }
 
   const getOther = (c) => {
+    if (c.kind === 'biz') {
+      const isSideA = c.client_a_id === clientProfile?.id
+      return isSideA ? c.client_b?.users : c.client_a?.users
+    }
     if (c.kind === 'pro') {
       return profile?.role === 'client' ? c.utilisateur : c.client?.users
     }
@@ -120,14 +142,20 @@ export default function ConversationsList() {
         <div className="px-2">
           {filtered.map((c) => {
             const isPro = c.kind === 'pro'
+            const isBiz = c.kind === 'biz'
             const isInfluencer = profile?.role === 'influenceur'
             const other = getOther(c)
 
-            const msgList = isPro ? c.messages_pro : c.messages
+            const msgList = isBiz ? c.messages_biz : isPro ? c.messages_pro : c.messages
             const lastMsg = msgList?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
 
             let seenByOther = false
-            if (isPro) {
+            if (isBiz) {
+              const isSideA = c.client_a_id === clientProfile?.id
+              const otherReadAt = isSideA ? c.client_b_last_read_at : c.client_a_last_read_at
+              const lastMsgIsMine = lastMsg?.sender_id === clientProfile?.id
+              seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
+            } else if (isPro) {
               const isUtilisateur = profile?.role === 'utilisateur_simple'
               const otherReadAt = isUtilisateur ? c.client_last_read_at : c.utilisateur_last_read_at
               const lastMsgIsMine = lastMsg?.sender_id === user.id
@@ -138,10 +166,12 @@ export default function ConversationsList() {
               seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
             }
 
+            const targetRoute = isBiz ? `/messages/biz/${c.id}` : isPro ? `/messages/pro/${c.id}` : `/messages/${c.id}`
+
             return (
               <div
                 key={`${c.kind}-${c.id}`}
-                onClick={() => navigate(isPro ? `/messages/pro/${c.id}` : `/messages/${c.id}`)}
+                onClick={() => navigate(targetRoute)}
                 className="flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-white/5 cursor-pointer transition-colors"
               >
                 <img
@@ -152,10 +182,10 @@ export default function ConversationsList() {
                 <div className="flex-1 min-w-0">
                   <p className="text-body-medium flex items-center gap-1.5">
                     {other?.nom_complet}
-                    {!isPro && !isInfluencer && c.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
+                    {!isBiz && !isPro && !isInfluencer && c.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
                   </p>
                   <p className="text-caption truncate">
-                    {lastMsg?.contenu || (!isPro && c.offres?.titre && `Offre : ${c.offres.titre}`) || 'Nouvelle conversation'}
+                    {lastMsg?.contenu || (!isBiz && !isPro && c.offres?.titre && `Offre : ${c.offres.titre}`) || 'Nouvelle conversation'}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">

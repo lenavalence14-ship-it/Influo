@@ -65,7 +65,25 @@ export function useUnreadCounts() {
           })
         }
 
-        if (!cancelled) setHasUnreadMessages(unread || unreadPro)
+        // conversations_biz : entreprise <-> entreprise, symétrique (client_a/client_b).
+        let unreadBiz = false
+        if (clientProfile?.id) {
+          const { data: convsBiz, error: errorBiz } = await supabase
+            .from('conversations_biz')
+            .select('id, client_a_id, client_b_id, client_a_last_read_at, client_b_last_read_at, updated_at')
+            .or(`client_a_id.eq.${clientProfile.id},client_b_id.eq.${clientProfile.id}`)
+
+          if (!errorBiz) {
+            unreadBiz = (convsBiz || []).some((c) => {
+              const isSideA = c.client_a_id === clientProfile.id
+              const lastRead = isSideA ? c.client_a_last_read_at : c.client_b_last_read_at
+              if (!c.updated_at) return false
+              return !lastRead || new Date(c.updated_at) > new Date(lastRead)
+            })
+          }
+        }
+
+        if (!cancelled) setHasUnreadMessages(unread || unreadPro || unreadBiz)
       } catch (err) {
         console.warn('checkMessages a échoué (non bloquant):', err)
       }
@@ -97,6 +115,8 @@ export function useUnreadCounts() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, checkMessages)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages_pro' }, checkMessages)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations_pro' }, checkMessages)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages_biz' }, checkMessages)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations_biz' }, checkMessages)
         .subscribe((status, err) => {
           if (err) console.warn('Realtime unread-counts erreur (non bloquant):', err)
         })

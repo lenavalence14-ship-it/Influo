@@ -17,8 +17,9 @@ import { useFollow } from '../../hooks/useFollow'
 // est en place pour ne pas avoir à retoucher cette page à ce moment-là.
 export default function ClientProfileView() {
   const { id } = useParams() // id = public.users.id de l'entreprise consultée
-  const { profile: viewerProfile, user: viewerUser } = useAuth()
+  const { user: viewerUser, profile: viewerProfile, clientProfile: viewerClientProfile } = useAuth()
   const navigate = useNavigate()
+  const isMe = viewerUser?.id === id
   const { followersCount, isFollowing, toggleFollow, pending: followPending } = useFollow(id)
 
   const [entreprise, setEntreprise] = useState(null)
@@ -27,6 +28,10 @@ export default function ClientProfileView() {
   const [posts, setPosts] = useState([])
   const [selectedPost, setSelectedPost] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (isMe) navigate('/profil', { replace: true })
+  }, [isMe, navigate])
 
   useEffect(() => {
     if (!id) return
@@ -156,6 +161,15 @@ export default function ClientProfileView() {
               shape="rect"
               fullWidth
               onClick={() => navigate(`/messages/pro/nouveau?entreprise=${entreprise.id}`)}
+            >
+              {contactLabel}
+            </Button>
+          ) : viewerIsEntreprise ? (
+            <Button
+              variant="glass"
+              shape="rect"
+              fullWidth
+              onClick={() => navigate(`/messages/biz/nouveau?entreprise=${entreprise.id}`)}
             >
               {contactLabel}
             </Button>
