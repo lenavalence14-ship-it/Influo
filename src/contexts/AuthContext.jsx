@@ -12,6 +12,12 @@ export function AuthProvider({ children }) {
   const [clientProfile, setClientProfile] = useState(null) // ligne profils_client si role=client
   const [loading, setLoading] = useState(true)
 
+  // "utilisateur_simple" = compte grand public, sans bio/ville/collab vérifiée.
+  // Il n'a pas de table dédiée en base : ce booléen dérivé du rôle suffit à piloter
+  // l'UI (EditProfile, MyProfileRouter, Search) sans complexifier le schéma pour
+  // un rôle qui n'a besoin d'aucune donnée métier supplémentaire.
+  const isUtilisateurSimple = profile?.role === 'utilisateur_simple'
+
   usePushNotifications(session?.user?.id)
 
   const loadProfile = async (userId) => {
@@ -115,6 +121,8 @@ export function AuthProvider({ children }) {
           user_id: data.user.id,
         })
       }
+      // 'utilisateur_simple' n'a pas de table de profil dédiée : rien à insérer de plus,
+      // la ligne dans public.users (nom_complet, photo_url) lui suffit.
       await loadProfile(data.user.id)
     }
     return { data, error: null }
@@ -147,6 +155,7 @@ export function AuthProvider({ children }) {
         profile,
         influencerProfile,
         clientProfile,
+        isUtilisateurSimple,
         loading,
         signUp,
         signIn,

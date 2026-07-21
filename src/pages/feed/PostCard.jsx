@@ -131,10 +131,10 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false 
             {isCollabVerifiee && client && (
               <>
                 <span className="text-[var(--text-secondary)] opacity-40 shrink-0">|</span>
-                <div className="flex items-center gap-1 min-w-0">
+                <Link to={`/entreprise/${client.id}`} className="flex items-center gap-1 min-w-0">
                   <Avatar src={client.photo_url} seed={client.nom_complet} size="sm" />
                   <span className="text-[13px] leading-[16px] font-medium truncate">{client.nom_complet}</span>
-                </div>
+                </Link>
               </>
             )}
           </div>

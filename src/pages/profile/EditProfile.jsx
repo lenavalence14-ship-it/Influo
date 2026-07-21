@@ -20,6 +20,7 @@ export default function EditProfile() {
   const [ville, setVille] = useState(influencerProfile?.ville || clientProfile?.ville || '')
   const [reseaux, setReseaux] = useState([])
   const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
     if (!influencerProfile?.id) return
@@ -59,65 +60,92 @@ export default function EditProfile() {
 
   const handleSave = async () => {
     setLoading(true)
+    setErrorMsg('')
 
-    let photoUrl = profile?.photo_url || null
-    if (photoFile) {
-      // Un avatar est vu par chaque follower, sur chaque post, dans le feed, les stories,
-      // les commentaires : il n'y a pas de photo plus souvent re-téléchargée dans l'app.
-      // La compresser avant upload réduit directement le volume réseau consommé par
-      // tout le monde, pas seulement par la personne qui l'a uploadée.
-      const compressed = await compressImage(photoFile, { maxDimension: 512, quality: 0.85 })
-      const ext = compressed.name.split('.').pop()
-      const fileName = `${user.id}/avatar-${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, compressed, {
-        upsert: true,
-      })
-      if (!uploadError) {
+    try {
+      let photoUrl = profile?.photo_url || null
+      if (photoFile) {
+        // Un avatar est vu par chaque follower, sur chaque post, dans le feed, les stories,
+        // les commentaires : il n'y a pas de photo plus souvent re-téléchargée dans l'app.
+        // La compresser avant upload réduit directement le volume réseau consommé par
+        // tout le monde, pas seulement par la personne qui l'a uploadée.
+        const compressed = await compressImage(photoFile, { maxDimension: 512, quality: 0.85 })
+        const ext = compressed.name.split('.').pop()
+        const fileName = `${user.id}/avatar-${Date.now()}.${ext}`
+        const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, compressed, {
+          upsert: true,
+        })
+        if (uploadError) {
+          // Avant, cette erreur était silencieusement ignorée : la photo semblait "ne pas
+          // s'enregistrer" sans aucune explication. On arrête maintenant l'enregistrement
+          // et on prévient clairement, plutôt que de continuer comme si de rien n'était.
+          throw new Error("Échec de l'envoi de la photo : " + uploadError.message)
+        }
         const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName)
         photoUrl = urlData.publicUrl
       }
-    }
 
-    await supabase.from('users').update({ nom_complet: nomComplet, photo_url: photoUrl }).eq('id', user.id)
+      const { error: userError } = await supabase
+        .from('users')
+        .update({ nom_complet: nomComplet, photo_url: photoUrl })
+        .eq('id', user.id)
+      if (userError) throw new Error('Échec de la mise à jour du profil : ' + userError.message)
 
-    if (influencerProfile?.id) {
-      await supabase.from('profils_influenceur').update({ bio, pays, ville }).eq('id', influencerProfile.id)
+      if (influencerProfile?.id) {
+        const { error: infError } = await supabase
+          .from('profils_influenceur')
+          .update({ bio, pays, ville })
+          .eq('id', influencerProfile.id)
+        if (infError) throw new Error(infError.message)
 
-      const validReseaux = reseaux.filter((r) => r.nom_compte)
-      const existants = validReseaux.filter((r) => r.id)
-      const nouveaux = validReseaux.filter((r) => !r.id)
+        const validReseaux = reseaux.filter((r) => r.nom_compte)
+        const existants = validReseaux.filter((r) => r.id)
+        const nouveaux = validReseaux.filter((r) => !r.id)
 
-      await Promise.all([
-        ...existants.map((r) =>
-          supabase
-            .from('reseaux_sociaux')
-            .update({
+        await Promise.all([
+          ...existants.map((r) =>
+            supabase
+              .from('reseaux_sociaux')
+              .update({
+                plateforme: r.plateforme,
+                nom_compte: r.nom_compte,
+                lien_profil: r.lien_profil,
+                nombre_abonnes: parseInt(r.nombre_abonnes, 10) || 0,
+              })
+              .eq('id', r.id)
+          ),
+          ...nouveaux.map((r) =>
+            supabase.from('reseaux_sociaux').insert({
+              influenceur_id: influencerProfile.id,
               plateforme: r.plateforme,
               nom_compte: r.nom_compte,
               lien_profil: r.lien_profil,
               nombre_abonnes: parseInt(r.nombre_abonnes, 10) || 0,
             })
-            .eq('id', r.id)
-        ),
-        ...nouveaux.map((r) =>
-          supabase.from('reseaux_sociaux').insert({
-            influenceur_id: influencerProfile.id,
-            plateforme: r.plateforme,
-            nom_compte: r.nom_compte,
-            lien_profil: r.lien_profil,
-            nombre_abonnes: parseInt(r.nombre_abonnes, 10) || 0,
-          })
-        ),
-        ...deletedReseauIds.map((id) => supabase.from('reseaux_sociaux').delete().eq('id', id)),
-      ])
-    } else if (clientProfile?.id) {
-      await supabase.from('profils_client').update({ bio, pays, ville }).eq('id', clientProfile.id)
-    }
+          ),
+          ...deletedReseauIds.map((id) => supabase.from('reseaux_sociaux').delete().eq('id', id)),
+        ])
+      } else if (clientProfile?.id) {
+        const { error: cliError } = await supabase
+          .from('profils_client')
+          .update({ bio, pays, ville })
+          .eq('id', clientProfile.id)
+        if (cliError) throw new Error(cliError.message)
+      }
+      // utilisateur_simple : pas de bio/pays/ville, rien de plus à enregistrer que
+      // nom_complet et photo_url, déjà faits ci-dessus.
 
-    await refreshProfile()
-    setLoading(false)
-    navigate('/profil')
+      await refreshProfile()
+      navigate('/profil')
+    } catch (err) {
+      setErrorMsg(err.message || "Une erreur est survenue, réessaie.")
+    } finally {
+      setLoading(false)
+    }
   }
+
+  // Un utilisateur_simple n'a ni profils_influenceur ni profils_client : pas de bio/ville.
+  const showBioLocation = Boolean(influencerProfile || clientProfile)
 
   return (
     <div className="px-5 pt-6 pb-6">
@@ -144,7 +172,7 @@ export default function EditProfile() {
 
         <Input label="Nom complet" value={nomComplet} onChange={(e) => setNomComplet(e.target.value)} />
 
-        {(influencerProfile || clientProfile) && (
+        {showBioLocation && (
           <>
             <label className="block">
               <span className="block text-body mb-2 text-[var(--text-secondary)] font-medium">Bio</span>
@@ -210,6 +238,10 @@ export default function EditProfile() {
               </div>
             </div>
           </>
+        )}
+
+        {errorMsg && (
+          <p className="text-caption text-red-400 text-center">{errorMsg}</p>
         )}
 
         <Button fullWidth onClick={handleSave} disabled={loading} className="mt-2">

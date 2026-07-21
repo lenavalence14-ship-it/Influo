@@ -23,7 +23,7 @@ export default function PostDetail() {
           id, legende, crop_format, type, created_at, commande_id,
           post_medias(media_url, media_type, thumbnail_url, position),
           profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
-          client:client_id(nom_complet, photo_url),
+          client:client_id(id, nom_complet, photo_url),
           commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)
         `)
         .eq('id', id)

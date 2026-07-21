@@ -29,6 +29,8 @@ const PostDetail = lazy(() => import('./pages/feed/PostDetail'))
 
 const InfluencerProfile = lazy(() => import('./pages/profile/InfluencerProfile'))
 const EditProfile = lazy(() => import('./pages/profile/EditProfile'))
+const ClientProfileView = lazy(() => import('./pages/profile/ClientProfileView'))
+const SimpleUserProfileView = lazy(() => import('./pages/profile/SimpleUserProfileView'))
 
 const CreateOffer = lazy(() => import('./pages/offers/CreateOffer'))
 const OfferDetail = lazy(() => import('./pages/offers/OfferDetail'))
@@ -101,6 +103,8 @@ function AppRoutes() {
           <Route path="/profil" element={<MyProfileRouter />} />
           <Route path="/profil/modifier" element={<EditProfile />} />
           <Route path="/influenceur/:id" element={<InfluencerProfile />} />
+          <Route path="/entreprise/:id" element={<ClientProfileView />} />
+          <Route path="/utilisateur/:id" element={<SimpleUserProfileView />} />
           <Route path="/offre/nouvelle" element={<CreateOffer />} />
           <Route path="/offre/:id/modifier" element={<CreateOffer />} />
           <Route path="/offre/:id" element={<OfferDetail />} />
