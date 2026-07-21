@@ -15,9 +15,9 @@ export default function EditProfile() {
   const [nomComplet, setNomComplet] = useState(profile?.nom_complet || '')
   const [photoFile, setPhotoFile] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(profile?.photo_url || '')
-  const [bio, setBio] = useState(influencerProfile?.bio || clientProfile?.bio || '')
-  const [pays, setPays] = useState(influencerProfile?.pays || clientProfile?.pays || '')
-  const [ville, setVille] = useState(influencerProfile?.ville || clientProfile?.ville || '')
+  const [bio, setBio] = useState(influencerProfile?.bio || clientProfile?.bio || profile?.bio || '')
+  const [pays, setPays] = useState(influencerProfile?.pays || clientProfile?.pays || profile?.pays || '')
+  const [ville, setVille] = useState(influencerProfile?.ville || clientProfile?.ville || profile?.ville || '')
   const [reseaux, setReseaux] = useState([])
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
@@ -85,9 +85,16 @@ export default function EditProfile() {
         photoUrl = urlData.publicUrl
       }
 
+      const userUpdate = { nom_complet: nomComplet, photo_url: photoUrl }
+      if (!influencerProfile?.id && !clientProfile?.id) {
+        // utilisateur_simple : bio/pays/ville vivent directement sur users.
+        userUpdate.bio = bio
+        userUpdate.pays = pays
+        userUpdate.ville = ville
+      }
       const { error: userError } = await supabase
         .from('users')
-        .update({ nom_complet: nomComplet, photo_url: photoUrl })
+        .update(userUpdate)
         .eq('id', user.id)
       if (userError) throw new Error('Échec de la mise à jour du profil : ' + userError.message)
 
@@ -132,9 +139,6 @@ export default function EditProfile() {
           .eq('id', clientProfile.id)
         if (cliError) throw new Error(cliError.message)
       }
-      // utilisateur_simple : pas de bio/pays/ville, rien de plus à enregistrer que
-      // nom_complet et photo_url, déjà faits ci-dessus.
-
       await refreshProfile()
       navigate('/profil')
     } catch (err) {
@@ -144,8 +148,9 @@ export default function EditProfile() {
     }
   }
 
-  // Un utilisateur_simple n'a ni profils_influenceur ni profils_client : pas de bio/ville.
-  const showBioLocation = Boolean(influencerProfile || clientProfile)
+  // Bio/Pays/Ville existent pour tous les rôles : sur profils_influenceur / profils_client
+  // pour ces rôles-là, et directement sur users pour utilisateur_simple.
+  const showBioLocation = true
 
   return (
     <div className="px-5 pt-6 pb-6">
