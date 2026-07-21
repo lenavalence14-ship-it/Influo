@@ -10,14 +10,14 @@ import { compressImage } from '../../lib/mediaCompression'
 const PLATEFORMES = ['tiktok', 'instagram', 'youtube', 'facebook', 'x', 'snapchat', 'autre']
 
 export default function EditProfile() {
-  const { user, profile, influencerProfile, refreshProfile } = useAuth()
+  const { user, profile, influencerProfile, clientProfile, refreshProfile } = useAuth()
   const navigate = useNavigate()
   const [nomComplet, setNomComplet] = useState(profile?.nom_complet || '')
   const [photoFile, setPhotoFile] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(profile?.photo_url || '')
-  const [bio, setBio] = useState(influencerProfile?.bio || '')
-  const [pays, setPays] = useState(influencerProfile?.pays || '')
-  const [ville, setVille] = useState(influencerProfile?.ville || '')
+  const [bio, setBio] = useState(influencerProfile?.bio || clientProfile?.bio || '')
+  const [pays, setPays] = useState(influencerProfile?.pays || clientProfile?.pays || '')
+  const [ville, setVille] = useState(influencerProfile?.ville || clientProfile?.ville || '')
   const [reseaux, setReseaux] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -78,6 +78,8 @@ export default function EditProfile() {
           })
         )
       )
+    } else if (clientProfile?.id) {
+      await supabase.from('profils_client').update({ bio, pays, ville }).eq('id', clientProfile.id)
     }
 
     await refreshProfile()
@@ -110,7 +112,7 @@ export default function EditProfile() {
 
         <Input label="Nom complet" value={nomComplet} onChange={(e) => setNomComplet(e.target.value)} />
 
-        {influencerProfile && (
+        {(influencerProfile || clientProfile) && (
           <>
             <label className="block">
               <span className="block text-body mb-2 text-[var(--text-secondary)] font-medium">Bio</span>
@@ -123,7 +125,11 @@ export default function EditProfile() {
             </label>
             <Input label="Pays" value={pays} onChange={(e) => setPays(e.target.value)} />
             <Input label="Ville" value={ville} onChange={(e) => setVille(e.target.value)} />
+          </>
+        )}
 
+        {influencerProfile && (
+          <>
             <div>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-body-medium">Réseaux sociaux</span>
