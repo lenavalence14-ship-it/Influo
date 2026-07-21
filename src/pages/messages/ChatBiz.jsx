@@ -2,16 +2,20 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { ArrowLeft, Send, Banknote, ThumbsUp, PackageCheck, ShieldCheck, Download } from 'lucide-react'
+import {
+  ArrowLeft, Send, Camera, Image as ImageIcon,
+  Download, Banknote, ThumbsUp, PackageCheck, ShieldCheck,
+  Phone, Video, Plus, Mic,
+} from 'lucide-react'
 import Button from '../../components/ui/Button'
 import BottomSheet from '../../components/ui/BottomSheet'
 import { generateReceipt } from '../../lib/receipt'
 import { timeShort } from '../../lib/time'
 
-// Chat entreprise <-> entreprise. Contrairement à ChatPro.jsx (utilisateur -> entreprise,
-// où seule l'entreprise peut demander un paiement), ici les deux parties peuvent
-// initier une demande de paiement — mais une seule commande active à la fois par
-// conversation, appliqué côté serveur par create_commande_biz.
+// Chat entreprise <-> entreprise. Repris fidèlement de Chat.jsx (mêmes pièces jointes,
+// header, style de boutons), avec la différence validée : n'importe laquelle des deux
+// parties peut demander un paiement (pas seulement un rôle fixe), une seule commande
+// active à la fois par conversation (appliqué côté serveur par create_commande_biz).
 export default function ChatBiz() {
   const { id } = useParams()
   const [conversation, setConversation] = useState(null)
@@ -23,8 +27,11 @@ export default function ChatBiz() {
   const [paymentDelai, setPaymentDelai] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
-  const { user, clientProfile } = useAuth()
+  const { clientProfile } = useAuth()
   const navigate = useNavigate()
+  const fileInputRef = useRef(null)
+  const cameraInputRef = useRef(null)
+  const galleryInputRef = useRef(null)
   const bottomRef = useRef(null)
 
   const myClientId = clientProfile?.id
@@ -72,6 +79,8 @@ export default function ChatBiz() {
       .channel(`chat-biz-${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages_biz', filter: `conversation_id=eq.${id}` }, (payload) => {
         setMessages((prev) => [...prev, payload.new])
+        const readField = isSideA ? 'client_a_last_read_at' : 'client_b_last_read_at'
+        supabase.from('conversations_biz').update({ [readField]: new Date().toISOString() }).eq('id', id)
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations_biz', filter: `id=eq.${id}` }, (payload) => {
         setConversation((c) => (c ? { ...c, ...payload.new } : c))
@@ -89,8 +98,15 @@ export default function ChatBiz() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const sendMessage = async (content) => {
-    await supabase.from('messages_biz').insert({ conversation_id: id, sender_id: myClientId, contenu: content, is_system: false })
+  const sendMessage = async (content, fichierUrl = null, fichierType = null) => {
+    await supabase.from('messages_biz').insert({
+      conversation_id: id,
+      sender_id: myClientId,
+      contenu: content,
+      fichier_url: fichierUrl,
+      fichier_type: fichierType,
+      is_system: false,
+    })
     await supabase.from('conversations_biz').update({ updated_at: new Date().toISOString() }).eq('id', id)
   }
 
@@ -106,6 +122,16 @@ export default function ChatBiz() {
     await sendMessage(content)
   }
 
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const fileName = `${id}/${Date.now()}-${file.name}`
+    const { error } = await supabase.storage.from('messagerie').upload(fileName, file)
+    if (error) return
+    const { data: signedUrl } = await supabase.storage.from('messagerie').createSignedUrl(fileName, 60 * 60 * 24 * 7)
+    await sendMessage(null, signedUrl?.signedUrl, file.type.startsWith('image/') ? 'image' : 'fichier')
+  }
+
   const handleRequestPayment = async () => {
     if (!paymentAmount) return
     setErrorMsg('')
@@ -117,8 +143,6 @@ export default function ChatBiz() {
     })
 
     if (error) {
-      // Ex : "Une commande est déjà en cours sur cette conversation" — message renvoyé
-      // tel quel par la fonction RPC, déjà rédigé pour être lu directement par l'utilisateur.
       setErrorMsg(error.message)
       return
     }
@@ -194,6 +218,7 @@ export default function ChatBiz() {
   const other = isSideA ? conversation.client_b?.users : conversation.client_a?.users
   const isDemandeur = commande?.demandeur_id === myClientId
   const isPayeur = commande?.payeur_id === myClientId
+  const canRequestPayment = !commande || commande.status === 'terminee'
 
   const contextAction = (() => {
     if (isPayeur && commande?.status === 'paiement_demande') {
@@ -207,10 +232,6 @@ export default function ChatBiz() {
     }
     return null
   })()
-
-  // N'importe laquelle des deux entreprises peut demander un paiement, tant qu'aucune
-  // commande n'est déjà active (vérifié côté serveur, message d'erreur affiché sinon).
-  const canRequestPayment = !commande || commande.status === 'terminee'
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
@@ -226,15 +247,34 @@ export default function ChatBiz() {
         <p className="text-body-medium flex-1 min-w-0 truncate">{other?.nom_complet}</p>
 
         {canRequestPayment && (
-          <button
-            onClick={() => setShowPaymentAsk(true)}
-            className="w-9 h-9 flex items-center justify-center shrink-0"
-            style={{ color: 'var(--accent)' }}
-            aria-label="Demander le paiement"
-          >
-            <Banknote size={22} />
-          </button>
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setShowPaymentAsk(true)}
+              className="w-9 h-9 flex items-center justify-center"
+              style={{ color: 'var(--accent)' }}
+              aria-label="Demander le paiement"
+            >
+              <Banknote size={22} />
+            </button>
+            <div
+              className="absolute top-full right-0 mt-2 whitespace-nowrap glass-strong rounded-xl px-3 py-1.5 text-[11px] z-30"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              <div
+                className="absolute right-3 -top-1 w-2 h-2 rotate-45"
+                style={{ background: 'var(--surface-primary)' }}
+              />
+              Demander le paiement
+            </div>
+          </div>
         )}
+
+        <button className="w-9 h-9 flex items-center justify-center shrink-0" style={{ color: 'var(--accent)' }} aria-label="Appeler">
+          <Phone size={20} />
+        </button>
+        <button className="w-9 h-9 flex items-center justify-center shrink-0" style={{ color: 'var(--accent)' }} aria-label="Appel vidéo">
+          <Video size={20} />
+        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 min-h-0">
@@ -255,6 +295,11 @@ export default function ChatBiz() {
               ) : (
                 <>
                   <div className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-body ${isMe ? 'bg-[var(--accent)] text-white' : 'glass'}`}>
+                    {m.fichier_url && m.fichier_type === 'image' ? (
+                      <img src={m.fichier_url} alt="" className="rounded-xl mb-1 max-w-full" />
+                    ) : m.fichier_url ? (
+                      <a href={m.fichier_url} target="_blank" rel="noreferrer" className="underline">Fichier joint</a>
+                    ) : null}
                     {m.contenu}
                   </div>
                   {m.created_at && (
@@ -291,14 +336,46 @@ export default function ChatBiz() {
       </div>
 
       <div className="px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-1.5 flex items-center gap-1 shrink-0">
+        <button onClick={() => fileInputRef.current?.click()} className="w-9 h-9 flex items-center justify-center shrink-0" style={{ color: 'var(--accent)' }} aria-label="Joindre">
+          <Plus size={22} />
+        </button>
+        <input ref={fileInputRef} type="file" onChange={handleFileUpload} className="hidden" />
+
+        <button onClick={() => cameraInputRef.current?.click()} className="w-9 h-9 flex items-center justify-center shrink-0" style={{ color: 'var(--accent)' }} aria-label="Caméra">
+          <Camera size={20} />
+        </button>
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+
+        <button onClick={() => galleryInputRef.current?.click()} className="w-9 h-9 flex items-center justify-center shrink-0" style={{ color: 'var(--accent)' }} aria-label="Galerie">
+          <ImageIcon size={20} />
+        </button>
+        <input
+          ref={galleryInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+
+        <button className="w-9 h-9 flex items-center justify-center shrink-0" style={{ color: 'var(--accent)' }} aria-label="Message vocal">
+          <Mic size={20} />
+        </button>
+
         {contextAction && (
           <button
             onClick={contextAction.onClick}
             aria-label={contextAction.label}
-            className="h-9 px-3 rounded-full flex items-center gap-1.5 shrink-0 text-caption-medium"
+            className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
             style={{ background: 'var(--accent)', color: '#fff' }}
           >
-            <contextAction.icon size={16} /> {contextAction.label}
+            <contextAction.icon size={16} />
           </button>
         )}
 
@@ -324,25 +401,25 @@ export default function ChatBiz() {
       {showPaymentAsk && (
         <BottomSheet onClose={() => { setShowPaymentAsk(false); setErrorMsg('') }} title="Demander le paiement">
           <div className="px-4 pb-4 pt-1 space-y-2">
-            <input
-              type="number"
-              value={paymentAmount}
-              onChange={(e) => setPaymentAmount(e.target.value)}
-              placeholder="Montant en €"
-              autoFocus
-              className="w-full glass rounded-2xl outline-none text-body px-4 py-3"
-            />
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                placeholder="Montant en €"
+                autoFocus
+                className="flex-1 glass rounded-2xl outline-none text-body px-4 py-3"
+              />
+              <Button onClick={handleRequestPayment} disabled={!paymentAmount}>Demander</Button>
+            </div>
             <input
               type="text"
               value={paymentDelai}
               onChange={(e) => setPaymentDelai(e.target.value)}
-              placeholder="Délai de livraison (ex : 3 jours)"
+              placeholder="Délai de livraison (optionnel, ex : 3 jours)"
               className="w-full glass rounded-2xl outline-none text-body px-4 py-3"
             />
             {errorMsg && <p className="text-caption text-red-400 text-center">{errorMsg}</p>}
-            <Button fullWidth onClick={handleRequestPayment} disabled={!paymentAmount} className="mt-1">
-              Demander
-            </Button>
           </div>
         </BottomSheet>
       )}
