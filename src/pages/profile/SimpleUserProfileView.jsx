@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 import Button from '../../components/ui/Button'
 import { X, Grid3x3, Video, ArrowLeft } from 'lucide-react'
 import PostCard from '../feed/PostCard'
 import { useFollow } from '../../hooks/useFollow'
 
-// Profil "utilisateur normal" vu par un visiteur (influenceur ou entreprise).
+// Profil "utilisateur normal" vu par un visiteur.
 // Aujourd'hui un utilisateur_simple ne peut pas encore publier (décision produit :
 // "profil vide pour l'instant"), donc la grille sera vide tant que ce n'est pas
 // ajouté séparément — le composant est prêt à afficher du contenu dès que ce sera le cas.
 export default function SimpleUserProfileView() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const { followersCount, isFollowing, toggleFollow, pending: followPending } = useFollow(id)
 
   const [utilisateur, setUtilisateur] = useState(null)
@@ -102,17 +104,30 @@ export default function SimpleUserProfileView() {
           </span>
         </div>
 
-        {/* Un utilisateur normal ou une entreprise qui visite un autre utilisateur normal
-            ne voit que "Suivre" — la messagerie utilisateur↔utilisateur n'est pas prévue. */}
-        <Button
-          shape="rect"
-          variant={isFollowing ? 'glass' : 'primary'}
-          disabled={followPending}
-          onClick={toggleFollow}
-          className="w-full max-w-xs"
-        >
-          {isFollowing ? 'Abonné' : 'Suivre'}
-        </Button>
+        {/* La messagerie utilisateur_simple <-> utilisateur_simple n'a de sens qu'entre
+            deux comptes de ce rôle (même logique que conversations_biz entre deux
+            entreprises) : le bouton Message n'apparaît que dans ce cas. */}
+        <div className="flex gap-2 w-full max-w-xs">
+          <Button
+            shape="rect"
+            variant={isFollowing ? 'glass' : 'primary'}
+            disabled={followPending}
+            onClick={toggleFollow}
+            fullWidth
+          >
+            {isFollowing ? 'Abonné' : 'Suivre'}
+          </Button>
+          {profile?.role === 'utilisateur_simple' && (
+            <Button
+              shape="rect"
+              variant="glass"
+              fullWidth
+              onClick={() => navigate(`/messages/sociale/nouveau?utilisateur=${utilisateur.id}`)}
+            >
+              Message
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex border-t border-b border-[var(--border)]">
