@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -21,12 +21,25 @@ export default function EditProfile() {
   const [reseaux, setReseaux] = useState([])
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    if (!influencerProfile?.id) return
+    supabase
+      .from('reseaux_sociaux')
+      .select('*')
+      .eq('influenceur_id', influencerProfile.id)
+      .then(({ data }) => {
+        if (data) setReseaux(data)
+      })
+  }, [influencerProfile?.id])
+
   const handlePhotoChange = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     setPhotoFile(file)
     setPhotoPreview(URL.createObjectURL(file))
   }
+
+  const [deletedReseauIds, setDeletedReseauIds] = useState([])
 
   const addReseau = () => {
     setReseaux((r) => [...r, { plateforme: 'instagram', nom_compte: '', lien_profil: '', nombre_abonnes: 0 }])
@@ -37,7 +50,11 @@ export default function EditProfile() {
   }
 
   const removeReseau = (i) => {
-    setReseaux((r) => r.filter((_, idx) => idx !== i))
+    setReseaux((r) => {
+      const target = r[i]
+      if (target?.id) setDeletedReseauIds((ids) => [...ids, target.id])
+      return r.filter((_, idx) => idx !== i)
+    })
   }
 
   const handleSave = async () => {
@@ -66,9 +83,23 @@ export default function EditProfile() {
     if (influencerProfile?.id) {
       await supabase.from('profils_influenceur').update({ bio, pays, ville }).eq('id', influencerProfile.id)
 
-      const reseauxToInsert = reseaux.filter((r) => r.nom_compte)
-      await Promise.all(
-        reseauxToInsert.map((r) =>
+      const validReseaux = reseaux.filter((r) => r.nom_compte)
+      const existants = validReseaux.filter((r) => r.id)
+      const nouveaux = validReseaux.filter((r) => !r.id)
+
+      await Promise.all([
+        ...existants.map((r) =>
+          supabase
+            .from('reseaux_sociaux')
+            .update({
+              plateforme: r.plateforme,
+              nom_compte: r.nom_compte,
+              lien_profil: r.lien_profil,
+              nombre_abonnes: parseInt(r.nombre_abonnes, 10) || 0,
+            })
+            .eq('id', r.id)
+        ),
+        ...nouveaux.map((r) =>
           supabase.from('reseaux_sociaux').insert({
             influenceur_id: influencerProfile.id,
             plateforme: r.plateforme,
@@ -76,8 +107,9 @@ export default function EditProfile() {
             lien_profil: r.lien_profil,
             nombre_abonnes: parseInt(r.nombre_abonnes, 10) || 0,
           })
-        )
-      )
+        ),
+        ...deletedReseauIds.map((id) => supabase.from('reseaux_sociaux').delete().eq('id', id)),
+      ])
     } else if (clientProfile?.id) {
       await supabase.from('profils_client').update({ bio, pays, ville }).eq('id', clientProfile.id)
     }
@@ -139,7 +171,7 @@ export default function EditProfile() {
               </div>
               <div className="space-y-3">
                 {reseaux.map((r, i) => (
-                  <div key={i} className="glass rounded-2xl p-3 space-y-2">
+                  <div key={r.id || `new-${i}`} className="glass rounded-2xl p-3 space-y-2">
                     <div className="flex justify-between items-center">
                       <select
                         value={r.plateforme}
