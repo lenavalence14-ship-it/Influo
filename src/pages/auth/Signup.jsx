@@ -5,10 +5,10 @@ import { useTheme } from '../../contexts/ThemeContext'
 import GlassCard from '../../components/ui/GlassCard'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import { Sun, Moon, User, Briefcase, ArrowLeft } from 'lucide-react'
+import { Sun, Moon, User, Briefcase, Users, ArrowLeft } from 'lucide-react'
 import appIcon from '../../assets/app-icon.png'
 export default function Signup() {
-  const [role, setRole] = useState(null) // 'influenceur' | 'client'
+  const [role, setRole] = useState(null) // 'influenceur' | 'client' | 'utilisateur_simple'
   const [nomComplet, setNomComplet] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -85,16 +85,11 @@ export default function Signup() {
               className="p-5 cursor-pointer hover:bg-white/10 transition-colors"
               onClick={() => setRole('influenceur')}
             >
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col items-center text-center gap-3">
                 <div className="glass rounded-2xl p-3">
                   <User size={22} />
                 </div>
-                <div>
-                  <p className="font-semibold">Je suis influenceur</p>
-                  <p className="text-caption">
-                    Publie, propose des offres, sois payé
-                  </p>
-                </div>
+                <p className="font-semibold">Je suis influenceur</p>
               </div>
             </GlassCard>
 
@@ -103,16 +98,24 @@ export default function Signup() {
               className="p-5 cursor-pointer hover:bg-white/10 transition-colors"
               onClick={() => setRole('client')}
             >
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col items-center text-center gap-3">
                 <div className="glass rounded-2xl p-3">
                   <Briefcase size={22} />
                 </div>
-                <div>
-                  <p className="font-semibold">Je suis une entreprise</p>
-                  <p className="text-caption">
-                    Trouve des influenceurs, collabore
-                  </p>
+                <p className="font-semibold">Je suis une entreprise</p>
+              </div>
+            </GlassCard>
+
+            <GlassCard
+              strong
+              className="p-5 cursor-pointer hover:bg-white/10 transition-colors"
+              onClick={() => setRole('utilisateur_simple')}
+            >
+              <div className="flex flex-col items-center text-center gap-3">
+                <div className="glass rounded-2xl p-3">
+                  <Users size={22} />
                 </div>
+                <p className="font-semibold">Je suis un utilisateur simple</p>
               </div>
             </GlassCard>
 
@@ -133,7 +136,13 @@ export default function Signup() {
             </button>
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input
-                label={role === 'influenceur' ? 'Nom / nom de marque' : "Nom de l'entreprise"}
+                label={
+                  role === 'influenceur'
+                    ? 'Nom / nom de marque'
+                    : role === 'client'
+                    ? "Nom de l'entreprise"
+                    : 'Nom complet'
+                }
                 value={nomComplet}
                 onChange={(e) => setNomComplet(e.target.value)}
                 placeholder="Ton nom"
