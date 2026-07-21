@@ -70,8 +70,10 @@ export async function switchToAccount(userId) {
   const account = accounts.find((a) => a.userId === userId)
   if (!account) return { error: new Error('Profil introuvable sur cet appareil') }
 
-  const { data, error } = await supabase.auth.setSession({
-    access_token: '',
+  // IMPORTANT : setSession({ access_token: '', refresh_token }) casse avec "Auth session
+  // missing!" car un access_token vide n'est pas traité comme absent par le SDK. La méthode
+  // correcte pour restaurer une session à partir d'un refresh_token seul est refreshSession.
+  const { data, error } = await supabase.auth.refreshSession({
     refresh_token: account.refreshToken,
   })
 
