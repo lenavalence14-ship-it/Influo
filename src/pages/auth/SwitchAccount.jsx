@@ -45,6 +45,7 @@ export default function SwitchAccount() {
         nomComplet: userRow?.nom_complet || email,
         photoUrl: userRow?.photo_url || null,
         refreshToken: data.session.refresh_token,
+        debugTokenLength: data.session.refresh_token.length, // DEBUG TEMPORAIRE
       })
       setShowConsent(true)
       return
@@ -145,6 +146,9 @@ export default function SwitchAccount() {
             <p className="text-body-medium mb-2 text-white">Enregistrer ce profil sur cet appareil ?</p>
             <p className="text-caption text-white/70 mb-6">
               Tu pourras te reconnecter en un tap la prochaine fois, sans ressaisir ton mot de passe.
+            </p>
+            <p className="text-caption text-yellow-300 mb-4">
+              DEBUG: token = {pendingSession?.debugTokenLength} caractères
             </p>
             <div className="flex gap-3">
               <button
