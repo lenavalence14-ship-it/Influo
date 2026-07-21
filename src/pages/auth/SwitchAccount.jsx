@@ -1,103 +1,172 @@
-import { Preferences } from '@capacitor/preferences'
-import { supabase } from './supabase'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
+import { saveAccount } from '../../lib/accountSwitcher'
+import { ArrowLeft } from 'lucide-react'
+import appIcon from '../../assets/app-icon.png'
 
-// Liste des comptes déjà connectés sur cet appareil, façon "changer de profil" Facebook.
-// On stocke le refresh_token de chaque compte (jamais le mot de passe) pour pouvoir
-// restaurer sa session en un clic, tant que ce refresh_token n'a pas expiré côté Supabase.
-const STORAGE_KEY = 'influo_saved_accounts'
+// Écran de connexion classique, accessible via "Utiliser un autre profil" depuis
+// le sélecteur de profils. Reproduit la structure de l'écran de connexion Facebook
+// (logo rond, champ unique email, mot de passe, bouton plein, lien mot de passe oublié,
+// bouton créer un compte en contour) avec les couleurs et le logo Influo.
+export default function SwitchAccount() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [showConsent, setShowConsent] = useState(false)
+  const [pendingSession, setPendingSession] = useState(null)
+  const { signIn } = useAuth()
+  const navigate = useNavigate()
 
-// Lit la liste brute stockée sur l'appareil. Toujours un tableau, jamais null.
-export async function getSavedAccounts() {
-  const { value } = await Preferences.get({ key: STORAGE_KEY })
-  if (!value) return []
-  try {
-    return JSON.parse(value)
-  } catch {
-    return []
-  }
-}
-
-// À appeler juste après une connexion réussie (signIn) : ajoute ou met à jour
-// l'entrée de ce compte dans la liste locale de l'appareil.
-export async function saveAccount({ userId, nomComplet, email, photoUrl, refreshToken }) {
-  const accounts = await getSavedAccounts()
-  const filtered = accounts.filter((a) => a.userId !== userId)
-  filtered.unshift({
-    userId,
-    nomComplet: nomComplet || email,
-    email,
-    photoUrl: photoUrl || null,
-    refreshToken,
-    savedAt: new Date().toISOString(),
-  })
-  await Preferences.set({ key: STORAGE_KEY, value: JSON.stringify(filtered) })
-}
-
-// Retire un compte de la liste locale (bouton "Supprimer" dans l'écran de gestion).
-// Ne déconnecte rien côté serveur, retire seulement le raccourci de cet appareil.
-export async function removeAccount(userId) {
-  const accounts = await getSavedAccounts()
-  const filtered = accounts.filter((a) => a.userId !== userId)
-  await Preferences.set({ key: STORAGE_KEY, value: JSON.stringify(filtered) })
-}
-
-// Tente de restaurer la session d'un compte enregistré à partir de son refresh_token.
-// On ne retire l'entrée locale que si Supabase confirme que le token est invalide ou révoqué
-// (ex: mot de passe changé, déconnexion globale). Une simple coupure réseau ou une erreur
-// temporaire ne doit jamais faire disparaître le profil : sinon le bouton "Supprimer" dans
-// Gérer les profils devient le seul moyen de perdre un profil, ce qui est le but recherché.
-const INVALID_TOKEN_MESSAGES = [
-  'invalid refresh token',
-  'refresh token not found',
-  'refresh token already used',
-  'session not found',
-  'user not found',
-]
-
-function isTokenDefinitivelyInvalid(error) {
-  if (!error) return false
-  const msg = (error.message || '').toLowerCase()
-  const textMatch = INVALID_TOKEN_MESSAGES.some((needle) => msg.includes(needle))
-  // Supabase répond en 400/401 pour un refresh token mort ou révoqué, quel que soit le
-  // libellé exact du message (qui peut varier selon la version de gotrue). On se base
-  // aussi sur le code, pour ne pas dépendre uniquement d'un texte qui peut changer.
-  const statusMatch = error.status === 400 || error.status === 401
-  return textMatch || statusMatch
-}
-
-export async function switchToAccount(userId) {
-  const accounts = await getSavedAccounts()
-  const account = accounts.find((a) => a.userId === userId)
-  if (!account) return { error: new Error('Profil introuvable sur cet appareil') }
-
-  // IMPORTANT : setSession({ access_token: '', refresh_token }) casse avec "Auth session
-  // missing!" car un access_token vide n'est pas traité comme absent par le SDK. La méthode
-  // correcte pour restaurer une session à partir d'un refresh_token seul est refreshSession.
-  const { data, error } = await supabase.auth.refreshSession({
-    refresh_token: account.refreshToken,
-  })
-
-  if (error) {
-    // Uniquement si Supabase dit explicitement que le token est mort : on nettoie.
-    // Toute autre erreur (réseau, timeout, serveur temporairement indisponible) laisse
-    // le profil intact pour un nouvel essai.
-    if (isTokenDefinitivelyInvalid(error)) {
-      await removeAccount(userId)
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    const { data, error } = await signIn({ email, password })
+    setLoading(false)
+    if (error) {
+      setError('Email ou mot de passe incorrect.')
+      return
     }
-    return { error }
+    if (data?.session?.refresh_token) {
+      // On va chercher le vrai nom et la vraie photo dans public.users : sans ça,
+      // le sélecteur de profils affiche l'email à la place de l'avatar habituel.
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('nom_complet, photo_url')
+        .eq('id', data.user.id)
+        .maybeSingle()
+
+      setPendingSession({
+        userId: data.user.id,
+        email,
+        nomComplet: userRow?.nom_complet || email,
+        photoUrl: userRow?.photo_url || null,
+        refreshToken: data.session.refresh_token,
+        debugTokenLength: data.session.refresh_token.length, // DEBUG TEMPORAIRE
+      })
+      setShowConsent(true)
+      return
+    }
+    navigate('/')
   }
 
-  // Le refresh_token tourne à chaque utilisation : on met à jour la copie stockée
-  // pour que le prochain clic utilise bien le token le plus récent.
-  if (data.session?.refresh_token) {
-    await saveAccount({
-      userId,
-      nomComplet: account.nomComplet,
-      email: account.email,
-      photoUrl: account.photoUrl,
-      refreshToken: data.session.refresh_token,
-    })
+  const handleConsent = async (remember) => {
+    if (remember && pendingSession) {
+      await saveAccount({
+        userId: pendingSession.userId,
+        nomComplet: pendingSession.nomComplet,
+        email: pendingSession.email,
+        photoUrl: pendingSession.photoUrl,
+        refreshToken: pendingSession.refreshToken,
+      })
+    }
+    navigate('/')
   }
 
-  return { data, error: null }
+  return (
+    <div className="min-h-screen w-full flex flex-col items-center px-6 py-8 relative overflow-hidden bg-[var(--bg-primary)]">
+      <button
+        onClick={() => navigate(-1)}
+        className="absolute top-6 left-6 p-2 rounded-full hover:bg-white/5 transition-colors z-10"
+        aria-label="Retour"
+      >
+        <ArrowLeft size={22} />
+      </button>
+
+      <div className="w-full max-w-sm relative z-10 animate-fade-in mt-20 flex flex-col items-center">
+        <img src={appIcon} alt="Influo" className="w-20 h-20 rounded-2xl mb-16" />
+
+        <form onSubmit={handleSubmit} className="w-full space-y-3">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            required
+            className="w-full h-14 px-4 rounded-xl bg-transparent border border-[var(--border)] text-body placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)]"
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Mot de passe"
+            required
+            className="w-full h-14 px-4 rounded-xl bg-transparent border border-[var(--border)] text-body placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)]"
+          />
+
+          {error && <p className="text-body text-[var(--accent)]">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full h-14 rounded-full bg-[var(--accent)] text-white text-body-medium disabled:opacity-60 active:scale-[0.98] transition-all"
+          >
+            {loading ? 'Connexion…' : 'Se connecter'}
+          </button>
+
+          <Link
+            to="/mot-de-passe-oublie"
+            className="block text-center text-body text-[var(--text-primary)] pt-1"
+          >
+            Mot de passe oublié ?
+          </Link>
+        </form>
+
+        <div className="flex-1 min-h-[40px]" />
+
+        <Link
+          to="/inscription"
+          className="w-full h-14 rounded-full border border-[var(--accent)] text-[var(--accent)] text-body-medium flex items-center justify-center active:scale-[0.98] transition-all mt-16"
+        >
+          Créer un nouveau compte
+        </Link>
+
+        <p
+          className="text-center mt-10 text-[var(--accent)] text-2xl"
+          style={{ fontFamily: 'var(--font-logo)' }}
+        >
+          Influo
+        </p>
+      </div>
+
+      {showConsent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6 bg-black/60">
+          <div
+            className="w-full max-w-sm rounded-2xl p-6 text-center border"
+            style={{
+              background: 'linear-gradient(135deg, rgba(79,12,45,0.55), rgba(79,12,45,0.25))',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              borderColor: 'rgba(255,255,255,0.18)',
+            }}
+          >
+            <p className="text-body-medium mb-2 text-white">Enregistrer ce profil sur cet appareil ?</p>
+            <p className="text-caption text-white/70 mb-6">
+              Tu pourras te reconnecter en un tap la prochaine fois, sans ressaisir ton mot de passe.
+            </p>
+            <p className="text-caption text-yellow-300 mb-4">
+              DEBUG: token = {pendingSession?.debugTokenLength} caractères
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleConsent(false)}
+                className="flex-1 h-12 rounded-full border border-white/25 text-white text-body-medium active:scale-[0.98] transition-all"
+              >
+                Non merci
+              </button>
+              <button
+                onClick={() => handleConsent(true)}
+                className="flex-1 h-12 rounded-full bg-white text-[var(--accent)] text-body-medium font-semibold active:scale-[0.98] transition-all"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
