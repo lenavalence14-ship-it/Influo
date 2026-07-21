@@ -7,6 +7,16 @@ import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { timeShort } from '../../lib/time'
 import StoryBar from '../feed/StoryBar'
 
+// Un message supprimé "pour tous" ne doit jamais apparaître comme aperçu, et un
+// message supprimé "pour moi" ne doit pas apparaître dans MON aperçu (mais reste
+// visible dans celui de l'autre, deleted_for étant propre à chacun).
+function isVisibleForMe(m, myId) {
+  if (!m) return false
+  if (m.is_deleted_for_all) return false
+  if (m.deleted_for?.includes(myId)) return false
+  return true
+}
+
 export default function ConversationsList() {
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
@@ -24,7 +34,7 @@ export default function ConversationsList() {
             client:client_id(nom_complet, photo_url),
             profils_influenceur(id, verifie, users(nom_complet, photo_url)),
             offres(titre),
-            messages(contenu, created_at, is_system, sender_id)
+            messages(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all)
           `)
           .order('updated_at', { ascending: false })
 
@@ -41,7 +51,7 @@ export default function ConversationsList() {
             .select(`
               id, updated_at, utilisateur_last_read_at, client_last_read_at,
               client:client_id(id, users(nom_complet, photo_url)),
-              messages_pro(contenu, created_at, is_system, sender_id)
+              messages_pro(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all)
             `)
             .eq('utilisateur_id', user.id)
             .order('updated_at', { ascending: false })
@@ -51,7 +61,7 @@ export default function ConversationsList() {
             .select(`
               id, updated_at, utilisateur_last_read_at, client_last_read_at,
               utilisateur:utilisateur_id(nom_complet, photo_url),
-              messages_pro(contenu, created_at, is_system, sender_id)
+              messages_pro(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all)
             `)
             .eq('client_id', clientProfile.id)
             .order('updated_at', { ascending: false })
@@ -67,7 +77,7 @@ export default function ConversationsList() {
               id, updated_at, client_a_id, client_b_id, client_a_last_read_at, client_b_last_read_at,
               client_a:client_a_id(id, users(nom_complet, photo_url)),
               client_b:client_b_id(id, users(nom_complet, photo_url)),
-              messages_biz(contenu, created_at, is_system, sender_id)
+              messages_biz(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all)
             `)
             .or(`client_a_id.eq.${clientProfile.id},client_b_id.eq.${clientProfile.id}`)
             .order('updated_at', { ascending: false })
@@ -83,7 +93,7 @@ export default function ConversationsList() {
               id, updated_at, user_a_id, user_b_id, user_a_last_read_at, user_b_last_read_at,
               user_a:user_a_id(id, nom_complet, photo_url),
               user_b:user_b_id(id, nom_complet, photo_url),
-              messages_sociale(contenu, created_at, is_system, sender_id)
+              messages_sociale(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all)
             `)
             .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
             .order('updated_at', { ascending: false })
@@ -184,29 +194,60 @@ export default function ConversationsList() {
             const isInfluencer = profile?.role === 'influenceur'
             const other = getOther(c)
 
-            const msgList = isBiz ? c.messages_biz : isPro ? c.messages_pro : isSociale ? c.messages_sociale : c.messages
-            const lastMsg = msgList?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+            const rawMsgList = isBiz ? c.messages_biz : isPro ? c.messages_pro : isSociale ? c.messages_sociale : c.messages
+            // On exclut d'abord les messages que MOI j'ai supprimés (pour moi ou pour
+            // tous) : mon aperçu ne doit jamais s'appuyer dessus, même si l'autre les
+            // voit encore de son côté.
+            const myVisibleMsgs = (rawMsgList || [])
+              .filter((m) => isVisibleForMe(m, user?.id))
+              .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
 
-            let seenByOther = false
+            const lastMsg = myVisibleMsgs[myVisibleMsgs.length - 1]
+
+            let myReadAt = null
+            let otherReadAt = null
+            let lastMsgIsMine = false
+
             if (isBiz) {
               const isSideA = c.client_a_id === clientProfile?.id
-              const otherReadAt = isSideA ? c.client_b_last_read_at : c.client_a_last_read_at
-              const lastMsgIsMine = lastMsg?.sender_id === clientProfile?.id
-              seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
+              myReadAt = isSideA ? c.client_a_last_read_at : c.client_b_last_read_at
+              otherReadAt = isSideA ? c.client_b_last_read_at : c.client_a_last_read_at
+              lastMsgIsMine = lastMsg?.sender_id === clientProfile?.id
             } else if (isSociale) {
               const isSideA = c.user_a_id === user?.id
-              const otherReadAt = isSideA ? c.user_b_last_read_at : c.user_a_last_read_at
-              const lastMsgIsMine = lastMsg?.sender_id === user?.id
-              seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
+              myReadAt = isSideA ? c.user_a_last_read_at : c.user_b_last_read_at
+              otherReadAt = isSideA ? c.user_b_last_read_at : c.user_a_last_read_at
+              lastMsgIsMine = lastMsg?.sender_id === user?.id
             } else if (isPro) {
               const isUtilisateur = profile?.role === 'utilisateur_simple'
-              const otherReadAt = isUtilisateur ? c.client_last_read_at : c.utilisateur_last_read_at
-              const lastMsgIsMine = lastMsg?.sender_id === user.id
-              seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
+              myReadAt = isUtilisateur ? c.utilisateur_last_read_at : c.client_last_read_at
+              otherReadAt = isUtilisateur ? c.client_last_read_at : c.utilisateur_last_read_at
+              lastMsgIsMine = lastMsg?.sender_id === user.id
             } else {
-              const otherReadAt = isInfluencer ? c.client_last_read_at : c.influenceur_last_read_at
-              const lastMsgIsMine = lastMsg?.sender_id === user.id
-              seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
+              myReadAt = isInfluencer ? c.influenceur_last_read_at : c.client_last_read_at
+              otherReadAt = isInfluencer ? c.client_last_read_at : c.influenceur_last_read_at
+              lastMsgIsMine = lastMsg?.sender_id === user.id
+            }
+
+            const seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
+
+            // Messages reçus (pas de moi, pas système) depuis ma dernière lecture :
+            // s'il y en a plusieurs, on affiche "X nouveaux messages" façon Messenger
+            // plutôt que le contenu, tant que je n'ai pas rouvert la conversation.
+            const unreadReceived = myVisibleMsgs.filter(
+              (m) => !m.is_system && m.sender_id !== user?.id && (!myReadAt || new Date(m.created_at) > new Date(myReadAt))
+            )
+            const isUnread = !lastMsgIsMine && unreadReceived.length > 0
+
+            let previewText
+            if (!lastMsg) {
+              previewText = !isBiz && !isSociale && !isPro && c.offres?.titre ? `Offre : ${c.offres.titre}` : 'Nouvelle conversation'
+            } else if (isUnread && unreadReceived.length > 1) {
+              previewText = `${unreadReceived.length} nouveaux messages`
+            } else if (lastMsgIsMine) {
+              previewText = `Vous : ${lastMsg.contenu || (lastMsg.fichier_url ? 'Pièce jointe' : '')}`
+            } else {
+              previewText = lastMsg.contenu || (lastMsg.fichier_url ? 'Pièce jointe' : '')
             }
 
             const targetRoute = isBiz
@@ -233,8 +274,12 @@ export default function ConversationsList() {
                     {other?.nom_complet}
                     {!isBiz && !isSociale && !isPro && !isInfluencer && c.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
                   </p>
-                  <p className="text-caption truncate">
-                    {lastMsg?.contenu || (!isBiz && !isSociale && !isPro && c.offres?.titre && `Offre : ${c.offres.titre}`) || 'Nouvelle conversation'}
+                  <p
+                    className={`text-caption truncate ${
+                      isUnread ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    {previewText}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
@@ -243,12 +288,16 @@ export default function ConversationsList() {
                       {timeShort(lastMsg.created_at)}
                     </span>
                   )}
-                  {seenByOther && (
-                    <img
-                      src={other?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${c.id}`}
-                      alt="Vu"
-                      className="w-4 h-4 rounded-full object-cover"
-                    />
+                  {isUnread ? (
+                    <span className="w-2 h-2 rounded-full" style={{ background: '#a00' }} />
+                  ) : (
+                    seenByOther && (
+                      <img
+                        src={other?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${c.id}`}
+                        alt="Vu"
+                        className="w-4 h-4 rounded-full object-cover"
+                      />
+                    )
                   )}
                 </div>
               </div>
