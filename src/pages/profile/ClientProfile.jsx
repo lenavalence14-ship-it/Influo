@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import Button from '../../components/ui/Button'
 import { LogOut, X, Grid3x3, Video, ArrowLeft } from 'lucide-react'
 import PostCard from '../feed/PostCard'
+import { useFollow } from '../../hooks/useFollow'
 
 // Profil client : même disposition que le profil influenceur (header, photo + stats,
 // bio/localisation, boutons Modifier/Dashboard, onglets), sans les éléments propres
@@ -14,6 +15,7 @@ import PostCard from '../feed/PostCard'
 // (la table posts porte à la fois influenceur_id et client_id sur ces posts).
 export default function ClientProfile() {
   const { user, profile, clientProfile, signOut } = useAuth()
+  const { followersCount } = useFollow(user?.id)
   const [tab, setTab] = useState('publications')
   const [subTab, setSubTab] = useState('grille')
   const [posts, setPosts] = useState([])
@@ -112,6 +114,10 @@ export default function ClientProfile() {
               <span className="text-small">
                 <span className="font-bold">{posts.length}</span>{' '}
                 <span className="text-[var(--text-secondary)]">publications</span>
+              </span>
+              <span className="text-small">
+                <span className="font-bold">{followersCount.toLocaleString()}</span>{' '}
+                <span className="text-[var(--text-secondary)]">abonnés</span>
               </span>
             </div>
           </div>

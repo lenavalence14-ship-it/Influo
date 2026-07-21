@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import Button from '../../components/ui/Button'
 import { X, Grid3x3, Video, ArrowLeft } from 'lucide-react'
 import PostCard from '../feed/PostCard'
+import { useFollow } from '../../hooks/useFollow'
 
 // Profil "utilisateur normal" vu par un visiteur (influenceur ou entreprise).
 // Aujourd'hui un utilisateur_simple ne peut pas encore publier (décision produit :
@@ -12,6 +13,7 @@ import PostCard from '../feed/PostCard'
 export default function SimpleUserProfileView() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { followersCount, isFollowing, toggleFollow, pending: followPending } = useFollow(id)
 
   const [utilisateur, setUtilisateur] = useState(null)
   const [subTab, setSubTab] = useState('grille')
@@ -89,14 +91,27 @@ export default function SimpleUserProfileView() {
           className="w-20 h-20 rounded-full object-cover mb-3"
         />
         <h1 className="text-h2 font-bold mb-1">{utilisateur.nom_complet}</h1>
-        <span className="text-small text-[var(--text-secondary)] mb-4">
-          <span className="font-bold text-[var(--text-primary)]">{posts.length}</span> publications
-        </span>
+        <div className="flex gap-4 justify-center mb-4">
+          <span className="text-small">
+            <span className="font-bold text-[var(--text-primary)]">{posts.length}</span>{' '}
+            <span className="text-[var(--text-secondary)]">publications</span>
+          </span>
+          <span className="text-small">
+            <span className="font-bold text-[var(--text-primary)]">{followersCount.toLocaleString()}</span>{' '}
+            <span className="text-[var(--text-secondary)]">abonnés</span>
+          </span>
+        </div>
 
-        {/* Un utilisateur normal ne voit que "Suivre" en visitant un autre utilisateur ou
-            un influenceur — pas de contact ici, conforme à la règle donnée. */}
-        <Button variant="glass" shape="rect" disabled title="Bientôt disponible" className="w-full max-w-xs">
-          Suivre
+        {/* Un utilisateur normal ou une entreprise qui visite un autre utilisateur normal
+            ne voit que "Suivre" — la messagerie utilisateur↔utilisateur n'est pas prévue. */}
+        <Button
+          shape="rect"
+          variant={isFollowing ? 'glass' : 'primary'}
+          disabled={followPending}
+          onClick={toggleFollow}
+          className="w-full max-w-xs"
+        >
+          {isFollowing ? 'Abonné' : 'Suivre'}
         </Button>
       </div>
 

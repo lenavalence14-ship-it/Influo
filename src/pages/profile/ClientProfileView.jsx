@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import Button from '../../components/ui/Button'
 import { X, Grid3x3, Video, ArrowLeft } from 'lucide-react'
 import PostCard from '../feed/PostCard'
+import { useFollow } from '../../hooks/useFollow'
 
 // Profil entreprise vu par un visiteur (influenceur, utilisateur normal, ou une autre
 // entreprise) — distinct de ClientProfile.jsx qui est réservé au propriétaire du compte
@@ -16,8 +17,9 @@ import PostCard from '../feed/PostCard'
 // est en place pour ne pas avoir à retoucher cette page à ce moment-là.
 export default function ClientProfileView() {
   const { id } = useParams() // id = public.users.id de l'entreprise consultée
-  const { profile: viewerProfile } = useAuth()
+  const { profile: viewerProfile, user: viewerUser } = useAuth()
   const navigate = useNavigate()
+  const { followersCount, isFollowing, toggleFollow, pending: followPending } = useFollow(id)
 
   const [entreprise, setEntreprise] = useState(null)
   const [clientProfile, setClientProfile] = useState(null)
@@ -92,10 +94,12 @@ export default function ClientProfileView() {
     )
   }
 
-  // Un utilisateur normal envoie un message, une entreprise "entre en contact" avec
-  // une autre entreprise via le même canal de messagerie — le libellé change seulement
-  // pour rester cohérent avec le vocabulaire utilisé côté influenceur/entreprise.
-  const contactLabel = viewerProfile?.role === 'client' ? 'Entrer en contact' : 'Envoyer un message'
+  // La messagerie entreprise↔entreprise (paiement bidirectionnel) n'est pas encore
+  // construite — c'est un système à part, prévu dans un prochain lot. Ici on distingue
+  // seulement le cas utilisateur→entreprise, qui est câblé.
+  const viewerIsEntreprise = viewerProfile?.role === 'client'
+  const viewerIsUtilisateurSimple = viewerProfile?.role === 'utilisateur_simple'
+  const contactLabel = viewerIsEntreprise ? 'Entrer en contact' : 'Envoyer un message'
 
   const filteredPosts = posts.filter((p) => (subTab === 'video' ? p.type === 'video' : p.type !== 'video'))
 
@@ -121,6 +125,10 @@ export default function ClientProfileView() {
                 <span className="font-bold">{posts.length}</span>{' '}
                 <span className="text-[var(--text-secondary)]">publications</span>
               </span>
+              <span className="text-small">
+                <span className="font-bold">{followersCount.toLocaleString()}</span>{' '}
+                <span className="text-[var(--text-secondary)]">abonnés</span>
+              </span>
             </div>
           </div>
         </div>
@@ -133,19 +141,29 @@ export default function ClientProfileView() {
         )}
 
         <div className="mt-4 flex gap-2">
-          {/* Suivre : UI en place, branchement fonctionnel dans le lot "système de suivi" */}
-          <Button variant="glass" shape="rect" fullWidth disabled title="Bientôt disponible">
-            Suivre
-          </Button>
           <Button
-            variant="primary"
             shape="rect"
             fullWidth
-            disabled
-            title="Bientôt disponible"
+            variant={isFollowing ? 'glass' : 'primary'}
+            disabled={followPending}
+            onClick={toggleFollow}
           >
-            {contactLabel}
+            {isFollowing ? 'Abonné' : 'Suivre'}
           </Button>
+          {viewerIsUtilisateurSimple ? (
+            <Button
+              variant="glass"
+              shape="rect"
+              fullWidth
+              onClick={() => navigate(`/messages/pro/nouveau?entreprise=${entreprise.id}`)}
+            >
+              {contactLabel}
+            </Button>
+          ) : (
+            <Button variant="glass" shape="rect" fullWidth disabled title="Bientôt disponible">
+              {contactLabel}
+            </Button>
+          )}
         </div>
       </div>
 

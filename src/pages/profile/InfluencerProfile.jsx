@@ -17,6 +17,7 @@ const PLATFORM_ICONS = {
 }
 import PostCard from '../feed/PostCard'
 import { useActiveStories } from '../../hooks/useActiveStories'
+import { useFollow } from '../../hooks/useFollow'
 
 export default function InfluencerProfile() {
   const { id } = useParams() // id du profils_influenceur ; si absent, c'est "mon" profil
@@ -34,6 +35,10 @@ export default function InfluencerProfile() {
 
   const targetId = id || influencerProfile?.id
   const isMe = !id || id === influencerProfile?.id
+  // useFollow travaille sur des public.users.id, pas des profils_influenceur.id :
+  // target.user_id n'est connu qu'après le chargement, donc le hook reçoit undefined
+  // le temps du premier rendu puis se réhydrate normalement une fois `target` posé.
+  const { followersCount, isFollowing, toggleFollow, pending: followPending } = useFollow(target?.user_id)
 
   const reloadOffres = async () => {
     const offresQuery = supabase.from('offres').select('*').eq('influenceur_id', targetId).order('created_at', { ascending: false })
@@ -115,7 +120,9 @@ export default function InfluencerProfile() {
     )
   }
 
-  const totalAbonnes = reseaux.reduce((sum, r) => sum + (r.nombre_abonnes || 0), 0)
+  // "abonnés" au centre du header = abonnés Influo (table follows), pas la somme des
+  // followers Instagram/TikTok/etc déclarés par l'influenceur. Ces derniers restent
+  // affichés plus bas, à côté de chaque icône de réseau, où ils ont plus de sens.
 
   return (
     <div>
@@ -187,7 +194,7 @@ export default function InfluencerProfile() {
                 <span className="text-[var(--text-secondary)]">publications</span>
               </span>
               <span className="text-small">
-                <span className="font-bold">{totalAbonnes.toLocaleString()}</span>{' '}
+                <span className="font-bold">{followersCount.toLocaleString()}</span>{' '}
                 <span className="text-[var(--text-secondary)]">abonnés</span>
               </span>
               <span className="text-small">
@@ -238,10 +245,22 @@ export default function InfluencerProfile() {
             </>
           ) : (
             <>
-              <Button shape="rect" fullWidth>Suivre</Button>
-              <Button variant="glass" shape="rect" fullWidth onClick={() => navigate(`/messages/nouveau?influenceur=${target.id}`)}>
-                Contacter
+              <Button
+                shape="rect"
+                fullWidth
+                variant={isFollowing ? 'glass' : 'primary'}
+                disabled={followPending}
+                onClick={toggleFollow}
+              >
+                {isFollowing ? 'Abonné' : 'Suivre'}
               </Button>
+              {/* Un utilisateur normal ne voit que "Suivre" face à un influenceur ;
+                  seule une entreprise peut aussi entrer en contact avec lui. */}
+              {profile?.role === 'client' && (
+                <Button variant="glass" shape="rect" fullWidth onClick={() => navigate(`/messages/nouveau?influenceur=${target.id}`)}>
+                  Contacter
+                </Button>
+              )}
             </>
           )}
         </div>

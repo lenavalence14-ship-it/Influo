@@ -11,12 +11,12 @@ export default function ConversationsList() {
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
-  const { user, profile, influencerProfile } = useAuth()
+  const { user, profile, influencerProfile, clientProfile } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
     const load = async () => {
-      let query = supabase
+      let normalQuery = supabase
         .from('conversations')
         .select(`
           id, updated_at, client_last_read_at, influenceur_last_read_at,
@@ -28,17 +28,49 @@ export default function ConversationsList() {
         .order('updated_at', { ascending: false })
 
       if (profile?.role === 'influenceur' && influencerProfile) {
-        query = query.eq('influenceur_id', influencerProfile.id)
+        normalQuery = normalQuery.eq('influenceur_id', influencerProfile.id)
       } else {
-        query = query.eq('client_id', user.id)
+        normalQuery = normalQuery.eq('client_id', user.id)
       }
 
-      const { data } = await query
-      setConversations(data || [])
+      let proQuery = null
+      if (profile?.role === 'utilisateur_simple') {
+        proQuery = supabase
+          .from('conversations_pro')
+          .select(`
+            id, updated_at, utilisateur_last_read_at, client_last_read_at,
+            client:client_id(id, users(nom_complet, photo_url)),
+            messages_pro(contenu, created_at, is_system, sender_id)
+          `)
+          .eq('utilisateur_id', user.id)
+          .order('updated_at', { ascending: false })
+      } else if (profile?.role === 'client' && clientProfile?.id) {
+        proQuery = supabase
+          .from('conversations_pro')
+          .select(`
+            id, updated_at, utilisateur_last_read_at, client_last_read_at,
+            utilisateur:utilisateur_id(nom_complet, photo_url),
+            messages_pro(contenu, created_at, is_system, sender_id)
+          `)
+          .eq('client_id', clientProfile.id)
+          .order('updated_at', { ascending: false })
+      }
+
+      const [{ data: normalData }, proResult] = await Promise.all([
+        normalQuery,
+        proQuery ? proQuery : Promise.resolve({ data: [] }),
+      ])
+
+      const normalized = [
+        ...(normalData || []).map((c) => ({ ...c, kind: 'normal' })),
+        ...((proResult?.data) || []).map((c) => ({ ...c, kind: 'pro' })),
+      ].sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
+
+      setConversations(normalized)
       setLoading(false)
     }
     if (user) load()
-  }, [user, profile, influencerProfile])
+  }, [user, profile, influencerProfile, clientProfile])
 
   if (loading) {
     return (
@@ -48,11 +80,17 @@ export default function ConversationsList() {
     )
   }
 
+  const getOther = (c) => {
+    if (c.kind === 'pro') {
+      return profile?.role === 'client' ? c.utilisateur : c.client?.users
+    }
+    const isInfluencer = profile?.role === 'influenceur'
+    return isInfluencer ? c.client : c.profils_influenceur?.users
+  }
+
   const filtered = conversations.filter((c) => {
     if (!query.trim()) return true
-    const isInfluencer = profile?.role === 'influenceur'
-    const other = isInfluencer ? c.client : c.profils_influenceur?.users
-    return other?.nom_complet?.toLowerCase().includes(query.trim().toLowerCase())
+    return getOther(c)?.nom_complet?.toLowerCase().includes(query.trim().toLowerCase())
   })
 
   return (
@@ -81,19 +119,29 @@ export default function ConversationsList() {
       ) : (
         <div className="px-2">
           {filtered.map((c) => {
+            const isPro = c.kind === 'pro'
             const isInfluencer = profile?.role === 'influenceur'
-            const other = isInfluencer ? c.client : c.profils_influenceur?.users
-            const lastMsg = c.messages?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+            const other = getOther(c)
 
-            // "vu" façon Messenger : petit avatar de l'autre, si mon dernier message a été lu
-            const otherReadAt = isInfluencer ? c.client_last_read_at : c.influenceur_last_read_at
-            const lastMsgIsMine = lastMsg?.sender_id === user.id
-            const seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
+            const msgList = isPro ? c.messages_pro : c.messages
+            const lastMsg = msgList?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+
+            let seenByOther = false
+            if (isPro) {
+              const isUtilisateur = profile?.role === 'utilisateur_simple'
+              const otherReadAt = isUtilisateur ? c.client_last_read_at : c.utilisateur_last_read_at
+              const lastMsgIsMine = lastMsg?.sender_id === user.id
+              seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
+            } else {
+              const otherReadAt = isInfluencer ? c.client_last_read_at : c.influenceur_last_read_at
+              const lastMsgIsMine = lastMsg?.sender_id === user.id
+              seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
+            }
 
             return (
               <div
-                key={c.id}
-                onClick={() => navigate(`/messages/${c.id}`)}
+                key={`${c.kind}-${c.id}`}
+                onClick={() => navigate(isPro ? `/messages/pro/${c.id}` : `/messages/${c.id}`)}
                 className="flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-white/5 cursor-pointer transition-colors"
               >
                 <img
@@ -104,10 +152,10 @@ export default function ConversationsList() {
                 <div className="flex-1 min-w-0">
                   <p className="text-body-medium flex items-center gap-1.5">
                     {other?.nom_complet}
-                    {!isInfluencer && c.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
+                    {!isPro && !isInfluencer && c.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
                   </p>
                   <p className="text-caption truncate">
-                    {lastMsg?.contenu || (c.offres?.titre && `Offre : ${c.offres.titre}`) || 'Nouvelle conversation'}
+                    {lastMsg?.contenu || (!isPro && c.offres?.titre && `Offre : ${c.offres.titre}`) || 'Nouvelle conversation'}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">

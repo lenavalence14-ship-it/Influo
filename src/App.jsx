@@ -38,6 +38,8 @@ const OfferDetail = lazy(() => import('./pages/offers/OfferDetail'))
 const ConversationsList = lazy(() => import('./pages/messages/ConversationsList'))
 const NewConversation = lazy(() => import('./pages/messages/NewConversation'))
 const Chat = lazy(() => import('./pages/messages/Chat'))
+const ChatPro = lazy(() => import('./pages/messages/ChatPro'))
+const NewConversationPro = lazy(() => import('./pages/messages/NewConversationPro'))
 
 const Wallet = lazy(() => import('./pages/wallet/Wallet'))
 
@@ -73,6 +75,25 @@ function AppRoutes() {
         {/* Admin (séparé, pas de bottom nav) */}
         <Route path="/admin/connexion" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+
+        {/* Chat pro (utilisateur <-> entreprise) : placé avant /messages/:id pour que
+            "pro" ne soit jamais capturé comme un id de conversation normale. */}
+        <Route
+          path="/messages/pro/nouveau"
+          element={
+            <ProtectedRoute>
+              <NewConversationPro />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages/pro/:id"
+          element={
+            <ProtectedRoute>
+              <ChatPro />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Chat (séparé, pas de bottom nav — plein écran comme Messenger) */}
         <Route

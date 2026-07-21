@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import Button from '../../components/ui/Button'
 import { LogOut, X, Grid3x3, Video, ArrowLeft } from 'lucide-react'
 import PostCard from '../feed/PostCard'
+import { useFollow } from '../../hooks/useFollow'
 
 // Profil "utilisateur normal" (role = utilisateur_simple) : volontairement minimal.
 // Pas de bio/ville (ce rôle n'a pas de table de profil dédiée en base), pas de badge
@@ -13,6 +14,7 @@ import PostCard from '../feed/PostCard'
 // en grille photo/carrousel ou en grille vidéo, centrées au milieu de l'écran.
 export default function SimpleUserProfile() {
   const { user, profile, signOut } = useAuth()
+  const { followersCount } = useFollow(user?.id)
   const [subTab, setSubTab] = useState('grille')
   const [posts, setPosts] = useState([])
   const [selectedPost, setSelectedPost] = useState(null)
@@ -104,9 +106,16 @@ export default function SimpleUserProfile() {
           className="w-24 h-24 rounded-full object-cover mb-3"
         />
         <h1 className="text-h2 font-bold mb-1">{profile?.nom_complet}</h1>
-        <span className="text-small text-[var(--text-secondary)] mb-4">
-          <span className="font-bold text-[var(--text-primary)]">{posts.length}</span> publications
-        </span>
+        <div className="flex gap-4 justify-center mb-4">
+          <span className="text-small">
+            <span className="font-bold text-[var(--text-primary)]">{posts.length}</span>{' '}
+            <span className="text-[var(--text-secondary)]">publications</span>
+          </span>
+          <span className="text-small">
+            <span className="font-bold text-[var(--text-primary)]">{followersCount.toLocaleString()}</span>{' '}
+            <span className="text-[var(--text-secondary)]">abonnés</span>
+          </span>
+        </div>
 
         <Button variant="glass" shape="rect" onClick={() => navigate('/profil/modifier')} className="w-full max-w-xs">
           Modifier le profil
