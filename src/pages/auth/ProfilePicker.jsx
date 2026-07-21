@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MoreHorizontal, ChevronRight } from 'lucide-react'
-import { getSavedAccounts, switchToAccount } from '../../lib/accountSwitcher'
+import { getSavedAccounts, switchToAccount, saveAccount } from '../../lib/accountSwitcher'
+import { supabase } from '../../lib/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import Avatar from '../../components/ui/Avatar'
 import appIcon from '../../assets/app-icon.png'
@@ -27,6 +28,29 @@ export default function ProfilePicker() {
   const handleSelect = async (userId) => {
     setError('')
     setSwitchingId(userId)
+
+    // Avant de quitter le profil actuellement connecté, on met à jour son refresh_token
+    // stocké avec celui réellement en cours côté Supabase. Sans ça, si ce token a été
+    // renouvelé automatiquement en arrière-plan (autoRefreshToken) depuis sa dernière
+    // sauvegarde, la copie stockée est déjà périmée et le prochain retour sur ce profil
+    // échoue avec "session expirée" alors que la session est en réalité toujours valide.
+    const { data: currentSessionData } = await supabase.auth.getSession()
+    const currentSession = currentSessionData?.session
+    if (currentSession?.user?.id && currentSession.user.id !== userId) {
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('nom_complet, photo_url')
+        .eq('id', currentSession.user.id)
+        .maybeSingle()
+      await saveAccount({
+        userId: currentSession.user.id,
+        nomComplet: userRow?.nom_complet || currentSession.user.email,
+        email: currentSession.user.email,
+        photoUrl: userRow?.photo_url || null,
+        refreshToken: currentSession.refresh_token,
+      })
+    }
+
     const { error } = await switchToAccount(userId)
     setSwitchingId(null)
     if (error) {
