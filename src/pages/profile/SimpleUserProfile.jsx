@@ -97,34 +97,39 @@ export default function SimpleUserProfile() {
         </button>
       </div>
 
-      {/* header profil : photo + nom + bio + localisation + nombre de publications */}
-      <div className="px-5 pt-4 pb-4 flex flex-col items-center text-center">
-        <img
-          src={profile?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${user?.id}`}
-          alt=""
-          className="w-24 h-24 rounded-full object-cover mb-3"
-        />
-        <h1 className="text-h2 font-bold mb-1">{profile?.nom_complet}</h1>
-        {profile?.bio && (
-          <p className="text-body text-[var(--text-secondary)] mb-2 max-w-xs">{profile.bio}</p>
-        )}
-        {(profile?.ville || profile?.pays) && (
-          <p className="text-small text-[var(--text-secondary)] mb-2">
+      {/* header profil : photo + nom + stats côte à côte, bio/localisation en dessous */}
+      <div className="px-5 pt-2 pb-4">
+        <div className="flex items-center gap-5">
+          <img
+            src={profile?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${user?.id}`}
+            alt=""
+            className="w-20 h-20 rounded-full object-cover shrink-0"
+          />
+          <div className="flex-1 pt-1">
+            <div className="flex items-center gap-1.5 mb-2">
+              <h1 className="text-h2 font-bold">{profile?.nom_complet}</h1>
+            </div>
+            <div className="flex gap-4">
+              <span className="text-small">
+                <span className="font-bold">{posts.length}</span>{' '}
+                <span className="text-[var(--text-secondary)]">publications</span>
+              </span>
+              <span className="text-small">
+                <span className="font-bold">{followersCount.toLocaleString()}</span>{' '}
+                <span className="text-[var(--text-secondary)]">abonnés</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {profile?.bio && <p className="text-small mt-4">{profile.bio}</p>}
+        {(profile?.pays || profile?.ville) && (
+          <p className="text-caption mt-1">
             {[profile?.ville, profile?.pays].filter(Boolean).join(', ')}
           </p>
         )}
-        <div className="flex gap-4 justify-center mb-4">
-          <span className="text-small">
-            <span className="font-bold text-[var(--text-primary)]">{posts.length}</span>{' '}
-            <span className="text-[var(--text-secondary)]">publications</span>
-          </span>
-          <span className="text-small">
-            <span className="font-bold text-[var(--text-primary)]">{followersCount.toLocaleString()}</span>{' '}
-            <span className="text-[var(--text-secondary)]">abonnés</span>
-          </span>
-        </div>
 
-        <Button variant="glass" shape="rect" onClick={() => navigate('/profil/modifier')} className="w-full max-w-xs">
+        <Button variant="glass" shape="rect" fullWidth onClick={() => navigate('/profil/modifier')} className="mt-4">
           Modifier le profil
         </Button>
       </div>
