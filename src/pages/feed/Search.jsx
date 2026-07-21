@@ -7,9 +7,13 @@ import { Search as SearchIcon } from 'lucide-react'
 import { useActiveStories } from '../../hooks/useActiveStories'
 
 async function fetchInfluencers() {
+  // Filtre sur users.role : un compte peut garder une ligne profils_influenceur
+  // (posts, wallet en cascade) tout en ayant été reconverti en client ou
+  // utilisateur_simple. Il ne doit alors plus apparaître ici.
   const { data } = await supabase
     .from('profils_influenceur')
-    .select('id, bio, verifie, users(nom_complet, photo_url)')
+    .select('id, bio, verifie, users!inner(nom_complet, photo_url, role)')
+    .eq('users.role', 'influenceur')
     .limit(30)
   return data || []
 }
