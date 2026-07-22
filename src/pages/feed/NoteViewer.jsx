@@ -5,6 +5,7 @@ import { X, Heart, Repeat2, Send, Eye, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { timeAgo } from '../../lib/time'
+import { profileRoute } from '../../lib/profileRoute'
 
 const SEGMENT_DURATION_MS = 5000
 
@@ -498,13 +499,23 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
             <img
               src={author?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${author?.id}`}
               alt=""
-              className="w-9 h-9 rounded-full object-cover border-2"
+              onClick={(e) => {
+                e.stopPropagation()
+                onClose()
+                navigate(profileRoute(author.id, author.role))
+              }}
+              className="w-9 h-9 rounded-full object-cover border-2 cursor-pointer"
               style={{ borderColor: 'white' }}
             />
             <img
               src={current.reposter.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${current.reposter.id}`}
               alt=""
-              className="w-9 h-9 rounded-full object-cover border-2 -ml-3"
+              onClick={(e) => {
+                e.stopPropagation()
+                onClose()
+                navigate(profileRoute(current.reposter.id, current.reposter.role))
+              }}
+              className="w-9 h-9 rounded-full object-cover border-2 -ml-3 cursor-pointer"
               style={{ borderColor: 'white' }}
             />
           </div>
@@ -512,7 +523,12 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
           <img
             src={author?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${author?.id}`}
             alt=""
-            className="w-9 h-9 rounded-full object-cover shrink-0"
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose()
+              navigate(profileRoute(author.id, author.role))
+            }}
+            className="w-9 h-9 rounded-full object-cover shrink-0 cursor-pointer"
           />
         )}
         <div className="flex-1 min-w-0">

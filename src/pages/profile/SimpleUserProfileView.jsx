@@ -6,6 +6,8 @@ import Button from '../../components/ui/Button'
 import { X, Grid3x3, Video, ArrowLeft } from 'lucide-react'
 import PostCard from '../feed/PostCard'
 import { useFollow } from '../../hooks/useFollow'
+import { useActiveNotes } from '../../hooks/useActiveNotes'
+import { useProfileNoteLauncher } from '../feed/ProfileNoteLauncher'
 
 // Profil "utilisateur normal" vu par un visiteur.
 // Aujourd'hui un utilisateur_simple ne peut pas encore publier (décision produit :
@@ -16,6 +18,8 @@ export default function SimpleUserProfileView() {
   const navigate = useNavigate()
   const { profile } = useAuth()
   const { followersCount, followingCount, isFollowing, toggleFollow, pending: followPending } = useFollow(id)
+  const activeNoteUserIds = useActiveNotes()
+  const { openNote, viewer: noteViewer } = useProfileNoteLauncher(id)
 
   const [utilisateur, setUtilisateur] = useState(null)
   const [subTab, setSubTab] = useState('grille')
@@ -90,7 +94,11 @@ export default function SimpleUserProfileView() {
         <img
           src={utilisateur.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${utilisateur.id}`}
           alt=""
-          className="w-20 h-20 rounded-full object-cover mb-3"
+          onClick={activeNoteUserIds.has(id) ? openNote : undefined}
+          className={`w-20 h-20 rounded-full object-cover mb-3 ${
+            activeNoteUserIds.has(id) ? 'cursor-pointer ring-2 ring-offset-2 ring-offset-[var(--bg-primary)]' : ''
+          }`}
+          style={activeNoteUserIds.has(id) ? { '--tw-ring-color': '#7a1240' } : undefined}
         />
         <h1 className="text-h2 font-bold mb-1">{utilisateur.nom_complet}</h1>
         <div className="flex gap-4 justify-center mb-4">
@@ -209,6 +217,7 @@ export default function SimpleUserProfileView() {
           </div>
         </div>
       )}
+      {noteViewer}
     </div>
   )
 }

@@ -16,7 +16,8 @@ const PLATFORM_ICONS = {
   snapchat: SnapchatIcon,
 }
 import PostCard from '../feed/PostCard'
-import { useActiveStories } from '../../hooks/useActiveStories'
+import { useActiveNotes } from '../../hooks/useActiveNotes'
+import { useProfileNoteLauncher } from '../feed/ProfileNoteLauncher'
 import { useFollow } from '../../hooks/useFollow'
 
 export default function InfluencerProfile() {
@@ -32,7 +33,8 @@ export default function InfluencerProfile() {
   const [collabCount, setCollabCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
-  const activeStoryIds = useActiveStories()
+  const activeNoteUserIds = useActiveNotes()
+  const { openNote, viewer: noteViewer } = useProfileNoteLauncher(target?.user_id)
 
   const targetId = id || influencerProfile?.id
   const isMe = !id || id === influencerProfile?.id
@@ -173,12 +175,31 @@ export default function InfluencerProfile() {
         </div>
       )}
 
+      {/* Profil d'un AUTRE influenceur : pas de logo ni déconnexion, juste la
+          flèche retour pour pouvoir quitter cet écran (sinon on est bloqué
+          sans moyen visuel de revenir en arrière). */}
+      {!isMe && (
+        <div className="flex items-center px-3 pt-4 pb-1">
+          <button
+            onClick={() => navigate(-1)}
+            aria-label="Retour"
+            className="w-9 h-9 flex items-center justify-center"
+          >
+            <ArrowLeft size={20} />
+          </button>
+        </div>
+      )}
+
       {/* header profil */}
       <div className="px-5 pt-2 pb-4">
         <div className="flex items-center gap-5">
           <div className="relative shrink-0">
-            {activeStoryIds.has(target.id) ? (
-              <div className="w-20 h-20 rounded-full p-[2.5px]" style={{ background: 'linear-gradient(to bottom right, #4f0c2d, #7a1240)' }}>
+            {activeNoteUserIds.has(target.user_id) ? (
+              <div
+                className="w-20 h-20 rounded-full p-[2.5px] cursor-pointer"
+                style={{ background: 'linear-gradient(to bottom right, #4f0c2d, #7a1240)' }}
+                onClick={openNote}
+              >
                 <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
                   <img
                     src={target.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${target.id}`}
@@ -454,6 +475,7 @@ export default function InfluencerProfile() {
           </div>
         </div>
       )}
+      {noteViewer}
     </div>
   )
 }

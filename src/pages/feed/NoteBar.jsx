@@ -7,6 +7,7 @@ import { Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import NoteViewer from './NoteViewer'
 import StoryRing from './StoryRing'
+import { profileRoute } from '../../lib/profileRoute'
 
 // Remplace StoryBar : plus de story photo/vidéo, seulement des notes texte 24h.
 //
@@ -276,9 +277,15 @@ export default function NoteBar() {
           )
         })}
 
-        {/* Tout le monde d'autre, sans note active ni jamais postée : anneau neutre, pas de couleur */}
+        {/* Tout le monde d'autre, sans note active ni jamais postée : anneau
+            neutre, pas de couleur, mais cliquable -> renvoie vers son profil
+            (puisqu'il n'y a pas de note à ouvrir). */}
         {usersWithoutNote.map((u) => (
-          <div key={u.id} className="flex flex-col items-center gap-2 shrink-0 cursor-default opacity-70">
+          <div
+            key={u.id}
+            className="flex flex-col items-center gap-2 shrink-0 cursor-pointer opacity-70"
+            onClick={() => navigate(profileRoute(u.id, u.role))}
+          >
             <StoryRing photoUrl={u.photo_url} fallbackSeed={u.id} hasStory={false} />
             <span className="text-caption max-w-[72px] truncate">{u.nom_complet?.split(' ')[0]}</span>
           </div>

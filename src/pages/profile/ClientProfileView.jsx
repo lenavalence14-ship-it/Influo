@@ -6,6 +6,8 @@ import Button from '../../components/ui/Button'
 import { X, Grid3x3, Video, ArrowLeft } from 'lucide-react'
 import PostCard from '../feed/PostCard'
 import { useFollow } from '../../hooks/useFollow'
+import { useActiveNotes } from '../../hooks/useActiveNotes'
+import { useProfileNoteLauncher } from '../feed/ProfileNoteLauncher'
 
 // Profil entreprise vu par un visiteur (influenceur, utilisateur normal, ou une autre
 // entreprise) — distinct de ClientProfile.jsx qui est réservé au propriétaire du compte
@@ -21,6 +23,8 @@ export default function ClientProfileView() {
   const navigate = useNavigate()
   const isMe = viewerUser?.id === id
   const { followersCount, followingCount, isFollowing, toggleFollow, pending: followPending } = useFollow(id)
+  const activeNoteUserIds = useActiveNotes()
+  const { openNote, viewer: noteViewer } = useProfileNoteLauncher(id)
 
   const [entreprise, setEntreprise] = useState(null)
   const [clientProfile, setClientProfile] = useState(null)
@@ -121,7 +125,11 @@ export default function ClientProfileView() {
           <img
             src={entreprise.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${entreprise.id}`}
             alt=""
-            className="w-20 h-20 rounded-full object-cover shrink-0"
+            onClick={activeNoteUserIds.has(id) ? openNote : undefined}
+            className={`w-20 h-20 rounded-full object-cover shrink-0 ${
+              activeNoteUserIds.has(id) ? 'cursor-pointer ring-2 ring-offset-2 ring-offset-[var(--bg-primary)]' : ''
+            }`}
+            style={activeNoteUserIds.has(id) ? { '--tw-ring-color': '#7a1240' } : undefined}
           />
           <div className="flex-1 pt-1">
             <h1 className="text-h2 font-bold mb-2">{entreprise.nom_complet}</h1>
@@ -266,6 +274,7 @@ export default function ClientProfileView() {
           </div>
         </div>
       )}
+      {noteViewer}
     </div>
   )
 }
