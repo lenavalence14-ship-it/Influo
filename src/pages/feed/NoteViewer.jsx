@@ -206,14 +206,31 @@ export default function NoteViewer({ entries, startIndex, onClose }) {
       </div>
 
       <div className="flex items-center gap-3 px-4 py-3">
-        <img
-          src={author?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${author?.id}`}
-          alt=""
-          className="w-9 h-9 rounded-full object-cover"
-        />
+        <div className="relative shrink-0">
+          <img
+            src={author?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${author?.id}`}
+            alt=""
+            className="w-9 h-9 rounded-full object-cover"
+          />
+          {current.kind === 'repost' && current.reposter && (
+            <img
+              src={current.reposter.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${current.reposter.id}`}
+              alt=""
+              className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full object-cover border-2"
+              style={{ borderColor: 'var(--accent, #7c1a3a)' }}
+            />
+          )}
+        </div>
         <div className="flex-1 min-w-0">
-          <p className="text-body-medium text-white truncate">{author?.nom_complet}</p>
-          <p className="text-caption text-white/70">{timeAgo(note.created_at)}</p>
+          <p className="text-body-medium text-white truncate">
+            {current.kind === 'repost' && current.reposter
+              ? `${author?.nom_complet} & ${current.reposter.nom_complet}`
+              : author?.nom_complet}
+          </p>
+          <p className="text-caption text-white/70">
+            {current.kind === 'repost' ? 'a republié · ' : ''}
+            {timeAgo(note.created_at)}
+          </p>
         </div>
         <button onClick={onClose} className="w-9 h-9 flex items-center justify-center text-white">
           <X size={22} />

@@ -196,9 +196,9 @@ export default function InfluencerProfile() {
             )}
             {isMe && (
               <button
-                onClick={() => navigate('/publier?type=story')}
+                onClick={() => navigate('/notes/nouvelle')}
                 className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[var(--accent)] border-2 border-[var(--bg-primary)] flex items-center justify-center"
-                aria-label="Ajouter une story"
+                aria-label="Ajouter une note"
               >
                 <Plus size={15} className="text-white" strokeWidth={3} />
               </button>
@@ -281,10 +281,16 @@ export default function InfluencerProfile() {
               >
                 {isFollowing ? 'Abonné' : 'Suivre'}
               </Button>
-              {/* Un utilisateur normal ne voit que "Suivre" face à un influenceur ;
-                  seule une entreprise peut aussi entrer en contact avec lui. */}
+              {/* Une entreprise peut contacter un influenceur (canal existant) ; un
+                  influenceur peut aussi contacter un autre influenceur, maintenant
+                  que conversations_influenceur existe pour ce cas. */}
               {profile?.role === 'client' && (
                 <Button variant="glass" shape="rect" fullWidth onClick={() => navigate(`/messages/nouveau?influenceur=${target.id}`)}>
+                  Contacter
+                </Button>
+              )}
+              {profile?.role === 'influenceur' && target?.user_id && (
+                <Button variant="glass" shape="rect" fullWidth onClick={() => navigate(`/messages/influenceur/nouveau?utilisateur=${target.user_id}`)}>
                   Contacter
                 </Button>
               )}

@@ -100,17 +100,34 @@ export default function ConversationsList() {
             .order('updated_at', { ascending: false })
         }
 
-        const [normalResult, proResult, bizResult, socialeResult] = await Promise.all([
+        // conversations_influenceur = influenceur ↔ influenceur, même logique symétrique
+        // que conversations_sociale, référence users.id directement.
+        let influenceurQuery = null
+        if (profile?.role === 'influenceur') {
+          influenceurQuery = supabase
+            .from('conversations_influenceur')
+            .select(`
+              id, updated_at, user_a_id, user_b_id, user_a_last_read_at, user_b_last_read_at,
+              user_a:user_a_id(id, nom_complet, photo_url),
+              user_b:user_b_id(id, nom_complet, photo_url),
+              messages_influenceur(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all)
+            `)
+            .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
+            .order('updated_at', { ascending: false })
+        }
+
+        const [normalResult, proResult, bizResult, socialeResult, influenceurResult] = await Promise.all([
           normalQuery,
           proQuery ? proQuery : Promise.resolve({ data: [] }),
           bizQuery ? bizQuery : Promise.resolve({ data: [] }),
           socialeQuery ? socialeQuery : Promise.resolve({ data: [] }),
+          influenceurQuery ? influenceurQuery : Promise.resolve({ data: [] }),
         ])
 
         // Chaque requête Supabase peut échouer sans throw (elle renvoie { error }) :
         // avant, une erreur ici passait inaperçue et laissait le spinner tourner
         // indéfiniment puisque rien ne le signalait ni ne redonnait la main au rendu.
-        for (const r of [normalResult, proResult, bizResult, socialeResult]) {
+        for (const r of [normalResult, proResult, bizResult, socialeResult, influenceurResult]) {
           if (r?.error) console.error('Erreur chargement conversations :', r.error)
         }
 
@@ -119,6 +136,7 @@ export default function ConversationsList() {
           ...((proResult?.data) || []).map((c) => ({ ...c, kind: 'pro' })),
           ...((bizResult?.data) || []).map((c) => ({ ...c, kind: 'biz' })),
           ...((socialeResult?.data) || []).map((c) => ({ ...c, kind: 'sociale' })),
+          ...((influenceurResult?.data) || []).map((c) => ({ ...c, kind: 'influenceur' })),
         ].sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
 
         setConversations(normalized)
@@ -147,7 +165,7 @@ export default function ConversationsList() {
       const isSideA = c.client_a_id === clientProfile?.id
       return isSideA ? c.client_b?.users : c.client_a?.users
     }
-    if (c.kind === 'sociale') {
+    if (c.kind === 'sociale' || c.kind === 'influenceur') {
       const isSideA = c.user_a_id === user?.id
       return isSideA ? c.user_b : c.user_a
     }
@@ -192,10 +210,19 @@ export default function ConversationsList() {
             const isPro = c.kind === 'pro'
             const isBiz = c.kind === 'biz'
             const isSociale = c.kind === 'sociale'
+            const isInfluenceurConv = c.kind === 'influenceur'
             const isInfluencer = profile?.role === 'influenceur'
             const other = getOther(c)
 
-            const rawMsgList = isBiz ? c.messages_biz : isPro ? c.messages_pro : isSociale ? c.messages_sociale : c.messages
+            const rawMsgList = isBiz
+              ? c.messages_biz
+              : isPro
+              ? c.messages_pro
+              : isSociale
+              ? c.messages_sociale
+              : isInfluenceurConv
+              ? c.messages_influenceur
+              : c.messages
             // On exclut d'abord les messages que MOI j'ai supprimés (pour moi ou pour
             // tous) : mon aperçu ne doit jamais s'appuyer dessus, même si l'autre les
             // voit encore de son côté.
@@ -214,7 +241,7 @@ export default function ConversationsList() {
               myReadAt = isSideA ? c.client_a_last_read_at : c.client_b_last_read_at
               otherReadAt = isSideA ? c.client_b_last_read_at : c.client_a_last_read_at
               lastMsgIsMine = lastMsg?.sender_id === clientProfile?.id
-            } else if (isSociale) {
+            } else if (isSociale || isInfluenceurConv) {
               const isSideA = c.user_a_id === user?.id
               myReadAt = isSideA ? c.user_a_last_read_at : c.user_b_last_read_at
               otherReadAt = isSideA ? c.user_b_last_read_at : c.user_a_last_read_at
@@ -242,7 +269,10 @@ export default function ConversationsList() {
 
             let previewText
             if (!lastMsg) {
-              previewText = !isBiz && !isSociale && !isPro && c.offres?.titre ? `Offre : ${c.offres.titre}` : 'Nouvelle conversation'
+              previewText =
+                !isBiz && !isSociale && !isPro && !isInfluenceurConv && c.offres?.titre
+                  ? `Offre : ${c.offres.titre}`
+                  : 'Nouvelle conversation'
             } else if (lastMsg.is_deleted_for_all) {
               previewText = 'Ce message a été supprimé'
             } else if (isUnread && unreadReceived.length > 1) {
@@ -257,6 +287,8 @@ export default function ConversationsList() {
               ? `/messages/biz/${c.id}`
               : isSociale
               ? `/messages/sociale/${c.id}`
+              : isInfluenceurConv
+              ? `/messages/influenceur/${c.id}`
               : isPro
               ? `/messages/pro/${c.id}`
               : `/messages/${c.id}`
@@ -275,7 +307,7 @@ export default function ConversationsList() {
                 <div className="flex-1 min-w-0">
                   <p className="text-body-medium flex items-center gap-1.5">
                     {other?.nom_complet}
-                    {!isBiz && !isSociale && !isPro && !isInfluencer && c.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
+                    {!isBiz && !isSociale && !isPro && !isInfluenceurConv && !isInfluencer && c.profils_influenceur?.verifie && <VerifiedBadge size={14} />}
                   </p>
                   <p
                     className={`text-caption truncate ${
