@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "81170353681",
+    "project_id": "influo-app-70781",
+    "storage_bucket": "influo-app-70781.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:81170353681:android:86a57f2aaa0677da2fabb0",
+        "android_client_info": {
+          "package_name": "com.influo.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKlcFAv4yDE7nVo17sd4E3kZczQl99h_g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

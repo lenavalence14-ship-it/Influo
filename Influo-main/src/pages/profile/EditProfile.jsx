@@ -1,0 +1,258 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
+import Button from '../../components/ui/Button'
+import Input from '../../components/ui/Input'
+import { ArrowLeft, Plus, Trash2, Camera } from 'lucide-react'
+import { compressImage } from '../../lib/mediaCompression'
+
+const PLATEFORMES = ['tiktok', 'instagram', 'youtube', 'facebook', 'x', 'snapchat', 'autre']
+
+export default function EditProfile() {
+  const { user, profile, influencerProfile, clientProfile, refreshProfile } = useAuth()
+  const navigate = useNavigate()
+  const [nomComplet, setNomComplet] = useState(profile?.nom_complet || '')
+  const [photoFile, setPhotoFile] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(profile?.photo_url || '')
+  const [bio, setBio] = useState(influencerProfile?.bio || clientProfile?.bio || profile?.bio || '')
+  const [pays, setPays] = useState(influencerProfile?.pays || clientProfile?.pays || profile?.pays || '')
+  const [ville, setVille] = useState(influencerProfile?.ville || clientProfile?.ville || profile?.ville || '')
+  const [reseaux, setReseaux] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  useEffect(() => {
+    if (!influencerProfile?.id) return
+    supabase
+      .from('reseaux_sociaux')
+      .select('*')
+      .eq('influenceur_id', influencerProfile.id)
+      .then(({ data }) => {
+        if (data) setReseaux(data)
+      })
+  }, [influencerProfile?.id])
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoFile(file)
+    setPhotoPreview(URL.createObjectURL(file))
+  }
+
+  const [deletedReseauIds, setDeletedReseauIds] = useState([])
+
+  const addReseau = () => {
+    setReseaux((r) => [...r, { plateforme: 'instagram', nom_compte: '', lien_profil: '', nombre_abonnes: 0 }])
+  }
+
+  const updateReseau = (i, field, value) => {
+    setReseaux((r) => r.map((item, idx) => (idx === i ? { ...item, [field]: value } : item)))
+  }
+
+  const removeReseau = (i) => {
+    setReseaux((r) => {
+      const target = r[i]
+      if (target?.id) setDeletedReseauIds((ids) => [...ids, target.id])
+      return r.filter((_, idx) => idx !== i)
+    })
+  }
+
+  const handleSave = async () => {
+    setLoading(true)
+    setErrorMsg('')
+
+    try {
+      let photoUrl = profile?.photo_url || null
+      if (photoFile) {
+        // Un avatar est vu par chaque follower, sur chaque post, dans le feed, les stories,
+        // les commentaires : il n'y a pas de photo plus souvent re-téléchargée dans l'app.
+        // La compresser avant upload réduit directement le volume réseau consommé par
+        // tout le monde, pas seulement par la personne qui l'a uploadée.
+        const compressed = await compressImage(photoFile, { maxDimension: 512, quality: 0.85 })
+        const ext = compressed.name.split('.').pop()
+        const fileName = `${user.id}/avatar-${Date.now()}.${ext}`
+        const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, compressed, {
+          upsert: true,
+        })
+        if (uploadError) {
+          // Avant, cette erreur était silencieusement ignorée : la photo semblait "ne pas
+          // s'enregistrer" sans aucune explication. On arrête maintenant l'enregistrement
+          // et on prévient clairement, plutôt que de continuer comme si de rien n'était.
+          throw new Error("Échec de l'envoi de la photo : " + uploadError.message)
+        }
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName)
+        photoUrl = urlData.publicUrl
+      }
+
+      const userUpdate = { nom_complet: nomComplet, photo_url: photoUrl }
+      if (!influencerProfile?.id && !clientProfile?.id) {
+        // utilisateur_simple : bio/pays/ville vivent directement sur users.
+        userUpdate.bio = bio
+        userUpdate.pays = pays
+        userUpdate.ville = ville
+      }
+      const { error: userError } = await supabase
+        .from('users')
+        .update(userUpdate)
+        .eq('id', user.id)
+      if (userError) throw new Error('Échec de la mise à jour du profil : ' + userError.message)
+
+      if (influencerProfile?.id) {
+        const { error: infError } = await supabase
+          .from('profils_influenceur')
+          .update({ bio, pays, ville })
+          .eq('id', influencerProfile.id)
+        if (infError) throw new Error(infError.message)
+
+        const validReseaux = reseaux.filter((r) => r.nom_compte)
+        const existants = validReseaux.filter((r) => r.id)
+        const nouveaux = validReseaux.filter((r) => !r.id)
+
+        await Promise.all([
+          ...existants.map((r) =>
+            supabase
+              .from('reseaux_sociaux')
+              .update({
+                plateforme: r.plateforme,
+                nom_compte: r.nom_compte,
+                lien_profil: r.lien_profil,
+                nombre_abonnes: parseInt(r.nombre_abonnes, 10) || 0,
+              })
+              .eq('id', r.id)
+          ),
+          ...nouveaux.map((r) =>
+            supabase.from('reseaux_sociaux').insert({
+              influenceur_id: influencerProfile.id,
+              plateforme: r.plateforme,
+              nom_compte: r.nom_compte,
+              lien_profil: r.lien_profil,
+              nombre_abonnes: parseInt(r.nombre_abonnes, 10) || 0,
+            })
+          ),
+          ...deletedReseauIds.map((id) => supabase.from('reseaux_sociaux').delete().eq('id', id)),
+        ])
+      } else if (clientProfile?.id) {
+        const { error: cliError } = await supabase
+          .from('profils_client')
+          .update({ bio, pays, ville })
+          .eq('id', clientProfile.id)
+        if (cliError) throw new Error(cliError.message)
+      }
+      await refreshProfile()
+      navigate('/profil')
+    } catch (err) {
+      setErrorMsg(err.message || "Une erreur est survenue, réessaie.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Bio/Pays/Ville existent pour tous les rôles : sur profils_influenceur / profils_client
+  // pour ces rôles-là, et directement sur users pour utilisateur_simple.
+  const showBioLocation = true
+
+  return (
+    <div className="px-5 pt-6 pb-6">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-caption mb-6">
+        <ArrowLeft size={16} /> Retour
+      </button>
+
+      <h1 className="text-h1 mb-6">Modifier le profil</h1>
+
+      <div className="space-y-4">
+        <div className="flex justify-center mb-2">
+          <label className="relative cursor-pointer">
+            <img
+              src={photoPreview || `https://api.dicebear.com/9.x/glass/svg?seed=${user?.id}`}
+              alt=""
+              className="w-24 h-24 rounded-full object-cover"
+            />
+            <div className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[var(--text-primary)] flex items-center justify-center">
+              <Camera size={15} className="text-[var(--bg-primary)]" />
+            </div>
+            <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
+          </label>
+        </div>
+
+        <Input label="Nom complet" value={nomComplet} onChange={(e) => setNomComplet(e.target.value)} />
+
+        {showBioLocation && (
+          <>
+            <label className="block">
+              <span className="block text-body mb-2 text-[var(--text-secondary)] font-medium">Bio</span>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                rows={3}
+                className="w-full rounded-2xl px-4 py-3 glass outline-none resize-none text-body"
+              />
+            </label>
+            <Input label="Pays" value={pays} onChange={(e) => setPays(e.target.value)} />
+            <Input label="Ville" value={ville} onChange={(e) => setVille(e.target.value)} />
+          </>
+        )}
+
+        {influencerProfile && (
+          <>
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-body-medium">Réseaux sociaux</span>
+                <button onClick={addReseau} className="glass rounded-full p-2">
+                  <Plus size={16} />
+                </button>
+              </div>
+              <div className="space-y-3">
+                {reseaux.map((r, i) => (
+                  <div key={r.id || `new-${i}`} className="glass rounded-2xl p-3 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <select
+                        value={r.plateforme}
+                        onChange={(e) => updateReseau(i, 'plateforme', e.target.value)}
+                        className="bg-transparent text-body outline-none"
+                      >
+                        {PLATEFORMES.map((p) => (
+                          <option key={p} value={p} className="bg-[var(--bg-elevated)]">{p}</option>
+                        ))}
+                      </select>
+                      <button onClick={() => removeReseau(i)}>
+                        <Trash2 size={16} className="text-[var(--text-secondary)]" />
+                      </button>
+                    </div>
+                    <input
+                      value={r.nom_compte}
+                      onChange={(e) => updateReseau(i, 'nom_compte', e.target.value)}
+                      placeholder="Nom du compte"
+                      className="w-full bg-transparent text-body outline-none border-b border-[var(--border)] pb-1"
+                    />
+                    <input
+                      value={r.lien_profil}
+                      onChange={(e) => updateReseau(i, 'lien_profil', e.target.value)}
+                      placeholder="Lien du profil"
+                      className="w-full bg-transparent text-body outline-none border-b border-[var(--border)] pb-1"
+                    />
+                    <input
+                      type="number"
+                      value={r.nombre_abonnes}
+                      onChange={(e) => updateReseau(i, 'nombre_abonnes', e.target.value)}
+                      placeholder="Nombre d'abonnés"
+                      className="w-full bg-transparent text-body outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {errorMsg && (
+          <p className="text-caption text-red-400 text-center">{errorMsg}</p>
+        )}
+
+        <Button fullWidth onClick={handleSave} disabled={loading} className="mt-2">
+          {loading ? 'Enregistrement...' : 'Enregistrer'}
+        </Button>
+      </div>
+    </div>
+  )
+}
