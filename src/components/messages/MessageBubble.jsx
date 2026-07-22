@@ -112,6 +112,16 @@ export default function MessageBubble({
   return (
     <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} relative`}>
       <div ref={bubbleRef} className="relative max-w-[75%]">
+        {message.reply_to_note_id && !isDeleted && (
+          <div
+            className={`mb-1 rounded-xl px-3 py-1.5 text-caption italic opacity-80 border-l-2 ${
+              isMe ? 'border-white/50' : 'border-[var(--accent)]'
+            }`}
+            style={{ background: 'rgba(128,128,128,0.12)' }}
+          >
+            Réponse à la note : {message.reply_to_note_contenu || '…'}
+          </div>
+        )}
         {editing ? (
           <div className="flex flex-col gap-1.5 min-w-[220px]">
             <input

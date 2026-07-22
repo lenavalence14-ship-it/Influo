@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { timeShort } from '../../lib/time'
-import StoryBar from '../feed/StoryBar'
+import NoteBar from '../feed/NoteBar'
 
 // Un message supprimé "pour moi" ne doit jamais apparaître dans MON aperçu
 // (deleted_for est propre à chacun, l'autre le voit toujours normalement).
@@ -178,7 +178,7 @@ export default function ConversationsList() {
         </div>
       </header>
 
-      <StoryBar />
+      <NoteBar />
 
       {filtered.length === 0 ? (
         <div className="glass rounded-2xl p-8 text-center mx-4">

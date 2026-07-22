@@ -3,7 +3,7 @@ import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
-import StoryBar from './StoryBar'
+import NoteBar from './NoteBar'
 import PostCard from './PostCard'
 import Card from '../../components/ui/Card'
 import { Sun, Moon, MessageCircle, Plus, RefreshCw } from 'lucide-react'
@@ -163,7 +163,7 @@ export default function Feed() {
         </div>
       )}
 
-      <StoryBar />
+      <NoteBar />
 
       {loading ? (
         <div className="flex justify-center py-20">

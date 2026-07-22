@@ -45,6 +45,10 @@ const ChatBiz = lazy(() => import('./pages/messages/ChatBiz'))
 const NewConversationBiz = lazy(() => import('./pages/messages/NewConversationBiz'))
 const ChatSociale = lazy(() => import('./pages/messages/ChatSociale'))
 const NewConversationSociale = lazy(() => import('./pages/messages/NewConversationSociale'))
+const ChatInfluenceur = lazy(() => import('./pages/messages/ChatInfluenceur'))
+const NewConversationInfluenceur = lazy(() => import('./pages/messages/NewConversationInfluenceur'))
+
+const CreateNote = lazy(() => import('./pages/feed/CreateNote'))
 
 const Wallet = lazy(() => import('./pages/wallet/Wallet'))
 
@@ -114,6 +118,33 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <ChatBiz />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Chat influenceur <-> influenceur : réponses aux notes entre influenceurs */}
+        <Route
+          path="/messages/influenceur/nouveau"
+          element={
+            <ProtectedRoute>
+              <NewConversationInfluenceur />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages/influenceur/:id"
+          element={
+            <ProtectedRoute>
+              <ChatInfluenceur />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/notes/nouvelle"
+          element={
+            <ProtectedRoute>
+              <CreateNote />
             </ProtectedRoute>
           }
         />

@@ -1,0 +1,3 @@
+-- fichiers supprimés (à retirer manuellement de ton repo) --
+src/pages/feed/StoryBar.jsx
+src/pages/feed/StoryViewer.jsx
