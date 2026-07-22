@@ -11,7 +11,7 @@ import Button from '../../components/ui/Button'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import BottomSheet from '../../components/ui/BottomSheet'
 import { generateReceipt } from '../../lib/receipt'
-import { timeShort } from '../../lib/time'
+import MessageBubble from '../../components/messages/MessageBubble'
 
 const FORMATS = [
   { value: 'carre', label: '1:1' },
@@ -83,9 +83,23 @@ export default function Chat() {
     const channel = supabase
       .channel(`chat-${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
-        setMessages((prev) => [...prev, payload.new])
+        // Si ce message vient de moi, il a déjà été affiché en optimiste (voir sendMessage) :
+        // on remplace juste la version temporaire par la vraie ligne DB plutôt que de dupliquer.
+        setMessages((prev) => {
+          const tempIndex = prev.findIndex((m) => m._optimisticId && m.sender_id === payload.new.sender_id && m.contenu === payload.new.contenu && !prev.some((mm) => mm.id === payload.new.id))
+          if (tempIndex !== -1) {
+            const next = [...prev]
+            next[tempIndex] = payload.new
+            return next
+          }
+          if (prev.some((m) => m.id === payload.new.id)) return prev
+          return [...prev, payload.new]
+        })
         const readField = isInfluencer ? 'influenceur_last_read_at' : 'client_last_read_at'
         supabase.from('conversations').update({ [readField]: new Date().toISOString() }).eq('id', id)
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
+        setMessages((prev) => prev.map((m) => (m.id === payload.new.id ? payload.new : m)))
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `id=eq.${id}` }, (payload) => {
         setConversation((c) => (c ? { ...c, ...payload.new } : c))
@@ -100,15 +114,79 @@ export default function Chat() {
   }, [messages])
 
   const sendMessage = async (content, fichierUrl = null, fichierType = null) => {
-    await supabase.from('messages').insert({
+    // Optimiste : on affiche le message tout de suite, sans attendre l'aller-retour
+    // réseau + le rebond realtime. C'est ce qui évite d'avoir à sortir/rentrer de la
+    // conversation pour voir ce qu'on vient d'envoyer soi-même.
+    const optimisticId = `temp-${Date.now()}-${Math.random()}`
+    const optimisticMsg = {
+      id: optimisticId,
+      _optimisticId: true,
       conversation_id: id,
       sender_id: user.id,
       contenu: content,
       fichier_url: fichierUrl,
       fichier_type: fichierType,
       is_system: false,
-    })
+      created_at: new Date().toISOString(),
+      deleted_for: [],
+      is_deleted_for_all: false,
+      edited_at: null,
+    }
+    setMessages((prev) => [...prev, optimisticMsg])
+
+    const { data: inserted, error } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: id,
+        sender_id: user.id,
+        contenu: content,
+        fichier_url: fichierUrl,
+        fichier_type: fichierType,
+        is_system: false,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      // L'envoi a échoué : on retire la bulle optimiste plutôt que de mentir sur l'état.
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
+      return
+    }
+
+    // On remplace la bulle temporaire par la vraie ligne DB (id réel notamment).
+    setMessages((prev) => prev.map((m) => (m.id === optimisticId ? inserted : m)))
     await supabase.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', id)
+  }
+
+  const handleEditMessage = async (message, newContent) => {
+    const { data } = await supabase
+      .from('messages')
+      .update({ contenu: newContent, edited_at: new Date().toISOString() })
+      .eq('id', message.id)
+      .select()
+      .single()
+    if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
+  }
+
+  const handleDeleteForMe = async (message) => {
+    const nextDeletedFor = [...(message.deleted_for || []), user.id]
+    const { data } = await supabase
+      .from('messages')
+      .update({ deleted_for: nextDeletedFor })
+      .eq('id', message.id)
+      .select()
+      .single()
+    if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
+  }
+
+  const handleDeleteForEveryone = async (message) => {
+    const { data } = await supabase
+      .from('messages')
+      .update({ is_deleted_for_all: true, contenu: null, fichier_url: null })
+      .eq('id', message.id)
+      .select()
+      .single()
+    if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
   }
 
   const sendSystemMessage = async (content, fichierUrl = null) => {
@@ -456,7 +534,6 @@ if (!conversation) {
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 min-h-0">
         {messages.map((m, i) => {
           const isMe = m.sender_id === user.id
-          const isSystem = !m.sender_id
 
           // "vu" façon Messenger : petit avatar sous le dernier message que j'ai envoyé,
           // affiché seulement si l'autre l'a lu après son envoi
@@ -465,36 +542,18 @@ if (!conversation) {
           const seenByOther = isLastMineMessage && readAt && new Date(readAt) > new Date(m.created_at)
 
           return (
-            <div key={m.id} className={`flex flex-col ${isSystem ? 'items-center' : isMe ? 'items-end' : 'items-start'}`}>
-              {isSystem ? (
-                <div className="glass rounded-2xl px-4 py-2 text-caption text-center text-[var(--text-secondary)] max-w-[85%]">
-                  {m.contenu}
-                </div>
-              ) : (
-                <>
-                  <div className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-body ${isMe ? 'bg-[var(--accent)] text-white' : 'glass'}`}>
-                    {m.fichier_url && m.fichier_type === 'image' ? (
-                      <img src={m.fichier_url} alt="" className="rounded-xl mb-1 max-w-full" />
-                    ) : m.fichier_url ? (
-                      <a href={m.fichier_url} target="_blank" rel="noreferrer" className="underline">Fichier joint</a>
-                    ) : null}
-                    {m.contenu}
-                  </div>
-                  {m.created_at && (
-                    <span className="text-[11px] mt-1 px-1" style={{ color: 'var(--text-secondary)' }}>
-                      {timeShort(m.created_at)}
-                    </span>
-                  )}
-                  {seenByOther && (
-                    <img
-                      src={other?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${id}`}
-                      alt="Vu"
-                      className="w-4 h-4 rounded-full object-cover mt-0.5"
-                    />
-                  )}
-                </>
-              )}
-            </div>
+            <MessageBubble
+              key={m.id}
+              message={m}
+              isMe={isMe}
+              myId={user.id}
+              seenByOther={seenByOther}
+              otherPhotoUrl={other?.photo_url}
+              seedId={id}
+              onEdit={handleEditMessage}
+              onDeleteForMe={handleDeleteForMe}
+              onDeleteForEveryone={handleDeleteForEveryone}
+            />
           )
         })}
 

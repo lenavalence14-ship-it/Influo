@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { ArrowLeft, Send, Camera, Image as ImageIcon, ThumbsUp, Plus, Mic } from 'lucide-react'
-import { timeShort } from '../../lib/time'
+import MessageBubble from '../../components/messages/MessageBubble'
 
 // Chat utilisateur_simple <-> utilisateur_simple. Repris de ChatBiz.jsx (mêmes pièces
 // jointes, header, style de bulles), sans tout ce qui concerne le paiement/la commande :
@@ -57,12 +57,24 @@ export default function ChatSociale() {
     const channel = supabase
       .channel(`chat-sociale-${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages_sociale', filter: `conversation_id=eq.${id}` }, (payload) => {
-        setMessages((prev) => [...prev, payload.new])
+        setMessages((prev) => {
+          const tempIndex = prev.findIndex((m) => m._optimisticId && m.sender_id === payload.new.sender_id && m.contenu === payload.new.contenu && !prev.some((mm) => mm.id === payload.new.id))
+          if (tempIndex !== -1) {
+            const next = [...prev]
+            next[tempIndex] = payload.new
+            return next
+          }
+          if (prev.some((m) => m.id === payload.new.id)) return prev
+          return [...prev, payload.new]
+        })
         const readField = isSideA ? 'user_a_last_read_at' : 'user_b_last_read_at'
         supabase.from('conversations_sociale').update({ [readField]: new Date().toISOString() }).eq('id', id)
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations_sociale', filter: `id=eq.${id}` }, (payload) => {
         setConversation((c) => (c ? { ...c, ...payload.new } : c))
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages_sociale', filter: `conversation_id=eq.${id}` }, (payload) => {
+        setMessages((prev) => prev.map((m) => (m.id === payload.new.id ? payload.new : m)))
       })
       .subscribe()
 
@@ -75,15 +87,73 @@ export default function ChatSociale() {
   }, [messages])
 
   const sendMessage = async (content, fichierUrl = null, fichierType = null) => {
-    await supabase.from('messages_sociale').insert({
+    const optimisticId = `temp-${Date.now()}-${Math.random()}`
+    const optimisticMsg = {
+      id: optimisticId,
+      _optimisticId: true,
       conversation_id: id,
       sender_id: myId,
       contenu: content,
       fichier_url: fichierUrl,
       fichier_type: fichierType,
       is_system: false,
-    })
+      created_at: new Date().toISOString(),
+      deleted_for: [],
+      is_deleted_for_all: false,
+      edited_at: null,
+    }
+    setMessages((prev) => [...prev, optimisticMsg])
+
+    const { data: inserted, error } = await supabase
+      .from('messages_sociale')
+      .insert({
+        conversation_id: id,
+        sender_id: myId,
+        contenu: content,
+        fichier_url: fichierUrl,
+        fichier_type: fichierType,
+        is_system: false,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
+      return
+    }
+    setMessages((prev) => prev.map((m) => (m.id === optimisticId ? inserted : m)))
     await supabase.from('conversations_sociale').update({ updated_at: new Date().toISOString() }).eq('id', id)
+  }
+
+  const handleEditMessage = async (message, newContent) => {
+    const { data } = await supabase
+      .from('messages_sociale')
+      .update({ contenu: newContent, edited_at: new Date().toISOString() })
+      .eq('id', message.id)
+      .select()
+      .single()
+    if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
+  }
+
+  const handleDeleteForMe = async (message) => {
+    const nextDeletedFor = [...(message.deleted_for || []), myId]
+    const { data } = await supabase
+      .from('messages_sociale')
+      .update({ deleted_for: nextDeletedFor })
+      .eq('id', message.id)
+      .select()
+      .single()
+    if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
+  }
+
+  const handleDeleteForEveryone = async (message) => {
+    const { data } = await supabase
+      .from('messages_sociale')
+      .update({ is_deleted_for_all: true, contenu: null, fichier_url: null })
+      .eq('id', message.id)
+      .select()
+      .single()
+    if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
   }
 
   const handleSend = async () => {
@@ -120,43 +190,24 @@ export default function ChatSociale() {
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 min-h-0">
         {messages.map((m, i) => {
           const isMe = m.sender_id === myId
-          const isSystem = !m.sender_id
 
           const readAt = isSideA ? conversation.user_b_last_read_at : conversation.user_a_last_read_at
           const isLastMineMessage = isMe && !messages.slice(i + 1).some((mm) => mm.sender_id === myId)
           const seenByOther = isLastMineMessage && readAt && new Date(readAt) > new Date(m.created_at)
 
           return (
-            <div key={m.id} className={`flex flex-col ${isSystem ? 'items-center' : isMe ? 'items-end' : 'items-start'}`}>
-              {isSystem ? (
-                <div className="glass rounded-2xl px-4 py-2 text-caption text-center text-[var(--text-secondary)] max-w-[85%]">
-                  {m.contenu}
-                </div>
-              ) : (
-                <>
-                  <div className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-body ${isMe ? 'bg-[var(--accent)] text-white' : 'glass'}`}>
-                    {m.fichier_url && m.fichier_type === 'image' ? (
-                      <img src={m.fichier_url} alt="" className="rounded-xl mb-1 max-w-full" />
-                    ) : m.fichier_url ? (
-                      <a href={m.fichier_url} target="_blank" rel="noreferrer" className="underline">Fichier joint</a>
-                    ) : null}
-                    {m.contenu}
-                  </div>
-                  {m.created_at && (
-                    <span className="text-[11px] mt-1 px-1" style={{ color: 'var(--text-secondary)' }}>
-                      {timeShort(m.created_at)}
-                    </span>
-                  )}
-                  {seenByOther && (
-                    <img
-                      src={other?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${id}`}
-                      alt="Vu"
-                      className="w-4 h-4 rounded-full object-cover mt-0.5"
-                    />
-                  )}
-                </>
-              )}
-            </div>
+            <MessageBubble
+              key={m.id}
+              message={m}
+              isMe={isMe}
+              myId={myId}
+              seenByOther={seenByOther}
+              otherPhotoUrl={other?.photo_url}
+              seedId={id}
+              onEdit={handleEditMessage}
+              onDeleteForMe={handleDeleteForMe}
+              onDeleteForEveryone={handleDeleteForEveryone}
+            />
           )
         })}
 
