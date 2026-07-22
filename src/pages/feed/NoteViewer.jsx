@@ -64,8 +64,18 @@ export default function NoteViewer({ entries, startIndex, onClose }) {
 
   if (!current || !note) return null
 
-  const sameRole = profile?.role && author?.role && profile.role === author.role && note.user_id !== user?.id
   const isMine = note.user_id === user?.id
+
+  // Qui peut répondre à qui, validé : client<->influenceur, client<->utilisateur_simple,
+  // client<->client, influenceur<->influenceur, utilisateur_simple<->utilisateur_simple.
+  // influenceur<->utilisateur_simple : NON, aucun canal entre ces deux rôles.
+  const myRole = profile?.role
+  const theirRole = author?.role
+  const canReply =
+    !isMine &&
+    myRole &&
+    theirRole &&
+    (myRole === theirRole || myRole === 'client' || theirRole === 'client')
 
   const handleLike = async () => {
     if (liked) {
@@ -113,54 +123,185 @@ export default function NoteViewer({ entries, startIndex, onClose }) {
   }
 
   const handleReply = async () => {
-    if (!replyText.trim() || !sameRole || sending) return
+    if (!replyText.trim() || !canReply || sending) return
     setSending(true)
-    const role = profile.role
-    const table =
-      role === 'influenceur' ? 'conversations_influenceur' : role === 'client' ? 'conversations_biz' : 'conversations_sociale'
-    const aField = role === 'client' ? 'client_a_id' : 'user_a_id'
-    const bField = role === 'client' ? 'client_b_id' : 'user_b_id'
 
-    // conversations_biz référence profils_client.id, pas users.id directement :
-    // il faut résoudre les deux profils_client avant de chercher/créer la conversation.
-    let myId = user.id
-    let otherId = note.user_id
-    if (role === 'client') {
-      const [{ data: myClientProfile }, { data: otherClientProfile }] = await Promise.all([
-        supabase.from('profils_client').select('id').eq('user_id', user.id).maybeSingle(),
-        supabase.from('profils_client').select('id').eq('user_id', note.user_id).maybeSingle(),
-      ])
-      if (!myClientProfile || !otherClientProfile) {
-        setSending(false)
-        return
+    const myRole = profile.role
+    const theirRole = author.role
+    const otherUserId = note.user_id
+
+    let table, messagesTable, aField, bField, myId, otherId, conversationId
+
+    if (myRole === theirRole) {
+      // même rôle : influenceur<->influenceur, client<->client, simple<->simple
+      myId = user.id
+      otherId = otherUserId
+      if (myRole === 'influenceur') {
+        table = 'conversations_influenceur'
+        messagesTable = 'messages_influenceur'
+        aField = 'user_a_id'
+        bField = 'user_b_id'
+      } else if (myRole === 'client') {
+        table = 'conversations_biz'
+        messagesTable = 'messages_biz'
+        aField = 'client_a_id'
+        bField = 'client_b_id'
+        // conversations_biz référence profils_client.id, pas users.id
+        const [{ data: mine }, { data: theirs }] = await Promise.all([
+          supabase.from('profils_client').select('id').eq('user_id', user.id).maybeSingle(),
+          supabase.from('profils_client').select('id').eq('user_id', otherUserId).maybeSingle(),
+        ])
+        if (!mine || !theirs) {
+          setSending(false)
+          return
+        }
+        myId = mine.id
+        otherId = theirs.id
+      } else {
+        table = 'conversations_sociale'
+        messagesTable = 'messages_sociale'
+        aField = 'user_a_id'
+        bField = 'user_b_id'
       }
-      myId = myClientProfile.id
-      otherId = otherClientProfile.id
-    }
 
-    // Cherche une conversation existante dans les deux sens
-    const { data: existing } = await supabase
-      .from(table)
-      .select('id')
-      .or(`and(${aField}.eq.${myId},${bField}.eq.${otherId}),and(${aField}.eq.${otherId},${bField}.eq.${myId})`)
-      .maybeSingle()
-
-    let conversationId = existing?.id
-    if (!conversationId) {
-      const { data: created, error } = await supabase
+      const { data: existing } = await supabase
         .from(table)
-        .insert({ [aField]: myId, [bField]: otherId })
-        .select()
-        .single()
-      if (error || !created) {
+        .select('id')
+        .or(`and(${aField}.eq.${myId},${bField}.eq.${otherId}),and(${aField}.eq.${otherId},${bField}.eq.${myId})`)
+        .maybeSingle()
+
+      conversationId = existing?.id
+      if (!conversationId) {
+        const { data: created, error } = await supabase.from(table).insert({ [aField]: myId, [bField]: otherId }).select().single()
+        if (error || !created) {
+          setSending(false)
+          return
+        }
+        conversationId = created.id
+      }
+    } else if (myRole === 'client' && theirRole === 'influenceur') {
+      // conversations : client_id (users.id) <-> influenceur_id (profils_influenceur.id)
+      table = 'conversations'
+      messagesTable = 'messages'
+      const { data: theirInfluenceurProfile } = await supabase
+        .from('profils_influenceur')
+        .select('id')
+        .eq('user_id', otherUserId)
+        .maybeSingle()
+      if (!theirInfluenceurProfile) {
         setSending(false)
         return
       }
-      conversationId = created.id
+      const { data: existing } = await supabase
+        .from(table)
+        .select('id')
+        .eq('client_id', user.id)
+        .eq('influenceur_id', theirInfluenceurProfile.id)
+        .maybeSingle()
+      conversationId = existing?.id
+      if (!conversationId) {
+        const { data: created, error } = await supabase
+          .from(table)
+          .insert({ client_id: user.id, influenceur_id: theirInfluenceurProfile.id })
+          .select()
+          .single()
+        if (error || !created) {
+          setSending(false)
+          return
+        }
+        conversationId = created.id
+      }
+    } else if (myRole === 'influenceur' && theirRole === 'client') {
+      // même table `conversations`, mais c'est MOI l'influenceur cette fois : influenceur_id = mon profils_influenceur.id
+      table = 'conversations'
+      messagesTable = 'messages'
+      const [{ data: myInfluenceurProfile }] = await Promise.all([
+        supabase.from('profils_influenceur').select('id').eq('user_id', user.id).maybeSingle(),
+      ])
+      if (!myInfluenceurProfile) {
+        setSending(false)
+        return
+      }
+      const { data: existing } = await supabase
+        .from(table)
+        .select('id')
+        .eq('client_id', otherUserId)
+        .eq('influenceur_id', myInfluenceurProfile.id)
+        .maybeSingle()
+      conversationId = existing?.id
+      if (!conversationId) {
+        const { data: created, error } = await supabase
+          .from(table)
+          .insert({ client_id: otherUserId, influenceur_id: myInfluenceurProfile.id })
+          .select()
+          .single()
+        if (error || !created) {
+          setSending(false)
+          return
+        }
+        conversationId = created.id
+      }
+    } else if (myRole === 'client' && theirRole === 'utilisateur_simple') {
+      // conversations_pro : client_id (profils_client.id) <-> utilisateur_id (users.id)
+      table = 'conversations_pro'
+      messagesTable = 'messages_pro'
+      const { data: myClientProfile } = await supabase.from('profils_client').select('id').eq('user_id', user.id).maybeSingle()
+      if (!myClientProfile) {
+        setSending(false)
+        return
+      }
+      const { data: existing } = await supabase
+        .from(table)
+        .select('id')
+        .eq('client_id', myClientProfile.id)
+        .eq('utilisateur_id', otherUserId)
+        .maybeSingle()
+      conversationId = existing?.id
+      if (!conversationId) {
+        const { data: created, error } = await supabase
+          .from(table)
+          .insert({ client_id: myClientProfile.id, utilisateur_id: otherUserId })
+          .select()
+          .single()
+        if (error || !created) {
+          setSending(false)
+          return
+        }
+        conversationId = created.id
+      }
+    } else if (myRole === 'utilisateur_simple' && theirRole === 'client') {
+      // même table conversations_pro, mais MOI je suis l'utilisateur_simple : utilisateur_id = mon users.id
+      table = 'conversations_pro'
+      messagesTable = 'messages_pro'
+      const { data: theirClientProfile } = await supabase.from('profils_client').select('id').eq('user_id', otherUserId).maybeSingle()
+      if (!theirClientProfile) {
+        setSending(false)
+        return
+      }
+      const { data: existing } = await supabase
+        .from(table)
+        .select('id')
+        .eq('client_id', theirClientProfile.id)
+        .eq('utilisateur_id', user.id)
+        .maybeSingle()
+      conversationId = existing?.id
+      if (!conversationId) {
+        const { data: created, error } = await supabase
+          .from(table)
+          .insert({ client_id: theirClientProfile.id, utilisateur_id: user.id })
+          .select()
+          .single()
+        if (error || !created) {
+          setSending(false)
+          return
+        }
+        conversationId = created.id
+      }
+    } else {
+      // influenceur <-> utilisateur_simple : aucun canal, ne devrait jamais arriver ici (canReply le bloque déjà)
+      setSending(false)
+      return
     }
-
-    const messagesTable =
-      role === 'influenceur' ? 'messages_influenceur' : role === 'client' ? 'messages_biz' : 'messages_sociale'
 
     await supabase.from(messagesTable).insert({
       conversation_id: conversationId,
@@ -174,10 +315,15 @@ export default function NoteViewer({ entries, startIndex, onClose }) {
 
     setSending(false)
     setReplyText('')
-    const route =
-      role === 'influenceur' ? `/messages/influenceur/${conversationId}` : role === 'client' ? `/messages/biz/${conversationId}` : `/messages/sociale/${conversationId}`
+    const routeByTable = {
+      conversations: `/messages/${conversationId}`,
+      conversations_pro: `/messages/pro/${conversationId}`,
+      conversations_biz: `/messages/biz/${conversationId}`,
+      conversations_sociale: `/messages/sociale/${conversationId}`,
+      conversations_influenceur: `/messages/influenceur/${conversationId}`,
+    }
     onClose()
-    navigate(route)
+    navigate(routeByTable[table])
   }
 
   const goNext = () => {
@@ -206,27 +352,36 @@ export default function NoteViewer({ entries, startIndex, onClose }) {
       </div>
 
       <div className="flex items-center gap-3 px-4 py-3">
-        <div className="relative shrink-0">
-          <img
-            src={author?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${author?.id}`}
-            alt=""
-            className="w-9 h-9 rounded-full object-cover"
-          />
-          {current.kind === 'repost' && current.reposter && (
+        {current.kind === 'repost' && current.reposter ? (
+          <div className="flex items-center shrink-0">
+            <img
+              src={author?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${author?.id}`}
+              alt=""
+              className="w-9 h-9 rounded-full object-cover border-2"
+              style={{ borderColor: 'white' }}
+            />
             <img
               src={current.reposter.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${current.reposter.id}`}
               alt=""
-              className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full object-cover border-2"
-              style={{ borderColor: 'var(--accent, #7c1a3a)' }}
+              className="w-9 h-9 rounded-full object-cover border-2 -ml-3"
+              style={{ borderColor: 'white' }}
             />
-          )}
-        </div>
+          </div>
+        ) : (
+          <img
+            src={author?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${author?.id}`}
+            alt=""
+            className="w-9 h-9 rounded-full object-cover shrink-0"
+          />
+        )}
         <div className="flex-1 min-w-0">
-          <p className="text-body-medium text-white truncate">
-            {current.kind === 'repost' && current.reposter
-              ? `${author?.nom_complet} & ${current.reposter.nom_complet}`
-              : author?.nom_complet}
-          </p>
+          {current.kind === 'repost' && current.reposter ? (
+            <p className="text-body-medium text-white truncate">
+              {author?.nom_complet} <span className="text-white/60">et</span> {current.reposter.nom_complet}
+            </p>
+          ) : (
+            <p className="text-body-medium text-white truncate">{author?.nom_complet}</p>
+          )}
           <p className="text-caption text-white/70">
             {current.kind === 'repost' ? 'a republié · ' : ''}
             {timeAgo(note.created_at)}
@@ -249,7 +404,7 @@ export default function NoteViewer({ entries, startIndex, onClose }) {
       </div>
 
       <div className="px-4 pb-[max(14px,env(safe-area-inset-bottom))] pt-2 flex flex-col gap-2.5">
-        {sameRole && (
+        {canReply && (
           <div className="flex items-center gap-2">
             <input
               value={replyText}
