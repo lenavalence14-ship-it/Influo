@@ -14,7 +14,7 @@ export default function StoryRing({
   hasStory, // conservé pour compat d'appel ; renommé conceptuellement en "hasNote"
   onClick,
   rotate = 0,
-  size = 72,
+  size = 88,
 }) {
   const hasNote = hasStory
   return (
