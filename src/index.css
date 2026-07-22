@@ -165,3 +165,11 @@ body {
 .animate-slide-up {
   animation: slideUp 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
+
+@keyframes storyRingSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-story-ring-spin {
+  animation: storyRingSpin 3.5s linear infinite;
+}

@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { AnimatePresence } from 'framer-motion'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import StoryViewer from './StoryViewer'
+import StoryRing from './StoryRing'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 
 async function fetchStories() {
@@ -19,22 +21,26 @@ async function fetchStories() {
   return data || []
 }
 
+// Rotation organique max appliquée à un cercle pendant le scroll, en degrés.
+// Volontairement subtile (cf. spec : "l'utilisateur doit ressentir la différence
+// sans forcément la remarquer consciemment").
+const MAX_TILT_DEG = 6
+
 export default function StoryBar() {
   const [viewerGroupIndex, setViewerGroupIndex] = useState(null)
+  const [tilts, setTilts] = useState({}) // { [key]: degrees }
   const { profile, influencerProfile } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const scrollRef = useRef(null)
+  const rafRef = useRef(null)
 
-  // React Query : mis en cache et partagé avec useActiveStories via la même donnée sous-jacente
-  // n'est pas nécessaire ici (clés différentes), mais bénéficie du staleTime pour éviter un
-  // refetch à chaque navigation retour vers le feed.
   const { data: rawStories = [] } = useQuery({
     queryKey: ['stories'],
     queryFn: fetchStories,
     staleTime: 15_000,
   })
 
-  // grouper par influenceur, dans l'ordre chronologique de leurs stories
   const groupsMap = new Map()
   for (const s of rawStories) {
     const infId = s.influenceur_id
@@ -72,26 +78,63 @@ export default function StoryBar() {
   const otherGroups = groups.filter((g) => g.influenceurId !== myInfluencerId)
 
   const myPhotoUrl = profile?.photo_url
-  const myName = profile?.nom_complet
+  const openViewerFor = (influenceurId) => {
+    setViewerGroupIndex(groups.findIndex((g) => g.influenceurId === influenceurId))
+  }
 
   const handleClickMine = () => {
     if (hasMyStory) {
-      setViewerGroupIndex(groups.findIndex((g) => g.influenceurId === myInfluencerId))
+      openViewerFor(myInfluencerId)
     } else {
       navigate('/publier?type=story')
     }
   }
 
+  // Calcule une légère inclinaison par cercle selon sa distance au centre du
+  // conteneur visible, recalculée à chaque frame de scroll (throttlé via rAF).
+  const handleScroll = () => {
+    if (rafRef.current) return
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null
+      const container = scrollRef.current
+      if (!container) return
+      const rect = container.getBoundingClientRect()
+      const centerX = rect.left + rect.width / 2
+      const next = {}
+      container.querySelectorAll('[data-story-key]').forEach((el) => {
+        const key = el.getAttribute('data-story-key')
+        const elRect = el.getBoundingClientRect()
+        const elCenter = elRect.left + elRect.width / 2
+        const offset = (elCenter - centerX) / (rect.width / 2) // ~-1..1
+        const clamped = Math.max(-1, Math.min(1, offset))
+        next[key] = clamped * MAX_TILT_DEG
+      })
+      setTilts(next)
+    })
+  }
+
   return (
     <>
-      <div className="flex gap-4 overflow-x-auto px-4 pt-4 pb-3" style={{ scrollbarWidth: 'none' }}>
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex gap-4 overflow-x-auto px-4 pt-4 pb-3"
+        style={{ scrollbarWidth: 'none' }}
+      >
         {profile?.role === 'influenceur' && (
           <div className="flex flex-col items-center gap-2 shrink-0 cursor-pointer" onClick={handleClickMine}>
-            <div
-              className="relative w-[72px] h-[72px] rounded-full"
-              style={hasMyStory ? { padding: '2.5px', background: 'linear-gradient(to bottom right, #4f0c2d, #7a1240)' } : undefined}
-            >
-              <div className={`w-full h-full rounded-full ${hasMyStory ? 'bg-[var(--bg-primary)] p-[2px]' : ''}`}>
+            {hasMyStory ? (
+              <div data-story-key="mine">
+                <StoryRing
+                  layoutId={`story-ring-${myInfluencerId}`}
+                  photoUrl={myPhotoUrl}
+                  fallbackSeed={myInfluencerId}
+                  hasStory
+                  rotate={tilts.mine || 0}
+                />
+              </div>
+            ) : (
+              <div className="relative w-[72px] h-[72px] rounded-full">
                 <img
                   src={myPhotoUrl || `https://api.dicebear.com/9.x/glass/svg?seed=${myInfluencerId}`}
                   alt=""
@@ -99,36 +142,31 @@ export default function StoryBar() {
                   decoding="async"
                   className="w-full h-full rounded-full object-cover"
                 />
-              </div>
-              {!hasMyStory && (
                 <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-[var(--accent)] border-2 border-[var(--bg-primary)] flex items-center justify-center">
                   <Plus size={12} className="text-white" strokeWidth={3} />
                 </div>
-              )}
-            </div>
+              </div>
+            )}
             <span className="text-caption max-w-[72px] truncate">
               {hasMyStory ? 'Ta story' : 'Ton story'}
             </span>
           </div>
         )}
 
-        {otherGroups.map((g, i) => (
+        {otherGroups.map((g) => (
           <div
             key={g.influenceurId}
+            data-story-key={g.influenceurId}
             className="flex flex-col items-center gap-2 shrink-0 cursor-pointer"
-            onClick={() => setViewerGroupIndex(groups.findIndex((x) => x.influenceurId === g.influenceurId))}
+            onClick={() => openViewerFor(g.influenceurId)}
           >
-            <div className="w-[72px] h-[72px] rounded-full p-[2.5px]" style={{ background: 'linear-gradient(to bottom right, #4f0c2d, #7a1240)' }}>
-              <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">
-                <img
-                  src={g.photoUrl || `https://api.dicebear.com/9.x/glass/svg?seed=${g.influenceurId}`}
-                  alt=""
-                  loading={i < 4 ? 'eager' : 'lazy'}
-                  decoding="async"
-                  className="w-full h-full rounded-full object-cover"
-                />
-              </div>
-            </div>
+            <StoryRing
+              layoutId={`story-ring-${g.influenceurId}`}
+              photoUrl={g.photoUrl}
+              fallbackSeed={g.influenceurId}
+              hasStory
+              rotate={tilts[g.influenceurId] || 0}
+            />
             <span className="text-caption max-w-[72px] truncate flex items-center gap-1">
               {g.nom?.split(' ')[0]}
               {g.verifie && <VerifiedBadge size={11} />}
@@ -137,17 +175,20 @@ export default function StoryBar() {
         ))}
       </div>
 
-      {viewerGroupIndex !== null && (
-        <StoryViewer
-          groups={groups}
-          startGroupIndex={viewerGroupIndex}
-          myInfluencerId={myInfluencerId}
-          onClose={() => {
-            setViewerGroupIndex(null)
-            queryClient.invalidateQueries({ queryKey: ['stories'] })
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {viewerGroupIndex !== null && (
+          <StoryViewer
+            key="story-viewer"
+            groups={groups}
+            startGroupIndex={viewerGroupIndex}
+            myInfluencerId={myInfluencerId}
+            onClose={() => {
+              setViewerGroupIndex(null)
+              queryClient.invalidateQueries({ queryKey: ['stories'] })
+            }}
+          />
+        )}
+      </AnimatePresence>
     </>
   )
 }

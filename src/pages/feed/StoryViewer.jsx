@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import { X, Trash2, Pencil, Send, Heart, MessageCircle, Share, Volume2, VolumeX } from 'lucide-react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
@@ -9,6 +10,9 @@ import { timeAgo } from '../../lib/time'
 import { getFilterCss } from './editor/FilterPicker'
 
 const STORY_DURATION_MS = 5000
+
+// Durée d'expansion cercle -> plein écran / contraction inverse, cf. spec (280-350ms).
+const TRANSITION = { type: 'tween', duration: 0.32, ease: [0.22, 1, 0.36, 1] }
 
 // groups: array of { influenceurId, nom, photoUrl, verifie, stories: [{id, media_url, media_type, texte_overlay, texte_x, texte_y, texte_couleur, texte_police, texte_taille}] }
 export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, onClose }) {
@@ -37,6 +41,13 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
   const story = group?.stories?.[storyIndex]
   const isOwner = group?.influenceurId === myInfluencerId
   const isVideo = story?.media_type === 'video'
+
+  // layoutId partagé avec le StoryRing correspondant dans StoryBar : c'est ce qui
+  // permet à Framer Motion de faire l'expansion cercle -> plein écran automatiquement.
+  // Se fige à l'ouverture (groupe de départ) : on n'anime pas re-depuis un autre
+  // cercle quand on swipe vers le groupe suivant à l'intérieur du viewer.
+  const originGroupId = localGroups[startGroupIndex]?.influenceurId
+  const sharedLayoutId = originGroupId != null ? `story-ring-${originGroupId}` : undefined
 
   // resynchronise avec les données fraîches si elles changent (ex: retour après modification d'une story)
   useEffect(() => {
@@ -248,7 +259,23 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black overflow-hidden">
+    <motion.div
+      layoutId={sharedLayoutId}
+      initial={{ borderRadius: 999 }}
+      animate={{ borderRadius: 0 }}
+      exit={{ borderRadius: 999 }}
+      transition={TRANSITION}
+      className="fixed inset-0 z-[100] bg-black overflow-hidden"
+    >
+      {/* le contenu apparaît une fois l'expansion bien engagée plutôt que d'être
+          étiré/déformé pendant la transition de forme du conteneur */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15, delay: 0.1 }}
+        className="absolute inset-0"
+      >
       {/* fond flouté plein écran (uniquement si le média n'est pas déjà vertical plein écran) */}
       {story.crop_format && story.crop_format !== 'vertical' && story.crop_format !== 'vertical_45' && (
         <div
@@ -479,6 +506,7 @@ export default function StoryViewer({ groups, startGroupIndex, myInfluencerId, o
           />
         </div>
       )}
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
