@@ -25,9 +25,10 @@ async function fetchReels(userId) {
   const { data } = await supabase
     .from('posts')
     .select(`
-      id, legende, created_at, filtre,
+      id, legende, created_at, filtre, client_id,
       post_medias(media_url, media_type, thumbnail_url, position),
-      profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
+      profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
+      client:client_id(id, nom_complet, photo_url)
     `)
     .eq('type', 'video')
     .order('created_at', { ascending: false })
@@ -329,6 +330,18 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
             {influencer?.verifie && <VerifiedBadge size={14} />}
           </span>
         </Link>
+        {reel.client && (
+          <Link to={`/entreprise/${reel.client.id}`} className="flex items-center gap-2 mb-2 -mt-1">
+            <img
+              src={reel.client.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${reel.client.nom_complet}`}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="w-6 h-6 rounded-full object-cover shrink-0"
+            />
+            <span className="text-white/80 text-small truncate">{reel.client.nom_complet}</span>
+          </Link>
+        )}
         {reel.legende && (
           <p className="text-white text-body line-clamp-2">{reel.legende}</p>
         )}

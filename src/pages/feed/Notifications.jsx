@@ -3,23 +3,47 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { Heart, MessageCircle, ShoppingBag, Wallet, ArrowLeft } from 'lucide-react'
+import { Heart, MessageCircle, ShoppingBag, Wallet, ArrowLeft, UserPlus } from 'lucide-react'
 import Avatar from '../../components/ui/Avatar'
+import Button from '../../components/ui/Button'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { timeAgo, dateSection } from '../../lib/time'
 import { useActiveStories } from '../../hooks/useActiveStories'
+import { profileRoute } from '../../lib/profileRoute'
+
+// Types de notifications qui pointent vers un post (pour aller chercher sa miniature)
+const POST_TYPES = [
+  'like', 'comment', 'comment_collab',
+  'nouveau_post', 'nouveau_reel', 'nouvelle_collab', 'nouveau_reel_collab',
+  'reply', 'reply_content', 'comment_like',
+]
 
 const TYPE_ICON = {
   like: Heart,
   comment: MessageCircle,
+  comment_collab: MessageCircle,
+  reply: MessageCircle,
+  reply_content: MessageCircle,
+  comment_like: Heart,
   commande: ShoppingBag,
+  commande_pro: ShoppingBag,
   retrait: Wallet,
+  retrait_pro: Wallet,
+  follow: UserPlus,
 }
 
+// Libellé de secours si `contenu` (déjà formulé côté trigger SQL) est absent pour
+// une raison quelconque — sert uniquement de filet de sécurité.
 const TYPE_SUFFIX = {
   like: 'a aimé votre publication',
   comment: 'a commenté votre publication',
+  comment_collab: 'a commenté votre contenu collaboratif',
+  reply: 'a répondu à votre commentaire',
+  reply_content: 'a répondu à un commentaire sur votre contenu',
+  comment_like: 'a aimé votre commentaire',
   commande: 'a passé une nouvelle commande',
+  commande_pro: 'a passé une nouvelle commande',
+  follow: 'a commencé à vous suivre',
 }
 
 const TABS = [
@@ -32,13 +56,13 @@ const SECTION_ORDER = ["Aujourd'hui", 'Hier', '7 derniers jours', '30 derniers j
 async function fetchNotifications(userId) {
   const { data } = await supabase
     .from('notifications')
-    .select('*, from_user:from_user_id(nom_complet, photo_url, profils_influenceur(id, verifie))')
+    .select('*, from_user:from_user_id(nom_complet, photo_url, role, profils_influenceur(id, verifie))')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(100)
 
   const postIds = (data || [])
-    .filter((n) => (n.type === 'like' || n.type === 'comment') && n.lien_ref_id)
+    .filter((n) => POST_TYPES.includes(n.type) && n.lien_ref_id)
     .map((n) => n.lien_ref_id)
 
   let mediaByPostId = {}
@@ -56,9 +80,16 @@ async function fetchNotifications(userId) {
 
   return (data || []).map((n) => ({
     ...n,
-    post_thumbnail: (n.type === 'like' || n.type === 'comment') ? mediaByPostId[n.lien_ref_id] : null,
+    post_thumbnail: POST_TYPES.includes(n.type) ? mediaByPostId[n.lien_ref_id] : null,
   }))
 }
+
+async function fetchMyFollowing(userId) {
+  const { data } = await supabase.from('follows').select('followed_id').eq('follower_id', userId)
+  return new Set((data || []).map((r) => r.followed_id))
+}
+
+const COMMENT_TAB_TYPES = ['comment', 'comment_collab', 'reply', 'reply_content']
 
 export default function Notifications() {
   const [tab, setTab] = useState('tout')
@@ -73,6 +104,14 @@ export default function Notifications() {
     enabled: !!user,
   })
 
+  // Qui je suis déjà, pour savoir si le bouton "Suivre en retour" doit apparaître
+  // sur une notification de type "follow" (façon Instagram).
+  const { data: myFollowing = new Set() } = useQuery({
+    queryKey: ['my-following', user?.id],
+    queryFn: () => fetchMyFollowing(user.id),
+    enabled: !!user,
+  })
+
   const handleClick = async (n) => {
     if (!n.lu) {
       queryClient.setQueryData(['notifications', user?.id], (old) =>
@@ -80,15 +119,37 @@ export default function Notifications() {
       )
       await supabase.from('notifications').update({ lu: true }).eq('id', n.id)
     }
-    if (!n.lien_ref_id) return
-    if (n.type === 'like') navigate(`/post/${n.lien_ref_id}`)
-else if (n.type === 'comment') navigate(`/post/${n.lien_ref_id}?comments=1`)
-    else if (n.type === 'commande') navigate('/dashboard')
-    else if (n.type === 'retrait') navigate('/wallet')
+
+    if (n.type === 'follow') {
+      if (n.from_user_id) navigate(profileRoute(n.from_user_id, n.from_user?.role))
+      return
+    }
+
+    if (!n.lien_ref_id) {
+      if (n.type === 'commande' || n.type === 'commande_pro') navigate('/dashboard')
+      else if (n.type === 'retrait' || n.type === 'retrait_pro') navigate('/wallet')
+      return
+    }
+
+    if (COMMENT_TAB_TYPES.includes(n.type)) navigate(`/post/${n.lien_ref_id}?comments=1`)
+    else if (POST_TYPES.includes(n.type)) navigate(`/post/${n.lien_ref_id}`)
+    else if (n.type === 'commande' || n.type === 'commande_pro') navigate('/dashboard')
+    else if (n.type === 'retrait' || n.type === 'retrait_pro') navigate('/wallet')
+  }
+
+  const handleFollowBack = async (n, e) => {
+    e.stopPropagation()
+    if (!user?.id || !n.from_user_id) return
+    queryClient.setQueryData(['my-following', user?.id], (old) => {
+      const next = new Set(old)
+      next.add(n.from_user_id)
+      return next
+    })
+    await supabase.from('follows').insert({ follower_id: user.id, followed_id: n.from_user_id })
   }
 
   const filtered = notifications.filter((n) => {
-    if (tab === 'commentaires') return n.type === 'comment'
+    if (tab === 'commentaires') return COMMENT_TAB_TYPES.includes(n.type)
     return true
   })
 
@@ -141,10 +202,13 @@ else if (n.type === 'comment') navigate(`/post/${n.lien_ref_id}?comments=1`)
                 const actor = n.from_user
                 const actorInfluencerId = actor?.profils_influenceur?.id
                 return (
-                  <button
+                  <div
                     key={n.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => handleClick(n)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150"
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleClick(n) }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 cursor-pointer"
                     style={{ backgroundColor: !n.lu ? 'var(--surface-secondary)' : 'transparent' }}
                   >
                     {actor ? (
@@ -164,7 +228,7 @@ else if (n.type === 'comment') navigate(`/post/${n.lien_ref_id}?comments=1`)
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-small leading-snug">
-                        {actor && TYPE_SUFFIX[n.type] ? (
+                        {actor && (n.type === 'like' || n.type === 'comment') ? (
                           <>
                             <span className="text-small-medium">{actor.nom_complet}</span>
                             {actor.profils_influenceur?.verifie && (
@@ -179,6 +243,16 @@ else if (n.type === 'comment') navigate(`/post/${n.lien_ref_id}?comments=1`)
                         )}{' '}
                         <span style={{ color: 'var(--text-secondary)' }}>{timeAgo(n.created_at)}</span>
                       </p>
+                      {n.type === 'follow' && n.from_user_id && !myFollowing.has(n.from_user_id) && (
+                        <Button
+                          variant="primary"
+                          shape="rect"
+                          className="mt-2"
+                          onClick={(e) => handleFollowBack(n, e)}
+                        >
+                          Suivre en retour
+                        </Button>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {!n.lu && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#4f0c2d' }} />}
@@ -206,7 +280,7 @@ else if (n.type === 'comment') navigate(`/post/${n.lien_ref_id}?comments=1`)
                         )
                       )}
                     </div>
-                  </button>
+                  </div>
                 )
               })}
             </div>

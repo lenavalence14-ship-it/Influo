@@ -29,6 +29,7 @@ export default function InfluencerProfile() {
   const [selectedPost, setSelectedPost] = useState(null)
   const [offres, setOffres] = useState([])
   const [reseaux, setReseaux] = useState([])
+  const [collabCount, setCollabCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
   const activeStoryIds = useActiveStories()
@@ -38,7 +39,7 @@ export default function InfluencerProfile() {
   // useFollow travaille sur des public.users.id, pas des profils_influenceur.id :
   // target.user_id n'est connu qu'après le chargement, donc le hook reçoit undefined
   // le temps du premier rendu puis se réhydrate normalement une fois `target` posé.
-  const { followersCount, isFollowing, toggleFollow, pending: followPending } = useFollow(target?.user_id)
+  const { followersCount, followingCount, isFollowing, toggleFollow, pending: followPending } = useFollow(target?.user_id)
 
   const reloadOffres = async () => {
     const offresQuery = supabase.from('offres').select('*').eq('influenceur_id', targetId).order('created_at', { ascending: false })
@@ -98,6 +99,26 @@ export default function InfluencerProfile() {
       setPosts(enrichedPosts)
       setOffres(offresData || [])
       setReseaux(reseauxData || [])
+
+      // Une "collaboration vérifiée" = un post de cet influenceur qui a plus d'un
+      // auteur dans post_auteurs (influenceur + entreprise), créé automatiquement
+      // à la validation d'une prestation côté chat. On compte parmi les posts déjà
+      // chargés plutôt que de refaire une requête séparée.
+      if (postIds.length > 0) {
+        const { data: auteurs } = await supabase
+          .from('post_auteurs')
+          .select('post_id')
+          .in('post_id', postIds)
+        if (!cancelled) {
+          const countByPost = {}
+          for (const a of auteurs || []) {
+            countByPost[a.post_id] = (countByPost[a.post_id] || 0) + 1
+          }
+          setCollabCount(Object.values(countByPost).filter((n) => n > 1).length)
+        }
+      } else if (!cancelled) {
+        setCollabCount(0)
+      }
       setLoading(false)
     }
     load()
@@ -193,14 +214,20 @@ export default function InfluencerProfile() {
                 <span className="font-bold">{posts.length}</span>{' '}
                 <span className="text-[var(--text-secondary)]">publications</span>
               </span>
-              <span className="text-small">
+              <button
+                onClick={() => target?.user_id && navigate(`/profil/${target.user_id}/abonnes?tab=followers`)}
+                className="text-small"
+              >
                 <span className="font-bold">{followersCount.toLocaleString()}</span>{' '}
                 <span className="text-[var(--text-secondary)]">abonnés</span>
-              </span>
-              <span className="text-small">
-                <span className="font-bold">{offres.length}</span>{' '}
-                <span className="text-[var(--text-secondary)]">offres</span>
-              </span>
+              </button>
+              <button
+                onClick={() => target?.user_id && navigate(`/profil/${target.user_id}/abonnes?tab=following`)}
+                className="text-small"
+              >
+                <span className="font-bold">{followingCount.toLocaleString()}</span>{' '}
+                <span className="text-[var(--text-secondary)]">abonnements</span>
+              </button>
             </div>
           </div>
         </div>
@@ -285,6 +312,19 @@ export default function InfluencerProfile() {
         >
           Offre
         </button>
+      </div>
+
+      {/* compteur collaborations vérifiées / offres, façon résumé sous les tabs */}
+      <div className="flex justify-center gap-1.5 py-2 text-caption text-[var(--text-secondary)] border-b border-[var(--border)]">
+        <span>
+          <span className="text-[var(--text-primary)] font-medium">{collabCount}</span>{' '}
+          {collabCount > 1 ? 'collaborations vérifiées' : 'collaboration vérifiée'}
+        </span>
+        <span>·</span>
+        <span>
+          <span className="text-[var(--text-primary)] font-medium">{offres.length}</span>{' '}
+          {offres.length > 1 ? 'offres' : 'offre'}
+        </span>
       </div>
 
       {/* sous-barre grille / vidéo, uniquement dans l'onglet Collaboration vérifiée */}

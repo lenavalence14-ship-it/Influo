@@ -20,7 +20,7 @@ export default function ClientProfileView() {
   const { user: viewerUser, profile: viewerProfile, clientProfile: viewerClientProfile } = useAuth()
   const navigate = useNavigate()
   const isMe = viewerUser?.id === id
-  const { followersCount, isFollowing, toggleFollow, pending: followPending } = useFollow(id)
+  const { followersCount, followingCount, isFollowing, toggleFollow, pending: followPending } = useFollow(id)
 
   const [entreprise, setEntreprise] = useState(null)
   const [clientProfile, setClientProfile] = useState(null)
@@ -130,10 +130,20 @@ export default function ClientProfileView() {
                 <span className="font-bold">{posts.length}</span>{' '}
                 <span className="text-[var(--text-secondary)]">publications</span>
               </span>
-              <span className="text-small">
+              <button
+                onClick={() => navigate(`/profil/${id}/abonnes?tab=followers`)}
+                className="text-small"
+              >
                 <span className="font-bold">{followersCount.toLocaleString()}</span>{' '}
                 <span className="text-[var(--text-secondary)]">abonnés</span>
-              </span>
+              </button>
+              <button
+                onClick={() => navigate(`/profil/${id}/abonnes?tab=following`)}
+                className="text-small"
+              >
+                <span className="font-bold">{followingCount.toLocaleString()}</span>{' '}
+                <span className="text-[var(--text-secondary)]">abonnements</span>
+              </button>
             </div>
           </div>
         </div>

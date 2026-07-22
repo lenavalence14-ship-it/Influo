@@ -13,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext'
 export function useFollow(targetUserId) {
   const { user } = useAuth()
   const [followersCount, setFollowersCount] = useState(0)
+  const [followingCount, setFollowingCount] = useState(0)
   const [isFollowing, setIsFollowing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [pending, setPending] = useState(false)
@@ -22,13 +23,20 @@ export function useFollow(targetUserId) {
     let cancelled = false
 
     const load = async () => {
-      const { count } = await supabase
-        .from('follows')
-        .select('id', { count: 'exact', head: true })
-        .eq('followed_id', targetUserId)
+      const [{ count }, { count: followingCountResult }] = await Promise.all([
+        supabase
+          .from('follows')
+          .select('id', { count: 'exact', head: true })
+          .eq('followed_id', targetUserId),
+        supabase
+          .from('follows')
+          .select('id', { count: 'exact', head: true })
+          .eq('follower_id', targetUserId),
+      ])
 
       if (cancelled) return
       setFollowersCount(count || 0)
+      setFollowingCount(followingCountResult || 0)
 
       if (user?.id) {
         const { data } = await supabase
@@ -71,5 +79,5 @@ export function useFollow(targetUserId) {
     setPending(false)
   }
 
-  return { followersCount, isFollowing, loading, pending, toggleFollow }
+  return { followersCount, followingCount, isFollowing, loading, pending, toggleFollow }
 }

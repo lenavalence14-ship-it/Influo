@@ -52,7 +52,7 @@ export default function Chat() {
   const loadAll = async () => {
     const { data: conv } = await supabase
       .from('conversations')
-      .select('*, client:client_id(nom_complet, photo_url), profils_influenceur(id, verifie, users(nom_complet, photo_url)), offres(*)')
+      .select('*, client:client_id(nom_complet, photo_url), profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)), offres(*)')
       .eq('id', id)
       .maybeSingle()
     setConversation(conv)
@@ -430,6 +430,19 @@ export default function Chat() {
           position: 0,
         })
         await supabase.from('commandes').update({ post_id: newPost.id }).eq('id', commande.id)
+
+        // Deux auteurs (influenceur + entreprise) => le trigger notify_on_new_post
+        // détecte automatiquement une "collaboration" (ou "réel collaboratif" si vidéo)
+        // et notifie tous les abonnés de l'un ou l'autre. Sans cette ligne, post_auteurs
+        // reste vide et aucune notification de collab n'est jamais envoyée.
+        const influenceurUserId = conversation?.profils_influenceur?.user_id
+        const auteurs = [
+          influenceurUserId ? { post_id: newPost.id, user_id: influenceurUserId, role: 'influenceur' } : null,
+          commande.client_id ? { post_id: newPost.id, user_id: commande.client_id, role: 'entreprise' } : null,
+        ].filter(Boolean)
+        if (auteurs.length > 0) {
+          await supabase.from('post_auteurs').insert(auteurs)
+        }
       }
     }
 

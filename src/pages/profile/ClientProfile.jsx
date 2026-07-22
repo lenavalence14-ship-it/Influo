@@ -15,7 +15,7 @@ import { useFollow } from '../../hooks/useFollow'
 // (la table posts porte à la fois influenceur_id et client_id sur ces posts).
 export default function ClientProfile() {
   const { user, profile, clientProfile, signOut } = useAuth()
-  const { followersCount } = useFollow(user?.id)
+  const { followersCount, followingCount } = useFollow(user?.id)
   const [tab, setTab] = useState('publications')
   const [subTab, setSubTab] = useState('grille')
   const [posts, setPosts] = useState([])
@@ -115,10 +115,20 @@ export default function ClientProfile() {
                 <span className="font-bold">{posts.length}</span>{' '}
                 <span className="text-[var(--text-secondary)]">publications</span>
               </span>
-              <span className="text-small">
+              <button
+                onClick={() => user?.id && navigate(`/profil/${user.id}/abonnes?tab=followers`)}
+                className="text-small"
+              >
                 <span className="font-bold">{followersCount.toLocaleString()}</span>{' '}
                 <span className="text-[var(--text-secondary)]">abonnés</span>
-              </span>
+              </button>
+              <button
+                onClick={() => user?.id && navigate(`/profil/${user.id}/abonnes?tab=following`)}
+                className="text-small"
+              >
+                <span className="font-bold">{followingCount.toLocaleString()}</span>{' '}
+                <span className="text-[var(--text-secondary)]">abonnements</span>
+              </button>
             </div>
           </div>
         </div>

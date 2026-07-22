@@ -15,7 +15,7 @@ export default function SimpleUserProfileView() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { followersCount, isFollowing, toggleFollow, pending: followPending } = useFollow(id)
+  const { followersCount, followingCount, isFollowing, toggleFollow, pending: followPending } = useFollow(id)
 
   const [utilisateur, setUtilisateur] = useState(null)
   const [subTab, setSubTab] = useState('grille')
@@ -98,10 +98,14 @@ export default function SimpleUserProfileView() {
             <span className="font-bold text-[var(--text-primary)]">{posts.length}</span>{' '}
             <span className="text-[var(--text-secondary)]">publications</span>
           </span>
-          <span className="text-small">
+          <button onClick={() => navigate(`/profil/${id}/abonnes?tab=followers`)} className="text-small">
             <span className="font-bold text-[var(--text-primary)]">{followersCount.toLocaleString()}</span>{' '}
             <span className="text-[var(--text-secondary)]">abonnés</span>
-          </span>
+          </button>
+          <button onClick={() => navigate(`/profil/${id}/abonnes?tab=following`)} className="text-small">
+            <span className="font-bold text-[var(--text-primary)]">{followingCount.toLocaleString()}</span>{' '}
+            <span className="text-[var(--text-secondary)]">abonnements</span>
+          </button>
         </div>
 
         {/* La messagerie utilisateur_simple <-> utilisateur_simple n'a de sens qu'entre
