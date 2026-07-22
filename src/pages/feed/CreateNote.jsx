@@ -5,8 +5,12 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 
 // Création d'une note texte, façon "Nouvelle note" Facebook/Messenger
-// (image de référence fournie). Une note dure 24h puis expire — pas de
-// suppression manuelle nécessaire, expire_at suffit pour la filtrer partout.
+// (image de référence fournie). Une note dure 24h puis expire.
+// IMPORTANT : chaque nouvelle note s'AJOUTE aux notes actives existantes de
+// l'utilisateur, elle ne les remplace jamais. Les anciennes notes restent
+// visibles jusqu'à leur expiration naturelle (24h) ou suppression manuelle
+// par l'auteur depuis le viewer (façon status texte WhatsApp : plusieurs
+// notes actives en même temps, chacune son propre segment).
 export default function CreateNote() {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
