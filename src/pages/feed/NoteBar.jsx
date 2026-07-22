@@ -18,9 +18,10 @@ import StoryRing from './StoryRing'
 //   importe qu'elle ait 1 ou 10 notes actives). Cliquer dessus ouvre le
 //   viewer sur le PREMIER groupe = cette personne, avec autant de segments
 //   dans la barre de progression que de notes actives pour elle.
-// - Un repost compte comme un item À PART pour le republieur (double anneau
-//   auteur original + republieur), mais dans SON groupe à lui, mélangé
-//   chronologiquement avec ses éventuelles notes personnelles.
+// - Un repost est TOUJOURS un groupe À PART, jamais fusionné avec les notes
+//   personnelles du republieur ni avec l'original : double anneau (auteur
+//   original + republieur en cloche), une seule note dedans, traité comme
+//   une entrée récente indépendante dans le tri de la barre.
 // - MA note à moi (mes propres notes, éventuellement plusieurs) est toujours
 //   à part, en premier, avec le bouton "+" qui reste visible en permanence :
 //   il ouvre toujours l'écran de création (ça AJOUTE une note, ne remplace
@@ -87,29 +88,46 @@ export default function NoteBar() {
     })
     .filter(Boolean)
 
-  // Regroupement PAR PERSONNE : la personne qui "possède" l'item dans la
-  // barre est toujours n.user_id (l'auteur du texte affiché dans son propre
-  // groupe, ou le republieur pour un item de repost).
-  const groupsByUser = new Map()
+  // Regroupement : DEUX types de groupes bien distincts.
+  // 1) Groupes "notes personnelles" : un groupe par auteur, UNIQUEMENT ses
+  //    notes originales à lui (jamais de repost dedans, même si c'est lui le
+  //    republieur — un repost n'appartient jamais au groupe personnel).
+  // 2) Groupes "repost" : un groupe À PART par repost, un seul item dedans,
+  //    affiché avec double-avatar (auteur original + republieur en cloche),
+  //    traité comme une entrée récente indépendante — pas fusionnée avec
+  //    les notes personnelles du republieur ni avec l'original.
+  const personalGroupsByUser = new Map()
+  const repostGroups = []
   for (const it of allItems) {
-    if (it.entry.user_id === user?.id) continue // ma note à moi est traitée à part, en tête
-    const key = it.entry.user_id
-    if (!groupsByUser.has(key)) groupsByUser.set(key, [])
-    groupsByUser.get(key).push(it)
+    if (it.entry.user_id === user?.id) continue // mes propres items sont traités à part, en tête
+    if (it.kind === 'repost') {
+      repostGroups.push({
+        userId: `repost:${it.entry.id}`,
+        displayUser: it.reposter,
+        items: [it],
+        hasActive: !isExpired(it.entry),
+        lastActiveTs: new Date(it.entry.created_at).getTime(),
+        isRepostGroup: true,
+      })
+    } else {
+      const key = it.entry.user_id
+      if (!personalGroupsByUser.has(key)) personalGroupsByUser.set(key, [])
+      personalGroupsByUser.get(key).push(it)
+    }
   }
 
-  // Un groupe = { userId, displayUser, items[] } ; items déjà triés du plus
-  // ancien au plus récent (ordre de fetchNotes), donc le défilement dans le
-  // groupe se fait naturellement dans cet ordre.
-  const otherGroups = [...groupsByUser.entries()].map(([userId, items]) => {
-    const mostRecent = items[items.length - 1]
-    const displayUser = mostRecent.kind === 'repost' ? mostRecent.reposter : mostRecent.original.users
+  // Un groupe personnel = { userId, displayUser, items[] } ; items déjà
+  // triés du plus ancien au plus récent (ordre de fetchNotes).
+  const personalGroups = [...personalGroupsByUser.entries()].map(([userId, items]) => {
+    const displayUser = items[items.length - 1].original.users
     const hasActive = items.some((it) => !isExpired(it.entry))
     const lastActiveTs = Math.max(...items.map((it) => new Date(it.entry.created_at).getTime()))
-    return { userId, displayUser, items, hasActive, lastActiveTs }
+    return { userId, displayUser, items, hasActive, lastActiveTs, isRepostGroup: false }
   })
 
-  const usersWithGroup = new Set(otherGroups.map((g) => g.userId))
+  const otherGroups = [...personalGroups, ...repostGroups]
+
+  const usersWithGroup = new Set(personalGroups.map((g) => g.userId))
   usersWithGroup.add(user?.id)
   const usersWithoutNote = allUsers.filter((u) => u.id !== user?.id && !usersWithGroup.has(u.id))
 
@@ -117,22 +135,50 @@ export default function NoteBar() {
   const expiredGroups = otherGroups.filter((g) => !g.hasActive).sort((a, b) => b.lastActiveTs - a.lastActiveTs)
   const sortedOtherGroups = [...activeGroups, ...expiredGroups]
 
-  // Mon groupe à moi : toutes mes notes personnelles actives ou expirées,
-  // jamais de repost dedans (un repost que je fais apparaît dans mon groupe
-  // "autre" ? Non : mon repost à moi, dans MA propre barre, n'a pas de sens
-  // -> il apparaît dans la barre des AUTRES pour eux, avec moi en republieur.
-  // Moi je vois juste mes propres notes personnelles ici.
+  // Mon "espace à moi" dans la barre est en réalité DEUX types d'entrées
+  // séparées, comme pour tout le monde :
+  // - mon groupe personnel (mes notes originales à moi, jamais de repost),
+  //   avec le "+" pour en ajouter ;
+  // - mes propres reposts, chacun un item à part avec double-avatar
+  //   (auteur original + moi en republieur), visible aussi par les autres
+  //   dans LEUR barre puisque allItems/otherGroups n'exclut que MA vue à
+  //   moi de mes propres items — les autres utilisateurs, eux, verront mes
+  //   reposts comme des repostGroups normaux dans sortedOtherGroups.
   const myItems = rawNotes
     .filter((n) => n.user_id === user?.id && !n.repost_of)
     .map((n) => ({ kind: 'original', entry: n, original: n, reposter: null }))
   const hasMyActiveNote = myItems.some((it) => !isExpired(it.entry))
 
   const myGroup = myItems.length
-    ? { userId: user?.id, displayUser: profile, items: myItems, hasActive: hasMyActiveNote, lastActiveTs: 0 }
+    ? { userId: user?.id, displayUser: profile, items: myItems, hasActive: hasMyActiveNote, lastActiveTs: 0, isRepostGroup: false }
     : null
 
-  // Liste complète des groupes utilisée par le viewer (moi en premier si j'ai des notes).
-  const viewerGroups = [...(myGroup ? [myGroup] : []), ...sortedOtherGroups]
+  const myRepostItems = rawNotes
+    .filter((n) => n.user_id === user?.id && n.repost_of)
+    .map((n) => {
+      const original = originalById.get(n.repost_of)
+      return original ? { kind: 'repost', entry: n, original, reposter: profile } : null
+    })
+    .filter(Boolean)
+  const myRepostGroups = myRepostItems.map((it) => ({
+    userId: `repost:${it.entry.id}`,
+    displayUser: profile,
+    items: [it],
+    hasActive: !isExpired(it.entry),
+    lastActiveTs: new Date(it.entry.created_at).getTime(),
+    isRepostGroup: true,
+  }))
+
+  // Liste complète des groupes utilisée par le viewer : mon groupe perso en
+  // premier, puis tous les autres groupes (reposts des autres + MES reposts
+  // à moi mélangés) triés actifs-d'abord puis par date décroissante — mes
+  // reposts ne sont jamais fusionnés avec mon groupe perso.
+  const allOtherPlusMine = [...sortedOtherGroups, ...myRepostGroups]
+  const activeFinal = allOtherPlusMine.filter((g) => g.hasActive).sort((a, b) => b.lastActiveTs - a.lastActiveTs)
+  const expiredFinal = allOtherPlusMine.filter((g) => !g.hasActive).sort((a, b) => b.lastActiveTs - a.lastActiveTs)
+  const finalOtherGroups = [...activeFinal, ...expiredFinal]
+
+  const viewerGroups = [...(myGroup ? [myGroup] : []), ...finalOtherGroups]
 
   const myPhotoUrl = profile?.photo_url
 
@@ -193,7 +239,7 @@ export default function NoteBar() {
           <span className="text-caption max-w-[72px] truncate">Ta note</span>
         </div>
 
-        {sortedOtherGroups.map((g) => {
+        {finalOtherGroups.map((g) => {
           const lastItem = g.items[g.items.length - 1]
           return (
             <div
@@ -222,7 +268,9 @@ export default function NoteBar() {
                 )}
               </div>
               <span className="text-caption max-w-[72px] truncate">
-                {g.displayUser?.nom_complet?.split(' ')[0]}
+                {g.isRepostGroup
+                  ? `${lastItem.original.users?.nom_complet?.split(' ')[0]} & ${g.displayUser?.nom_complet?.split(' ')[0]}`
+                  : g.displayUser?.nom_complet?.split(' ')[0]}
               </span>
             </div>
           )
