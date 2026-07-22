@@ -7,12 +7,13 @@ import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { timeShort } from '../../lib/time'
 import StoryBar from '../feed/StoryBar'
 
-// Un message supprimé "pour tous" ne doit jamais apparaître comme aperçu, et un
-// message supprimé "pour moi" ne doit pas apparaître dans MON aperçu (mais reste
-// visible dans celui de l'autre, deleted_for étant propre à chacun).
+// Un message supprimé "pour moi" ne doit jamais apparaître dans MON aperçu
+// (deleted_for est propre à chacun, l'autre le voit toujours normalement).
+// Un message supprimé "pour tous" en revanche RESTE le dernier message de la
+// conversation : il doit continuer à apparaître comme aperçu, mais sous forme
+// de "Ce message a été supprimé", pas disparaître au profit du message précédent.
 function isVisibleForMe(m, myId) {
   if (!m) return false
-  if (m.is_deleted_for_all) return false
   if (m.deleted_for?.includes(myId)) return false
   return true
 }
@@ -231,17 +232,19 @@ export default function ConversationsList() {
 
             const seenByOther = lastMsgIsMine && otherReadAt && lastMsg?.created_at && new Date(otherReadAt) > new Date(lastMsg.created_at)
 
-            // Messages reçus (pas de moi, pas système) depuis ma dernière lecture :
-            // s'il y en a plusieurs, on affiche "X nouveaux messages" façon Messenger
-            // plutôt que le contenu, tant que je n'ai pas rouvert la conversation.
+            // Un message supprimé pour tous ne doit jamais compter comme "nouveau
+            // message" (il n'y a plus rien à lire), ni faire gonfler "X nouveaux
+            // messages" — mais il reste le dernier message affiché en aperçu.
             const unreadReceived = myVisibleMsgs.filter(
-              (m) => !m.is_system && m.sender_id !== user?.id && (!myReadAt || new Date(m.created_at) > new Date(myReadAt))
+              (m) => !m.is_system && !m.is_deleted_for_all && m.sender_id !== user?.id && (!myReadAt || new Date(m.created_at) > new Date(myReadAt))
             )
             const isUnread = !lastMsgIsMine && unreadReceived.length > 0
 
             let previewText
             if (!lastMsg) {
               previewText = !isBiz && !isSociale && !isPro && c.offres?.titre ? `Offre : ${c.offres.titre}` : 'Nouvelle conversation'
+            } else if (lastMsg.is_deleted_for_all) {
+              previewText = 'Ce message a été supprimé'
             } else if (isUnread && unreadReceived.length > 1) {
               previewText = `${unreadReceived.length} nouveaux messages`
             } else if (lastMsgIsMine) {
@@ -276,7 +279,11 @@ export default function ConversationsList() {
                   </p>
                   <p
                     className={`text-caption truncate ${
-                      isUnread ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-secondary)]'
+                      lastMsg?.is_deleted_for_all
+                        ? 'italic text-[var(--text-secondary)]'
+                        : isUnread
+                        ? 'text-[var(--text-primary)] font-bold'
+                        : 'text-[var(--text-secondary)]'
                     }`}
                   >
                     {previewText}
