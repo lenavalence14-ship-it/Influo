@@ -12,6 +12,16 @@ import { getFilterCss as getNoteFilterCss } from './editor/FilterPicker'
 
 const SEGMENT_DURATION_MS = 5000
 
+// Une note avec musique dure le temps du passage audio choisi (15 ou 20s
+// selon ce qui a été sélectionné dans MusicPicker) au lieu des 5s standard.
+function getSegmentDurationMs(item) {
+  const audioDuration = item?.original?.audio_duration
+  if (audioDuration && Number.isFinite(audioDuration) && audioDuration > 0) {
+    return audioDuration * 1000
+  }
+  return SEGMENT_DURATION_MS
+}
+
 // Viewer plein écran pour les notes texte, façon statuts texte WhatsApp.
 //
 // STRUCTURE : `groups` est une liste de groupes, un groupe = une personne +
@@ -67,6 +77,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
   const timerRef = useRef(null)
   const remainingRef = useRef(SEGMENT_DURATION_MS)
   const startedAtRef = useRef(0)
+  const audioRef = useRef(null) // <audio> injecté pour les notes avec musique
 
   const group = groups[groupIndex]
   const items = group?.items || []
@@ -193,16 +204,46 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
   // Démarre / redémarre le timer d'auto-défilement à chaque changement de
   // segment ou de groupe (segment neuf = durée pleine).
   useEffect(() => {
-    remainingRef.current = SEGMENT_DURATION_MS
+    const durationMs = getSegmentDurationMs(items[segmentIndex])
+    remainingRef.current = durationMs
     setProgressKey((k) => k + 1)
     if (!paused) {
       startedAtRef.current = Date.now()
       clearTimer()
-      timerRef.current = setTimeout(goNextSegment, SEGMENT_DURATION_MS)
+      timerRef.current = setTimeout(goNextSegment, durationMs)
     }
     return clearTimer
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupIndex, segmentIndex])
+
+  // Musique de la note courante : positionne la lecture sur le passage
+  // choisi (audio_start) et la coupe proprement au changement de segment ou
+  // en pause (le nettoyage du useEffect précédent gère déjà le timer visuel ;
+  // celui-ci gère le son en synchro avec lui).
+  useEffect(() => {
+    const item = items[segmentIndex]
+    const audioUrl = item?.original?.audio_url
+    const audio = audioRef.current
+    if (!audio || !audioUrl) return
+    audio.src = audioUrl
+    audio.currentTime = item.original.audio_start || 0
+    if (!paused) audio.play().catch(() => {})
+    return () => {
+      audio.pause()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupIndex, segmentIndex])
+
+  // Pause / reprise (appui long) : synchronise le son avec le timer visuel.
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !audio.src) return
+    if (paused) {
+      audio.pause()
+    } else {
+      audio.play().catch(() => {})
+    }
+  }, [paused])
 
   const handlePauseStart = () => {
     if (paused) return
@@ -592,6 +633,11 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
         </div>
       )}
 
+      {/* Lecteur audio caché pour les notes avec musique : piloté entièrement
+          via audioRef (src, currentTime, play/pause) dans les useEffect
+          ci-dessus, jamais par des attributs contrôlés ici. */}
+      <audio ref={audioRef} className="hidden" />
+
       <div className="relative z-10 flex flex-col h-full" style={{ paddingTop: 'env(safe-area-inset-top, 24px)' }}>
       {/* Barre de progression : UNIQUEMENT les segments du groupe courant */}
       <div className="flex gap-1 px-3 pt-3">
@@ -603,7 +649,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
                 key={progressKey}
                 className="h-full bg-white"
                 style={{
-                  animation: `noteProgress ${SEGMENT_DURATION_MS}ms linear forwards`,
+                  animation: `noteProgress ${getSegmentDurationMs(items[segmentIndex])}ms linear forwards`,
                   animationPlayState: paused ? 'paused' : 'running',
                 }}
               />

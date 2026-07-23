@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Music, RotateCcw, X } from 'lucide-react'
 import FilterPicker, { getFilterCss } from './editor/FilterPicker'
 import DraggableElement from './editor/DraggableElement'
+import MusicPicker from './editor/MusicPicker'
 
 // Polices proposées à l'écran 4 (façon Instagram), un sous-ensemble sûr et
 // disponible nativement / déjà chargé par l'app (pas de police externe à
@@ -62,8 +63,14 @@ function BlurredPhoto({ src, filterCss, rotation, zoom = 1, children }) {
  * reçoit ici le résultat (fichier + filtre + texte + rotation) via onDone.
  */
 export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) {
-  const [screen, setScreen] = useState('main') // 'main' | 'crop' | 'texte'
+  const [screen, setScreen] = useState('main') // 'main' | 'crop' | 'texte' | 'musique'
   const [showFilters, setShowFilters] = useState(false)
+
+  // Musique : null tant qu'aucune n'est choisie. Une fois validée dans
+  // MusicPicker, on a { file, start, duration } — duration vaut 15 ou 20
+  // (secondes), c'est le passage exact choisi dans le fichier source, et
+  // cette durée remplace SEGMENT_DURATION_MS pour CETTE note dans NoteViewer.
+  const [musique, setMusique] = useState(null)
 
   const [rotation, setRotation] = useState(0) // 0, 90, 180, 270
   const [filtre, setFiltre] = useState(null)
@@ -100,6 +107,7 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
       crop,
       zoom,
       texte: textEl,
+      musique, // { file, start, duration } | null
     })
   }
 
@@ -385,6 +393,19 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
     )
   }
 
+  if (screen === 'musique') {
+    return (
+      <MusicPicker
+        initial={musique}
+        onCancel={() => setScreen('main')}
+        onDone={(result) => {
+          setMusique(result) // { file, start, duration } ou null si "Retirer"
+          setScreen('main')
+        }}
+      />
+    )
+  }
+
   if (screen === 'texte') {
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-black select-none">
@@ -452,7 +473,11 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
           <X size={22} />
         </button>
         <div className="flex items-center gap-4">
-          <button className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white">
+          <button
+            onClick={() => setScreen('musique')}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white relative"
+            style={{ background: musique ? 'var(--accent)' : 'rgba(255,255,255,0.1)' }}
+          >
             <Music size={18} />
           </button>
           <button

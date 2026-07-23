@@ -82,6 +82,24 @@ export default function CreateNote() {
       if (uploadError) return
       const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
 
+      // Musique (optionnelle) : on upload le fichier audio SOURCE tel quel
+      // (pas de découpe côté client, voir MusicPicker) et on stocke juste le
+      // point de départ + la durée du passage choisi. NoteViewer se charge
+      // de positionner la lecture sur ce passage.
+      let audioUrl = null
+      const musique = editedResult.musique
+      if (musique?.file) {
+        const ext = musique.file.name?.split('.').pop() || 'mp3'
+        const audioFileName = `${userId}/note-audio-${Date.now()}.${ext}`
+        const { error: audioUploadError } = await supabase.storage
+          .from('posts')
+          .upload(audioFileName, musique.file)
+        if (!audioUploadError) {
+          const { data: audioUrlData } = supabase.storage.from('posts').getPublicUrl(audioFileName)
+          audioUrl = audioUrlData.publicUrl
+        }
+      }
+
       await supabase.from('notes').insert({
         user_id: userId,
         contenu: editedResult.texte?.contenu || ' ',
@@ -94,6 +112,9 @@ export default function CreateNote() {
         texte_y: editedResult.texte?.y ?? 50,
         texte_couleur: editedResult.texte?.couleur || '#ffffff',
         texte_police: editedResult.texte?.police || 'Inter',
+        audio_url: audioUrl,
+        audio_start: audioUrl ? musique.start : null,
+        audio_duration: audioUrl ? musique.duration : null,
         expire_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       })
     } finally {
