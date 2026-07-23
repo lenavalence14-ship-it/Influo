@@ -16,7 +16,26 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        debug {
+            // Keystore de debug FIXE et versionné (android/app/influo-debug.keystore).
+            // Sans ceci, Gradle génère un ~/.android/debug.keystore ALÉATOIRE à
+            // chaque run — et comme le CI GitHub Actions part d'une machine
+            // vierge à chaque exécution, ça produit une signature DIFFÉRENTE à
+            // chaque build. Android refuse alors d'installer par-dessus une app
+            // déjà installée avec une signature différente ("Un problème est
+            // survenu, appli non installée"). Ce keystore doit rester identique
+            // entre tous les builds pour que les mises à jour s'installent.
+            storeFile file('influo-debug.keystore')
+            storePassword 'influo123'
+            keyAlias 'influo-debug'
+            keyPassword 'influo123'
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
