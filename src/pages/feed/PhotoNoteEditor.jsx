@@ -46,7 +46,7 @@ function BlurredPhoto({ src, filterCss, rotation, children }) {
         draggable={false}
         style={{ filter: filterCss, transform: `rotate(${rotation}deg)` }}
       />
-      {children}
+      <div className="absolute inset-0 z-20">{children}</div>
     </div>
   )
 }
@@ -253,6 +253,7 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
                 top: `${draftCrop.y}%`,
                 width: `${draftCrop.w}%`,
                 height: `${draftCrop.h}%`,
+                zIndex: 1,
               }}
               onPointerDown={startDrag('move')}
             >
@@ -262,20 +263,54 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
                   <div key={i} className="border border-white/40" />
                 ))}
               </div>
-              {/* poignées aux coins */}
+
+              {/* poignées de BORD (haut/bas/gauche/droite) : redimensionnent
+                  sur un seul axe. Placées avant les poignées de coin dans le
+                  DOM/z-index pour que les coins (plus spécifiques) gagnent
+                  s'ils se chevauchent légèrement. */}
+              {['t', 'b', 'l', 'r'].map((h) => {
+                const isVertical = h === 't' || h === 'b'
+                return (
+                  <div
+                    key={h}
+                    onPointerDown={startDrag(h)}
+                    className="absolute touch-none"
+                    style={{
+                      zIndex: 2,
+                      // Bande large (44px) centrée sur le bord concerné, sans
+                      // déborder sur les zones des poignées de coin.
+                      left: isVertical ? 16 : h === 'l' ? -22 : undefined,
+                      right: isVertical ? 16 : h === 'r' ? -22 : undefined,
+                      top: !isVertical ? 16 : h === 't' ? -22 : undefined,
+                      bottom: !isVertical ? 16 : h === 'b' ? -22 : undefined,
+                      width: isVertical ? undefined : 44,
+                      height: isVertical ? 44 : undefined,
+                      cursor: isVertical ? 'ns-resize' : 'ew-resize',
+                    }}
+                  />
+                )
+              })}
+
+              {/* poignées d'ANGLE : zone de hit agrandie à 44x44 (cible
+                  tactile correcte ; l'ancienne zone de 24x24 était trop
+                  petite et le doigt retombait souvent sur le cadre entier
+                  -> déplaçait au lieu de rogner). zIndex le plus haut pour
+                  toujours gagner sur le bord/le déplacement du cadre. */}
               {['tl', 'tr', 'bl', 'br'].map((h) => (
                 <div
                   key={h}
                   onPointerDown={startDrag(h)}
-                  className="absolute w-6 h-6 -m-3 touch-none"
+                  className="absolute w-11 h-11 -m-[22px] touch-none"
                   style={{
+                    zIndex: 3,
                     left: h.includes('l') ? 0 : undefined,
                     right: h.includes('r') ? 0 : undefined,
                     top: h.includes('t') ? 0 : undefined,
                     bottom: h.includes('b') ? 0 : undefined,
+                    cursor: h === 'tl' || h === 'br' ? 'nwse-resize' : 'nesw-resize',
                   }}
                 >
-                  <div className="w-6 h-6 border-white" style={{
+                  <div className="w-6 h-6 border-white m-[10px]" style={{
                     borderTopWidth: h.includes('t') ? 3 : 0,
                     borderBottomWidth: h.includes('b') ? 3 : 0,
                     borderLeftWidth: h.includes('l') ? 3 : 0,
