@@ -104,7 +104,11 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
   }
 
   // ---- pincer-zoomer (écran principal uniquement) ----
-  const ZOOM_MIN = 1
+  // ZOOM_MIN < 1 permet de dézoomer sous la taille "contain" normale (image
+  // plus petite dans le cadre, donc plus de flou visible autour) ; avant,
+  // ZOOM_MIN valait 1 ce qui bloquait tout dézoom, le pincement ne marchait
+  // que dans le sens agrandir.
+  const ZOOM_MIN = 0.5
   const ZOOM_MAX = 3
 
   const pinchDistance = (touches) => {

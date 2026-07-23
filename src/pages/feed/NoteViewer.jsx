@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { X, Heart, Repeat2, Send, Eye, ArrowLeft, MoreVertical } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
@@ -61,6 +61,52 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
   const [viewersList, setViewersList] = useState([])
   const [viewCount, setViewCount] = useState(0)
   const [showMenu, setShowMenu] = useState(false)
+  const [direction, setDirection] = useState(1) // 1 = next (slide vers la gauche), -1 = prev (slide vers la droite)
+
+  // Le fond flouté doit disparaître quand l'image nette (avec son zoom
+  // choisi en édition) couvre déjà 100% du cadre dans les deux axes — sinon
+  // il reste visible en dépassement même à fort zoom, quel que soit le
+  // ratio de l'image. object-contain + scale() ne garantit pas un
+  // recouvrement exact ; on le mesure réellement via les dimensions
+  // naturelles de l'image comparées au cadre.
+  const sharpImgRef = useRef(null)
+  const [fullyCovers, setFullyCovers] = useState(false)
+
+  const checkCoverage = useCallback(() => {
+    const img = sharpImgRef.current
+    if (!img || !img.naturalWidth || !img.naturalHeight) return
+    const zoom = typeof current?.original?.zoom === 'number' && current.original.zoom > 0
+      ? current.original.zoom
+      : 1
+    const frameW = img.clientWidth
+    const frameH = img.clientHeight
+    if (!frameW || !frameH) return
+    // Dimensions du rectangle "contain" de base (avant zoom) à l'intérieur du cadre
+    const imgRatio = img.naturalWidth / img.naturalHeight
+    const frameRatio = frameW / frameH
+    let baseW, baseH
+    if (imgRatio > frameRatio) {
+      baseW = frameW
+      baseH = frameW / imgRatio
+    } else {
+      baseH = frameH
+      baseW = frameH * imgRatio
+    }
+    const scaledW = baseW * zoom
+    const scaledH = baseH * zoom
+    // Marge d'1px pour tolérer les arrondis de sous-pixel
+    setFullyCovers(scaledW >= frameW - 1 && scaledH >= frameH - 1)
+  }, [current?.original?.zoom])
+
+  const handleSharpImgLoad = useCallback(() => {
+    checkCoverage()
+  }, [checkCoverage])
+
+  useEffect(() => {
+    checkCoverage()
+    window.addEventListener('resize', checkCoverage)
+    return () => window.removeEventListener('resize', checkCoverage)
+  }, [checkCoverage])
   const { user, profile } = useAuth()
   const navigate = useNavigate()
 
@@ -70,6 +116,22 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
 
   const group = groups[groupIndex]
   const items = group?.items || []
+
+  // Précharge la photo suivante ET précédente (dans le groupe courant, ou le
+  // premier/dernier segment du groupe voisin en bout de liste) pour que le
+  // glissement ne montre jamais une image en train de charger : le
+  // navigateur a déjà l'image en cache au moment où le slide démarre.
+  useEffect(() => {
+    const preload = (url) => {
+      if (!url) return
+      const img = new Image()
+      img.src = url
+    }
+    const nextItem = items[segmentIndex + 1] || groups[groupIndex + 1]?.items?.[0]
+    const prevItem = items[segmentIndex - 1] || (groupIndex > 0 ? groups[groupIndex - 1]?.items?.at?.(-1) : undefined)
+    preload(nextItem?.original?.photo_url)
+    preload(prevItem?.original?.photo_url)
+  }, [groupIndex, segmentIndex, items, groups])
   const current = items[segmentIndex]
 
   // Barre de statut système (heure, batterie, réseau) : on ne peut pas la
@@ -113,6 +175,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
 
   const goNextSegment = useCallback(() => {
     clearTimer()
+    setDirection(1)
     if (segmentIndex < items.length - 1) {
       setSegmentIndex((i) => i + 1)
     } else if (groupIndex < groups.length - 1) {
@@ -125,6 +188,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
 
   const goPrevSegment = useCallback(() => {
     clearTimer()
+    setDirection(-1)
     if (segmentIndex > 0) {
       setSegmentIndex((i) => i - 1)
     } else if (groupIndex > 0) {
@@ -517,7 +581,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
           progression, le header et la status bar — remplace le cramoisi
           uniquement quand c'est une photo. z-0 pour rester derrière tout le
           reste (progress bar, header, image nette, zone de tap). */}
-      {current.original.photo_url && (
+      {current.original.photo_url && !fullyCovers && (
         <div className="fixed inset-0 z-0 overflow-hidden">
           <div
             className="absolute inset-0"
@@ -650,6 +714,16 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
         onPointerLeave={handlePauseEnd}
         onPointerCancel={handlePauseEnd}
       >
+        <AnimatePresence initial={false} custom={direction} mode="popLayout">
+          <motion.div
+            key={`${groupIndex}-${segmentIndex}`}
+            custom={direction}
+            initial={(dir) => ({ x: dir > 0 ? '100%' : '-100%', opacity: 0.6 })}
+            animate={{ x: 0, opacity: 1 }}
+            exit={(dir) => ({ x: dir > 0 ? '-100%' : '100%', opacity: 0.6 })}
+            transition={{ type: 'tween', duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute inset-0"
+          >
         {current.original.photo_url ? (() => {
           let noteCrop = current.original.crop
           if (typeof noteCrop === 'string') {
@@ -671,8 +745,10 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
             }
           >
             <img
+              ref={sharpImgRef}
               src={current.original.photo_url}
               alt=""
+              onLoad={handleSharpImgLoad}
               className="relative z-10 w-full h-full object-contain select-none"
               draggable={false}
               style={{ filter: getNoteFilterCss(current.original.filtre), transform: `scale(${noteZoom})` }}
@@ -698,6 +774,8 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
             {current.original.contenu}
           </p>
         )}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <div className="px-4 pb-[max(14px,env(safe-area-inset-bottom))] pt-2 flex flex-col gap-2.5">
