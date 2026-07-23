@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { X, Heart, Repeat2, Send, Eye, ArrowLeft, MoreVertical } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
-import { StatusBar } from '@capacitor/status-bar'
+import { StatusBar, Style } from '@capacitor/status-bar'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { timeAgo } from '../../lib/time'
@@ -68,30 +68,39 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
   const remainingRef = useRef(SEGMENT_DURATION_MS)
   const startedAtRef = useRef(0)
 
-  // Plein écran natif : la note doit couvrir tout l'écran, y compris la
-  // zone habituellement occupée par la barre de statut système (heure,
-  // batterie, réseau). On la masque à l'ouverture et on la restaure à la
-  // fermeture, uniquement sur plateforme native (no-op sur le web).
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return
-    // Couleur exacte du fond de la note (résout la variable CSS --accent)
-    const noteBg = getComputedStyle(document.documentElement)
-      .getPropertyValue('--accent').trim() || '#7c1a3a'
-    // Couleur du thème actif à restaurer à la fermeture (voir ThemeContext)
-    const isLight = document.documentElement.classList.contains('light')
-    const themeBg = isLight ? '#f5f5f5' : '#0a0a0a'
-
-    StatusBar.setOverlaysWebView({ overlay: true })
-    StatusBar.setBackgroundColor({ color: noteBg })
-    return () => {
-      StatusBar.setOverlaysWebView({ overlay: false })
-      StatusBar.setBackgroundColor({ color: themeBg })
-    }
-  }, [])
-
   const group = groups[groupIndex]
   const items = group?.items || []
   const current = items[segmentIndex]
+
+  // Barre de statut système (heure, batterie, réseau) : on ne peut pas la
+  // flouter (elle est rendue par Android/iOS, en dehors du DOM du
+  // WebView — aucun CSS ne peut l'atteindre). À la place, sur une note
+  // PHOTO, on la met en noir ou blanc selon le thème actif de l'app (pas
+  // le cramoisi, qui jurerait sur une photo) ; sur une note TEXTE, on garde
+  // le cramoisi habituel. Réagit à chaque changement de segment puisqu'on
+  // peut naviguer texte <-> photo sans refermer le viewer.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    const isPhoto = Boolean(current?.original?.photo_url)
+    const isLight = document.documentElement.classList.contains('light')
+    const noteBg = getComputedStyle(document.documentElement)
+      .getPropertyValue('--accent').trim() || '#7c1a3a'
+    const themeBg = isLight ? '#f5f5f5' : '#0a0a0a'
+
+    const barColor = isPhoto ? (isLight ? '#ffffff' : '#000000') : noteBg
+    // Icônes/texte de la barre : sombres sur fond blanc, clairs sur fond
+    // noir ou cramoisi (tous foncés), pour rester lisibles dans les 3 cas.
+    const barStyle = isPhoto && isLight ? Style.Dark : Style.Light
+
+    StatusBar.setOverlaysWebView({ overlay: true })
+    StatusBar.setBackgroundColor({ color: barColor })
+    StatusBar.setStyle({ style: barStyle })
+    return () => {
+      StatusBar.setOverlaysWebView({ overlay: false })
+      StatusBar.setBackgroundColor({ color: themeBg })
+      StatusBar.setStyle({ style: isLight ? Style.Dark : Style.Light })
+    }
+  }, [current?.original?.photo_url])
   const note = current?.entry
   const author = current?.original?.users
 
