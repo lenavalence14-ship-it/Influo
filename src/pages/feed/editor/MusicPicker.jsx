@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Music, Play, Pause, X, Trash2 } from 'lucide-react'
+import { Music, Play, Pause, Trash2, Check } from 'lucide-react'
 
 // Durées de note disponibles quand il y a de la musique (façon Instagram :
 // pas de trim au sample près, juste "quelle fenêtre de X secondes je garde").
 const DURATIONS = [15, 20]
 
-// Formatte des secondes en m:ss pour affichage (ex: 83.4 -> "1:23").
 function formatTime(s) {
   if (!Number.isFinite(s)) return '0:00'
   const m = Math.floor(s / 60)
@@ -14,39 +13,37 @@ function formatTime(s) {
 }
 
 /**
- * Écran plein écran pour choisir une musique depuis la galerie/fichiers du
- * téléphone et rogner un passage de 15 ou 20 secondes qui deviendra la durée
- * d'affichage de la note (façon Instagram : la note "dure" ce que dure
- * l'extrait choisi).
+ * Panneau musique — PAS un écran séparé. Rendu par PhotoNoteEditor comme un
+ * panneau qui glisse depuis le bas (même pattern que FilterPicker), donc la
+ * photo en arrière-plan reste visible pendant toute la sélection/le trim.
  *
- * IMPORTANT : on ne découpe PAS le fichier audio ici (pas de ffmpeg côté
- * client). On garde le fichier source complet + un point de départ
- * (`start`) + une durée (`duration`). La lecture (preview ici, et plus tard
- * dans NoteViewer) se fait en positionnant `audio.currentTime = start` puis
- * en coupant après `duration` secondes. C'est amplement suffisant : la note
- * n'est jamais réexportée en vidéo, donc il n'y a jamais besoin du fichier
- * physiquement raccourci.
+ * On ne découpe PAS le fichier audio ici (pas de ffmpeg côté client) : on
+ * garde le fichier source complet + { start, duration }. La lecture
+ * (preview ici, et plus tard dans NoteViewer) se fait en positionnant
+ * `audio.currentTime = start` puis en coupant après `duration` secondes.
  *
- * onDone(null)               -> musique retirée (bouton "Retirer")
- * onDone({ file, start, duration }) -> musique choisie et validée
+ * onChange(null | { file, start, duration }) — appelé en live à chaque
+ * choix (fichier, durée, position glissée). PhotoNoteEditor lit juste l'état
+ * courant `musique` au moment de "Publier", pas besoin d'un bouton "OK"
+ * séparé qui changerait d'écran.
+ * onClose() — replie le panneau (bouton Music retoggle, ou "Terminé" ici).
  */
-export default function MusicPicker({ initial, onCancel, onDone }) {
+export default function MusicPicker({ initial, onClose, onChange }) {
   const [file, setFile] = useState(initial?.file || null)
   const [objectUrl, setObjectUrl] = useState(null)
   const [totalDuration, setTotalDuration] = useState(0)
   const [loadingMeta, setLoadingMeta] = useState(false)
-  const [duration, setDuration] = useState(initial?.duration || 15) // 15 ou 20
+  const [duration, setDuration] = useState(initial?.duration || 15)
   const [start, setStart] = useState(initial?.start || 0)
   const [playing, setPlaying] = useState(false)
   const [error, setError] = useState(null)
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
-  const trackRef = useRef(null) // zone timeline pour calculer les positions au drag
+  const trackRef = useRef(null)
   const stopTimeoutRef = useRef(null)
-  const dragRef = useRef(null) // { startX, startLeft, trackWidth }
+  const dragRef = useRef(null)
 
-  // Charge les métadonnées (durée totale) dès qu'un fichier est choisi.
   useEffect(() => {
     if (!file) return
     setLoadingMeta(true)
@@ -56,6 +53,15 @@ export default function MusicPicker({ initial, onCancel, onDone }) {
     return () => URL.revokeObjectURL(url)
   }, [file])
 
+  // Remonte le choix courant au parent à chaque changement pertinent, une
+  // fois les métadonnées chargées (pas de remontée tant qu'on ne connaît pas
+  // encore la durée réelle du morceau).
+  useEffect(() => {
+    if (!file || loadingMeta || error) return
+    onChange({ file, start, duration })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file, start, duration, loadingMeta, error])
+
   const handleLoadedMetadata = () => {
     const d = audioRef.current?.duration || 0
     setLoadingMeta(false)
@@ -64,9 +70,6 @@ export default function MusicPicker({ initial, onCancel, onDone }) {
       return
     }
     setTotalDuration(d)
-    // Si le morceau est plus court que la durée de note choisie, on réduit
-    // la durée de note automatiquement à la durée du morceau (mini 3s pour
-    // rester utilisable).
     setDuration((d0) => Math.min(d0, Math.max(3, Math.floor(d))))
     setStart((s0) => Math.max(0, Math.min(s0, Math.max(0, d - duration))))
   }
@@ -107,8 +110,6 @@ export default function MusicPicker({ initial, onCancel, onDone }) {
     }, duration * 1000)
   }
 
-  // À chaque changement de start/duration pendant la lecture, on redémarre
-  // proprement pour que le preview reflète toujours la fenêtre courante.
   useEffect(() => {
     if (!playing) return
     const audio = audioRef.current
@@ -126,7 +127,6 @@ export default function MusicPicker({ initial, onCancel, onDone }) {
 
   const maxStart = Math.max(0, totalDuration - duration)
 
-  // ---- déplacement de la fenêtre de sélection sur la timeline ----
   const startDrag = (e) => {
     if (!trackRef.current) return
     e.stopPropagation()
@@ -160,20 +160,21 @@ export default function MusicPicker({ initial, onCancel, onDone }) {
     }
   }, [onDragMove, endDrag])
 
-  const confirm = () => {
-    if (!file) return
-    onDone({ file, start, duration })
-  }
-
   const remove = () => {
-    onDone(null)
+    audioRef.current?.pause()
+    clearStopTimeout()
+    setPlaying(false)
+    setFile(null)
+    setTotalDuration(0)
+    setStart(0)
+    onChange(null)
   }
 
   const windowLeftPct = totalDuration ? (start / totalDuration) * 100 : 0
   const windowWidthPct = totalDuration ? (duration / totalDuration) * 100 : 0
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black select-none">
+    <div className="px-4 pb-3">
       <input
         ref={fileInputRef}
         type="file"
@@ -182,130 +183,109 @@ export default function MusicPicker({ initial, onCancel, onDone }) {
         onChange={handlePickFile}
       />
 
-      <div
-        className="flex items-center justify-between px-4 pb-3"
-        style={{ paddingTop: 'max(14px, env(safe-area-inset-top))' }}
-      >
-        <button onClick={onCancel} className="w-9 h-9 flex items-center justify-center text-white">
-          <X size={22} />
-        </button>
-        <p className="text-body-medium text-white">Musique</p>
-        <button
-          onClick={confirm}
-          disabled={!file || loadingMeta || !!error}
-          className="text-body-medium px-2 disabled:opacity-40"
-          style={{ color: 'var(--accent)' }}
-        >
-          OK
+      <div className="flex items-center justify-between pb-2">
+        <p className="text-white/60 text-caption">Musique</p>
+        <button onClick={onClose} className="flex items-center gap-1 text-body-medium" style={{ color: 'var(--accent)' }}>
+          <Check size={16} />
+          Terminé
         </button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6">
-        {!file && (
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex flex-col items-center gap-3 text-white/80"
-          >
-            <span
-              className="w-16 h-16 rounded-full flex items-center justify-center"
+      {!file && (
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 bg-white/10"
+        >
+          <span className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: 'var(--accent)' }}>
+            <Music size={16} className="text-white" />
+          </span>
+          <span className="text-white text-body">Choisir une musique depuis la galerie</span>
+        </button>
+      )}
+
+      {file && (
+        <>
+          <audio
+            ref={audioRef}
+            src={objectUrl}
+            onLoadedMetadata={handleLoadedMetadata}
+            onEnded={() => setPlaying(false)}
+          />
+
+          <div className="w-full flex items-center gap-3">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center shrink-0"
+            >
+              <Music size={18} className="text-white" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className="text-white text-body truncate">{file.name}</p>
+              <p className="text-white/50 text-caption">{formatTime(totalDuration)} au total</p>
+            </div>
+            <button
+              onClick={togglePlay}
+              disabled={loadingMeta || !!error}
+              className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40"
               style={{ background: 'var(--accent)' }}
             >
-              <Music size={26} className="text-white" />
-            </span>
-            <span className="text-body">Choisir une musique depuis la galerie</span>
-          </button>
-        )}
+              {playing ? <Pause size={18} className="text-white" /> : <Play size={18} className="text-white ml-0.5" />}
+            </button>
+            <button onClick={remove} className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+              <Trash2 size={16} className="text-white" />
+            </button>
+          </div>
 
-        {file && (
-          <>
-            <audio
-              ref={audioRef}
-              src={objectUrl}
-              onLoadedMetadata={handleLoadedMetadata}
-              onEnded={() => setPlaying(false)}
-            />
+          {error && <p className="text-caption text-red-400 pt-2">{error}</p>}
 
-            <div className="w-full flex items-center gap-3">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center shrink-0"
-              >
-                <Music size={18} className="text-white" />
-              </button>
-              <div className="min-w-0 flex-1">
-                <p className="text-white text-body truncate">{file.name}</p>
-                <p className="text-white/50 text-caption">{formatTime(totalDuration)} au total</p>
-              </div>
-              <button
-                onClick={togglePlay}
-                disabled={loadingMeta || !!error}
-                className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40"
-                style={{ background: 'var(--accent)' }}
-              >
-                {playing ? <Pause size={18} className="text-white" /> : <Play size={18} className="text-white ml-0.5" />}
-              </button>
-            </div>
-
-            {error && <p className="text-caption text-red-400">{error}</p>}
-
-            {!error && !loadingMeta && totalDuration > 0 && (
-              <>
-                {/* Durée de la note : 15s ou 20s */}
-                <div className="w-full flex items-center gap-2">
-                  {DURATIONS.filter((d) => d <= Math.max(3, Math.floor(totalDuration))).map((d) => (
-                    <button
-                      key={d}
-                      onClick={() => {
-                        setDuration(d)
-                        setStart((s) => Math.max(0, Math.min(s, Math.max(0, totalDuration - d))))
-                      }}
-                      className="flex-1 rounded-full py-2 text-body-medium"
-                      style={{
-                        background: duration === d ? 'var(--accent)' : 'rgba(255,255,255,0.1)',
-                        color: '#fff',
-                      }}
-                    >
-                      {d}s
-                    </button>
-                  ))}
-                </div>
-
-                {/* Timeline : la fenêtre colorée = le passage qui sera joué.
-                    On la fait glisser horizontalement pour choisir le refrain
-                    ou le passage voulu. */}
-                <div className="w-full">
-                  <p className="text-white/50 text-caption pb-2">
-                    Glisse pour choisir le passage ({formatTime(start)} – {formatTime(start + duration)})
-                  </p>
-                  <div
-                    ref={trackRef}
-                    className="relative w-full h-14 rounded-xl bg-white/10 overflow-hidden touch-none"
+          {!error && !loadingMeta && totalDuration > 0 && (
+            <>
+              <div className="w-full flex items-center gap-2 pt-3">
+                {DURATIONS.filter((d) => d <= Math.max(3, Math.floor(totalDuration))).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => {
+                      setDuration(d)
+                      setStart((s) => Math.max(0, Math.min(s, Math.max(0, totalDuration - d))))
+                    }}
+                    className="flex-1 rounded-full py-2 text-body-medium"
+                    style={{
+                      background: duration === d ? 'var(--accent)' : 'rgba(255,255,255,0.1)',
+                      color: '#fff',
+                    }}
                   >
-                    <div
-                      onPointerDown={startDrag}
-                      className="absolute top-0 bottom-0 rounded-lg flex items-center justify-center cursor-grab active:cursor-grabbing"
-                      style={{
-                        left: `${windowLeftPct}%`,
-                        width: `${windowWidthPct}%`,
-                        background: 'var(--accent)',
-                        minWidth: 24,
-                      }}
-                    >
-                      <div className="w-1 h-6 rounded-full bg-white/60 mx-0.5" />
-                      <div className="w-1 h-6 rounded-full bg-white/60 mx-0.5" />
-                    </div>
+                    {d}s
+                  </button>
+                ))}
+              </div>
+
+              <div className="w-full pt-3">
+                <p className="text-white/50 text-caption pb-2">
+                  Glisse pour choisir le passage ({formatTime(start)} – {formatTime(start + duration)})
+                </p>
+                <div
+                  ref={trackRef}
+                  className="relative w-full h-12 rounded-xl bg-white/10 overflow-hidden touch-none"
+                >
+                  <div
+                    onPointerDown={startDrag}
+                    className="absolute top-0 bottom-0 rounded-lg flex items-center justify-center cursor-grab active:cursor-grabbing"
+                    style={{
+                      left: `${windowLeftPct}%`,
+                      width: `${windowWidthPct}%`,
+                      background: 'var(--accent)',
+                      minWidth: 24,
+                    }}
+                  >
+                    <div className="w-1 h-5 rounded-full bg-white/60 mx-0.5" />
+                    <div className="w-1 h-5 rounded-full bg-white/60 mx-0.5" />
                   </div>
                 </div>
-              </>
-            )}
-
-            <button onClick={remove} className="flex items-center gap-2 text-white/60 text-body-medium mt-2">
-              <Trash2 size={16} />
-              Retirer la musique
-            </button>
-          </>
-        )}
-      </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
     </div>
   )
 }

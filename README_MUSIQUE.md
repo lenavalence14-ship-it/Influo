@@ -1,11 +1,24 @@
-# Feature musique sur les notes photo
+# Feature musique sur les notes photo (v2 — panneau inline, pas d'écran séparé)
+
+## Correction par rapport à la v1
+
+La v1 ouvrait un écran `fixed inset-0` séparé pour la musique (fond noir,
+photo invisible), ce qui cassait le flux : retour à un écran vide, plus de
+"Publier" réel. **Corrigé** : le bouton Music ouvre maintenant un panneau qui
+glisse depuis le bas, EXACTEMENT comme le panneau "Filtres" déjà existant —
+la photo reste visible en fond pendant toute la sélection et le trim. Il n'y
+a plus de bouton "Publier" dans le panneau musique : le seul "Publier" reste
+celui de l'écran principal, qui déclenche le même flux qu'avant (ferme
+l'éditeur, anneau de chargement sur l'avatar, retour au feed).
 
 ## Fichiers dans ce zip
 
-- `src/pages/feed/PhotoNoteEditor.jsx` (MODIFIÉ) — bouton Music ouvre l'écran de sélection.
-- `src/pages/feed/editor/MusicPicker.jsx` (NOUVEAU) — écran de choix + rognage 15s/20s.
+- `src/pages/feed/PhotoNoteEditor.jsx` (MODIFIÉ) — panneau musique inline, comme Filtres.
+- `src/pages/feed/editor/MusicPicker.jsx` (NOUVEAU/RÉÉCRIT) — plus un écran, un panneau : choix + trim 15s/20s, remonte l'état en live via `onChange`.
 - `src/pages/feed/CreateNote.jsx` (MODIFIÉ) — upload de l'audio + insert des colonnes audio_*.
 - `src/pages/feed/NoteViewer.jsx` (MODIFIÉ) — durée de note dynamique + lecture synchro de l'audio.
+- `src/pages/feed/NoteBar.jsx` (MODIFIÉ) — le `select()` qui charge les notes pour la barre principale n'incluait pas `audio_url`/`audio_start`/`audio_duration` : sans ce fix, la musique n'aurait jamais joué même avec tout le reste en place.
+- `src/pages/feed/ProfileNoteLauncher.jsx` (MODIFIÉ) — même souci sur le point d'entrée "notes depuis un profil" ; en plus il manquait déjà `photo_url`/`filtre`/`crop`/texte pour les notes photo classiques (bug préexistant, corrigé au passage).
 - `supabase/2026_add_note_audio.sql` (NOUVEAU) — migration à appliquer sur la table `notes`.
 
 ## Comment pousser depuis Termux
@@ -17,7 +30,9 @@ Dans le repo local (`Influo-main/`), copie chaque fichier à sa place exacte
 git add src/pages/feed/PhotoNoteEditor.jsx \
         src/pages/feed/editor/MusicPicker.jsx \
         src/pages/feed/CreateNote.jsx \
-        src/pages/feed/NoteViewer.jsx
+        src/pages/feed/NoteViewer.jsx \
+        src/pages/feed/NoteBar.jsx \
+        src/pages/feed/ProfileNoteLauncher.jsx
 
 git commit -m "feat: musique sur les notes photo (choix + trim 15s/20s)"
 git push

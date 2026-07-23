@@ -63,8 +63,9 @@ function BlurredPhoto({ src, filterCss, rotation, zoom = 1, children }) {
  * reçoit ici le résultat (fichier + filtre + texte + rotation) via onDone.
  */
 export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) {
-  const [screen, setScreen] = useState('main') // 'main' | 'crop' | 'texte' | 'musique'
+  const [screen, setScreen] = useState('main') // 'main' | 'crop' | 'texte'
   const [showFilters, setShowFilters] = useState(false)
+  const [showMusicPanel, setShowMusicPanel] = useState(false)
 
   // Musique : null tant qu'aucune n'est choisie. Une fois validée dans
   // MusicPicker, on a { file, start, duration } — duration vaut 15 ou 20
@@ -393,19 +394,6 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
     )
   }
 
-  if (screen === 'musique') {
-    return (
-      <MusicPicker
-        initial={musique}
-        onCancel={() => setScreen('main')}
-        onDone={(result) => {
-          setMusique(result) // { file, start, duration } ou null si "Retirer"
-          setScreen('main')
-        }}
-      />
-    )
-  }
-
   if (screen === 'texte') {
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-black select-none">
@@ -474,7 +462,10 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
         </button>
         <div className="flex items-center gap-4">
           <button
-            onClick={() => setScreen('musique')}
+            onClick={() => {
+              setShowMusicPanel((s) => !s)
+              setShowFilters(false)
+            }}
             className="w-9 h-9 rounded-full flex items-center justify-center text-white relative"
             style={{ background: musique ? 'var(--accent)' : 'rgba(255,255,255,0.1)' }}
           >
@@ -527,6 +518,19 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
         </div>
       )}
 
+      {showMusicPanel && (
+        <div
+          className="shrink-0 bg-black/95 pt-2"
+          style={{ animation: 'slideUpPanel 0.2s ease-out' }}
+        >
+          <MusicPicker
+            initial={musique}
+            onClose={() => setShowMusicPanel(false)}
+            onChange={setMusique}
+          />
+        </div>
+      )}
+
       <div
         className="flex items-center justify-between px-4 pt-2"
         style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
@@ -535,7 +539,10 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
           Annuler
         </button>
         <button
-          onClick={() => setShowFilters((s) => !s)}
+          onClick={() => {
+            setShowFilters((s) => !s)
+            setShowMusicPanel(false)
+          }}
           className="text-white text-body-medium px-2 py-2"
         >
           Filtres

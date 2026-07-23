@@ -27,7 +27,7 @@ export function useProfileNoteLauncher(userId) {
     queryFn: async () => {
       const { data } = await supabase
         .from('notes')
-        .select('id, user_id, contenu, created_at, expire_at, repost_of, users(id, nom_complet, photo_url, role)')
+        .select('id, user_id, contenu, created_at, expire_at, repost_of, photo_url, filtre, crop, zoom, texte_overlay, texte_x, texte_y, texte_couleur, texte_police, audio_url, audio_start, audio_duration, users(id, nom_complet, photo_url, role)')
         .eq('user_id', userId)
         .order('created_at', { ascending: true })
       const rows = data || []
@@ -39,7 +39,7 @@ export function useProfileNoteLauncher(userId) {
       if (repostOfIds.length) {
         const { data: originals } = await supabase
           .from('notes')
-          .select('id, user_id, contenu, created_at, expire_at, repost_of, users(id, nom_complet, photo_url, role)')
+          .select('id, user_id, contenu, created_at, expire_at, repost_of, photo_url, filtre, crop, zoom, texte_overlay, texte_x, texte_y, texte_couleur, texte_police, audio_url, audio_start, audio_duration, users(id, nom_complet, photo_url, role)')
           .in('id', repostOfIds)
         originalsById = new Map((originals || []).map((o) => [o.id, o]))
       }

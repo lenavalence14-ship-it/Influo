@@ -44,7 +44,7 @@ async function fetchAllUsers() {
 async function fetchNotes() {
   const { data } = await supabase
     .from('notes')
-    .select('id, user_id, contenu, created_at, expire_at, repost_of, photo_url, filtre, crop, zoom, texte_overlay, texte_x, texte_y, texte_couleur, texte_police, users(id, nom_complet, photo_url, role)')
+    .select('id, user_id, contenu, created_at, expire_at, repost_of, photo_url, filtre, crop, zoom, texte_overlay, texte_x, texte_y, texte_couleur, texte_police, audio_url, audio_start, audio_duration, users(id, nom_complet, photo_url, role)')
     .order('created_at', { ascending: true }) // ascendant : dans un groupe, les segments défilent du plus ancien au plus récent
   return data || []
 }
