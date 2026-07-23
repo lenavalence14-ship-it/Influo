@@ -68,12 +68,20 @@ export default function HlsVideo({
         // Limite le buffer en avance pour économiser la data mobile : pas besoin
         // de précharger 30s de vidéo en 720p si l'utilisateur peut swiper dans 2s.
         maxBufferLength: 15,
-        // Démarre directement sur le niveau de qualité le plus bas, puis monte
-        // dès que la bande passante mesurée le permet : priorise un démarrage
-        // quasi instantané plutôt qu'une qualité maximale dès la 1ère image,
-        // crucial sur réseau mobile instable.
-        startLevel: 0,
-        abrEwmaDefaultEstimate: 500000, // hypothèse initiale ~500kbps avant mesure réelle
+        // -1 = laisse hls.js choisir automatiquement le niveau de départ selon sa
+        // propre estimation de bande passante (voir abrEwmaDefaultEstimate), au
+        // lieu de forcer systématiquement la qualité la plus basse (360p) pour
+        // tout le monde. Sur un Reel plein écran, démarrer en 360p par défaut est
+        // visiblement flou même pour un utilisateur en bonne connexion — ce n'est
+        // pas ce que font TikTok/Instagram, qui n'utilisent le niveau minimal que
+        // comme filet de sécurité pour les connexions réellement mauvaises.
+        startLevel: -1,
+        // Hypothèse de départ avant la 1ère mesure réelle, le temps que hls.js
+        // affine avec les segments déjà téléchargés (preload de la vidéo suivante,
+        // voir ReelsViewer). 1.5 Mbps est une hypothèse raisonnable pour de la 4G
+        // correcte — nettement moins pessimiste que 500kbps, qui forçait quasi
+        // toujours le premier choix vers 360p.
+        abrEwmaDefaultEstimate: 1_500_000,
       })
       hls.loadSource(hlsPlaylistUrl)
       hls.attachMedia(video)
