@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { X, Heart, Repeat2, Send, Eye, Trash2 } from 'lucide-react'
+import { X, Heart, Repeat2, Send, Eye, ArrowLeft, MoreVertical } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { timeAgo } from '../../lib/time'
@@ -57,6 +57,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
   const [showViewers, setShowViewers] = useState(false)
   const [viewersList, setViewersList] = useState([])
   const [viewCount, setViewCount] = useState(0)
+  const [showMenu, setShowMenu] = useState(false)
   const { user, profile } = useAuth()
   const navigate = useNavigate()
 
@@ -494,7 +495,11 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
       </div>
 
       <div className="flex items-center gap-3 px-4 py-3">
-        {current.kind === 'repost' && current.reposter ? (
+        {isMine ? (
+          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center text-white shrink-0 -ml-1">
+            <ArrowLeft size={22} />
+          </button>
+        ) : current.kind === 'repost' && current.reposter ? (
           <div className="flex items-center shrink-0">
             <img
               src={author?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${author?.id}`}
@@ -531,8 +536,17 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
             className="w-9 h-9 rounded-full object-cover shrink-0 cursor-pointer"
           />
         )}
+        {isMine && (
+          <img
+            src={author?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${author?.id}`}
+            alt=""
+            className="w-9 h-9 rounded-full object-cover shrink-0"
+          />
+        )}
         <div className="flex-1 min-w-0">
-          {current.kind === 'repost' && current.reposter ? (
+          {isMine ? (
+            <p className="text-body-medium text-white truncate">Ma note</p>
+          ) : current.kind === 'repost' && current.reposter ? (
             <p className="text-body-medium text-white truncate">
               {author?.nom_complet} <span className="text-white/60">et</span> {current.reposter.nom_complet}
             </p>
@@ -544,21 +558,22 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
             {timeAgo(note.created_at)}
           </p>
         </div>
-        {isMine && (
+        {isMine ? (
           <button
             onClick={(e) => {
               e.stopPropagation()
-              handleDelete()
+              setShowMenu(true)
             }}
             className="w-9 h-9 flex items-center justify-center text-white/90"
-            aria-label="Supprimer cette note"
+            aria-label="Options de la note"
           >
-            <Trash2 size={19} />
+            <MoreVertical size={20} />
+          </button>
+        ) : (
+          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center text-white">
+            <X size={22} />
           </button>
         )}
-        <button onClick={onClose} className="w-9 h-9 flex items-center justify-center text-white">
-          <X size={22} />
-        </button>
       </div>
 
       {/* Zone tap gauche/droite + appui long = pause (comme les statuts WhatsApp) */}
@@ -599,18 +614,37 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
           </div>
         )}
 
-        <div className="flex items-center gap-5 text-white">
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleLike()
-            }}
-            className="flex items-center gap-1.5"
-          >
-            <Heart size={22} fill={liked ? 'white' : 'none'} />
-            {likeCount > 0 && <span className="text-caption">{likeCount}</span>}
-          </button>
-          {!isMine && (
+        {isMine ? (
+          <div className="flex items-center text-white">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowViewers(true)
+              }}
+              className="flex items-center gap-1.5"
+            >
+              <Eye size={22} />
+              <span className="text-caption">{viewCount}</span>
+            </button>
+            {likeCount > 0 && (
+              <div className="flex items-center gap-1.5 ml-auto">
+                <Heart size={22} fill="white" stroke="white" />
+                <span className="text-caption">{likeCount}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-5 text-white">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleLike()
+              }}
+              className="flex items-center gap-1.5"
+            >
+              <Heart size={22} fill={liked ? 'white' : 'none'} />
+              {likeCount > 0 && <span className="text-caption">{likeCount}</span>}
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -622,21 +656,47 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
               <Repeat2 size={22} />
               <span className="text-caption">{reposted ? 'Republié' : 'Republier'}</span>
             </button>
-          )}
-          {isMine && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowViewers(true)
-              }}
-              className="flex items-center gap-1.5 ml-auto"
-            >
-              <Eye size={22} />
-              <span className="text-caption">{viewCount}</span>
-            </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
+
+      {showMenu && (
+        <div
+          className="absolute inset-0 z-10"
+          onClick={(e) => {
+            e.stopPropagation()
+            setShowMenu(false)
+          }}
+        >
+          <div
+            className="absolute top-14 right-3 rounded-2xl overflow-hidden min-w-[170px] shadow-lg"
+            style={{ background: 'var(--surface-primary, #1c1c1e)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                setShowMenu(false)
+                onClose()
+                navigate(`/notes/nouvelle?edit=${note.id}`)
+              }}
+              className="w-full text-left px-4 py-3.5 text-body"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Modifier
+            </button>
+            <div className="h-px" style={{ background: 'var(--border)' }} />
+            <button
+              onClick={() => {
+                setShowMenu(false)
+                handleDelete()
+              }}
+              className="w-full text-left px-4 py-3.5 text-body text-red-500"
+            >
+              Supprimer
+            </button>
+          </div>
+        </div>
+      )}
 
       {showViewers && (
         <div

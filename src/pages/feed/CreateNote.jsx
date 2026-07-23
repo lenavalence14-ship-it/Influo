@@ -1,30 +1,59 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 
-// Création d'une note texte, façon "Nouvelle note" Facebook/Messenger
-// (image de référence fournie). Une note dure 24h puis expire.
+// Création (et édition) d'une note texte, façon "Nouvelle note"
+// Facebook/Messenger (image de référence fournie). Une note dure 24h puis
+// expire.
 // IMPORTANT : chaque nouvelle note s'AJOUTE aux notes actives existantes de
 // l'utilisateur, elle ne les remplace jamais. Les anciennes notes restent
 // visibles jusqu'à leur expiration naturelle (24h) ou suppression manuelle
 // par l'auteur depuis le viewer (façon status texte WhatsApp : plusieurs
 // notes actives en même temps, chacune son propre segment).
+//
+// MODE ÉDITION : si l'URL contient ?edit=<noteId>, on charge le contenu de
+// cette note existante, on pré-remplit le champ, et "Partager" devient
+// "Enregistrer" -> update au lieu d'insert (expire_at n'est PAS prolongé).
 export default function CreateNote() {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [loading, setLoading] = useState(false)
   const { user, profile } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const editId = searchParams.get('edit')
+
+  useEffect(() => {
+    if (!editId) return
+    let cancelled = false
+    setLoading(true)
+    supabase
+      .from('notes')
+      .select('id, contenu, user_id')
+      .eq('id', editId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return
+        if (data && data.user_id === user?.id) setText(data.contenu || '')
+        setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [editId, user?.id])
 
   const handlePublish = async () => {
     if (!text.trim() || sending) return
     setSending(true)
-    const { error } = await supabase.from('notes').insert({
-      user_id: user.id,
-      contenu: text.trim(),
-      expire_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    })
+    const { error } = editId
+      ? await supabase.from('notes').update({ contenu: text.trim() }).eq('id', editId).eq('user_id', user.id)
+      : await supabase.from('notes').insert({
+          user_id: user.id,
+          contenu: text.trim(),
+          expire_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        })
     setSending(false)
     if (!error) navigate(-1)
   }
@@ -35,14 +64,14 @@ export default function CreateNote() {
         <button onClick={() => navigate(-1)} className="w-9 h-9 flex items-center justify-center text-white">
           <X size={22} />
         </button>
-        <p className="text-body-medium text-white">Nouvelle note</p>
+        <p className="text-body-medium text-white">{editId ? 'Modifier la note' : 'Nouvelle note'}</p>
         <button
           onClick={handlePublish}
-          disabled={!text.trim() || sending}
+          disabled={!text.trim() || sending || loading}
           className="text-body-medium disabled:opacity-40"
           style={{ color: 'var(--accent)' }}
         >
-          Partager
+          {editId ? 'Enregistrer' : 'Partager'}
         </button>
       </div>
 
