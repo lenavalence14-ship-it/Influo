@@ -37,7 +37,7 @@ export function ThemeProvider({ children }) {
     // Android natif (Capacitor) : la meta tag ci-dessus n'a aucun effet, il faut appeler le plugin directement
     if (Capacitor.isNativePlatform()) {
       StatusBar.setBackgroundColor({ color })
-      StatusBar.setStyle({ style: theme === 'light' ? Style.Dark : Style.Light })
+      StatusBar.setStyle({ style: theme === 'light' ? Style.Light : Style.Dark })
     }
   }, [theme])
 
