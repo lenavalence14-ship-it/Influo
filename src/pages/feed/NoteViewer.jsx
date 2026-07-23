@@ -499,10 +499,35 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex flex-col select-none"
       style={{
-        background: 'var(--accent, #7c1a3a)',
-        paddingTop: 'env(safe-area-inset-top, 24px)',
+        background: current.original.photo_url ? '#000' : 'var(--accent, #7c1a3a)',
       }}
     >
+      {/* Fond flouté plein écran pour les notes photo : en position fixed
+          sur TOUTE la modale (pas seulement la zone de tap), pour remplir
+          vraiment l'écran du haut vers le bas, y compris sous la barre de
+          progression, le header et la status bar — remplace le cramoisi
+          uniquement quand c'est une photo. z-0 pour rester derrière tout le
+          reste (progress bar, header, image nette, zone de tap). */}
+      {current.original.photo_url && (
+        <div className="fixed inset-0 z-0 overflow-hidden">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url(${current.original.photo_url})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: (() => {
+                const f = getNoteFilterCss(current.original.filtre)
+                return f && f !== 'none' ? `blur(40px) ${f}` : 'blur(40px)'
+              })(),
+              transform: 'scale(1.2)',
+            }}
+          />
+          <div className="absolute inset-0 bg-black/30" />
+        </div>
+      )}
+
+      <div className="relative z-10 flex flex-col h-full" style={{ paddingTop: 'env(safe-area-inset-top, 24px)' }}>
       {/* Barre de progression : UNIQUEMENT les segments du groupe courant */}
       <div className="flex gap-1 px-3 pt-3">
         {items.map((_, i) => (
@@ -616,26 +641,23 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
         onPointerLeave={handlePauseEnd}
         onPointerCancel={handlePauseEnd}
       >
-        {current.original.photo_url ? (
-          <div className="absolute inset-0">
-            {/* -px-8 pour annuler le padding horizontal du conteneur parent
-                (zone de tap) : sans ça, le flou ne remplissait pas toute la
-                largeur de l'écran et laissait deux bandes cramoisies sur les
-                côtés. */}
-            <div
-              className="absolute -inset-y-0 -inset-x-8"
-              style={{
-                backgroundImage: `url(${current.original.photo_url})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                filter: (() => {
-                  const f = getNoteFilterCss(current.original.filtre)
-                  return f && f !== 'none' ? `blur(40px) ${f}` : 'blur(40px)'
-                })(),
-                transform: 'scale(1.2)',
-              }}
-            />
-            <div className="absolute -inset-y-0 -inset-x-8 bg-black/30" />
+        {current.original.photo_url ? (() => {
+          let noteCrop = current.original.crop
+          if (typeof noteCrop === 'string') {
+            try { noteCrop = JSON.parse(noteCrop) } catch { noteCrop = null }
+          }
+          const hasValidCrop = noteCrop && typeof noteCrop.w === 'number' && typeof noteCrop.h === 'number'
+          return (
+          <div
+            className="absolute inset-0"
+            style={
+              hasValidCrop
+                ? {
+                    clipPath: `inset(${noteCrop.y}% ${100 - noteCrop.x - noteCrop.w}% ${100 - noteCrop.y - noteCrop.h}% ${noteCrop.x}%)`,
+                  }
+                : undefined
+            }
+          >
             <img
               src={current.original.photo_url}
               alt=""
@@ -658,7 +680,8 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
               </p>
             )}
           </div>
-        ) : (
+          )
+        })() : (
           <p className="text-white text-2xl font-medium text-center leading-snug break-words">
             {current.original.contenu}
           </p>
@@ -767,6 +790,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
           </div>
         )}
       </div>
+      </div>{/* fin du wrapper relative z-10 flex flex-col h-full */}
 
       {showMenu && (
         <div
