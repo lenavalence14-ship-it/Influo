@@ -2,10 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { X, Heart, Repeat2, Send, Eye, ArrowLeft, MoreVertical } from 'lucide-react'
-import { Capacitor, registerPlugin } from '@capacitor/core'
+import { Capacitor } from '@capacitor/core'
 import { StatusBar, Style } from '@capacitor/status-bar'
-
-const StatusBarIcons = registerPlugin('StatusBarIcons')
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { timeAgo } from '../../lib/time'
@@ -151,12 +149,10 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
     StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {})
     StatusBar.setBackgroundColor({ color: themeBg }).catch(() => {})
     StatusBar.setStyle({ style: isLight ? Style.Dark : Style.Light }).catch(() => {})
-    StatusBarIcons.setLight({ light: isLight }).catch(() => {})
     return () => {
       StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {})
       StatusBar.setBackgroundColor({ color: themeBg }).catch(() => {})
       StatusBar.setStyle({ style: isLight ? Style.Dark : Style.Light }).catch(() => {})
-      StatusBarIcons.setLight({ light: isLight }).catch(() => {})
     }
   }, [current, groupIndex, segmentIndex])
   const note = current?.entry
