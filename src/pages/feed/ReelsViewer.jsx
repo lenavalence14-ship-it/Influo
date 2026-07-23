@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import CommentsSheet from './CommentsSheet'
 import { getFilterCss } from './editor/FilterPicker'
+import HlsVideo from '../../components/HlsVideo'
 
 const REELS_PAGE_SIZE = 20
 
@@ -26,7 +27,7 @@ async function fetchReels(userId) {
     .from('posts')
     .select(`
       id, legende, created_at, filtre, client_id,
-      post_medias(media_url, media_type, thumbnail_url, position),
+      post_medias(media_url, media_type, thumbnail_url, position, hls_status, hls_playlist_url),
       profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
       client:client_id(id, nom_complet, photo_url)
     `)
@@ -190,14 +191,17 @@ export default function ReelsViewer() {
           // on monte la balise <video> pour activeIndex-1, activeIndex et activeIndex+1.
           // Le reste du flux n'affiche que sa miniature (poster), donc pas de téléchargement
           // vidéo tant que le slide n'est pas sur le point d'être atteint.
-          shouldMount={Math.abs(i - activeIndex) <= 1}
-          // La vidéo active ET la suivante (i === activeIndex + 1) préchargent leur contenu
-          // en entier pendant que tu regardes la vidéo courante — comme TikTok, qui télécharge
-          // la vidéo suivante en avance pour qu'elle soit prête instantanément au swipe.
-          // Une fois chargée par le navigateur, elle reste en cache mémoire tant que la balise
-          // <video> reste montée avec la même URL (garanti par shouldMount ci-dessus) : swiper
-          // dessus ne redéclenche donc aucun nouveau téléchargement.
+          // Montée dans le DOM : active-1, active, active+1, active+2. On monte un cran
+          // plus loin que le preload réseau (ci-dessous) pour que la balise <video> de
+          // active+2 existe déjà quand son tour de précharger arrive, sans démontage/
+          // remontage au moment du swipe.
+          shouldMount={i >= activeIndex - 1 && i <= activeIndex + 2}
+          // Préchargement réseau réel : vidéo active, suivante (i+1) ET suivante+1 (i+2),
+          // comme demandé — TikTok précharge sur 2 crans d'avance pour absorber les swipes
+          // rapides. Sur réseau instable, ce 3e niveau (i+2) charge en 'metadata' seul plutôt
+          // qu'en entier pour ne pas saturer la bande passante déjà utilisée par i et i+1.
           shouldPreload={i === activeIndex || i === activeIndex + 1}
+          shouldPrefetchMeta={i === activeIndex + 2}
           isActive={i === activeIndex}
           setVideoRef={(el) => (videoRefs.current[i] = el)}
           muted={muted}
@@ -208,7 +212,7 @@ export default function ReelsViewer() {
   )
 }
 
-const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPreload, isActive, setVideoRef, muted, onToggleMute }) {
+const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPreload, shouldPrefetchMeta, isActive, setVideoRef, muted, onToggleMute }) {
   const { user } = useAuth()
   const [liked, setLiked] = useState(reel.liked_by_me)
   const [likeCount, setLikeCount] = useState(reel.like_count || 0)
@@ -220,8 +224,14 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
   const [videoReady, setVideoReady] = useState(false)
 
   const influencer = reel.profils_influenceur
-  const mediaUrl = reel.post_medias?.[0]?.media_url
-  const thumbnailUrl = reel.post_medias?.[0]?.thumbnail_url
+  const media = reel.post_medias?.[0]
+  const mediaUrl = media?.media_url
+  const thumbnailUrl = media?.thumbnail_url
+  // HLS utilisé uniquement si le transcodage est bien allé au bout (voir
+  // hls_status côté service de transcodage). Sinon, repli silencieux sur le
+  // MP4 classique déjà uploadé à la publication — l'utilisateur ne voit jamais
+  // d'erreur, juste une qualité fixe au lieu d'adaptative.
+  const hlsPlaylistUrl = media?.hls_status === 'ready' ? media?.hls_playlist_url : null
 
   const toggleLike = async () => {
     if (!user) return
@@ -253,18 +263,20 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
         />
       )}
       {shouldMount && (
-        <video
-          ref={setVideoRef}
-          src={mediaUrl}
+        <HlsVideo
+          videoRef={(el) => setVideoRef(el)}
+          hlsPlaylistUrl={hlsPlaylistUrl}
+          fallbackMp4Url={mediaUrl}
           poster={thumbnailUrl || undefined}
           className="absolute inset-0 w-full h-full object-cover"
           loop
           muted={muted}
-          playsInline
-          // La vidéo active ET la suivante téléchargent leur contenu dès maintenant.
-          // Les autres vidéos montées (celle qu'on vient de quitter, en N-1) restent en
-          // "metadata" seul : pas besoin de re-précharger une vidéo déjà vue en arrière.
-          preload={shouldPreload ? 'auto' : 'metadata'}
+          // 3 niveaux de préchargement réseau, du plus prioritaire au moins prioritaire :
+          // - active/suivante (shouldPreload) : 'auto', téléchargement complet immédiat
+          // - suivante+1 (shouldPrefetchMeta) : 'metadata' seul, juste assez pour un
+          //   démarrage rapide si l'utilisateur swipe vite sans saturer la data mobile
+          // - le reste (celle qu'on vient de quitter) : 'metadata' aussi, pas de re-fetch
+          preload={shouldPreload ? 'auto' : shouldPrefetchMeta ? 'metadata' : 'metadata'}
           onLoadedData={() => setVideoReady(true)}
           style={{ filter: getFilterCss(reel.filtre) }}
         />

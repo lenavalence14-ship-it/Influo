@@ -7,6 +7,7 @@ import {
   PenLine, AtSign, MoreHorizontal, ChevronDown, ChevronUp, Plus, Send,
 } from 'lucide-react'
 import { compressImage, compressVideo, generateVideoThumbnail } from '../../lib/mediaCompression'
+import { triggerHlsTranscode } from '../../lib/hlsTranscode'
 import DrawCanvas from './editor/DrawCanvas'
 import FilterPicker, { getFilterCss } from './editor/FilterPicker'
 import StickerPicker from './editor/StickerPicker'
@@ -261,13 +262,31 @@ export default function CreatePost() {
         ? supabase.storage.from('posts').getPublicUrl(thumbName).data.publicUrl
         : null
 
-      await supabase.from('post_medias').insert({
-        post_id: post.id,
-        media_url: urlData.publicUrl,
-        media_type: isVideo ? 'video' : 'image',
-        thumbnail_url: thumbnailUrl,
-        position: i,
-      })
+      const { data: mediaRow } = await supabase
+        .from('post_medias')
+        .insert({
+          post_id: post.id,
+          media_url: urlData.publicUrl,
+          media_type: isVideo ? 'video' : 'image',
+          thumbnail_url: thumbnailUrl,
+          position: i,
+        })
+        .select('id')
+        .single()
+
+      // Déclenche le transcodage HLS en arrière-plan, sans bloquer la publication :
+      // le post part tout de suite avec le MP4 (media_url) en lecture immédiate,
+      // et le player basculera sur le HLS (qualité adaptative) une fois prêt
+      // (voir hls_status côté ReelsViewer). "Fire-and-forget" volontaire ici :
+      // si ça échoue silencieusement, l'utilisateur voit quand même sa vidéo
+      // en MP4 classique, ce n'est jamais bloquant pour lui.
+      if (isVideo && mediaRow?.id) {
+        triggerHlsTranscode({
+          postMediaId: mediaRow.id,
+          sourceUrl: urlData.publicUrl,
+          storagePrefix: `${influencerProfile.id}/${post.id}/${i}-hls`,
+        })
+      }
     }))
 
     setLoading(false)
