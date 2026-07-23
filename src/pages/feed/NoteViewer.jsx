@@ -138,38 +138,27 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
   const { user, profile } = useAuth()
 
   // Barre de statut système (heure, batterie, réseau) : on ne peut pas la
-  // flouter (elle est rendue par Android/iOS, en dehors du DOM du
-  // WebView — aucun CSS ne peut l'atteindre). À la place, sur une note
-  // PHOTO, on la met en noir ou blanc selon le thème actif de l'app (pas
-  // le cramoisi, qui jurerait sur une photo) ; sur une note TEXTE, on garde
-  // le cramoisi habituel. Réagit à chaque changement de segment puisqu'on
-  // peut naviguer texte <-> photo sans refermer le viewer.
+  // flouter (rendue par le système, hors du DOM du WebView). Règle simple,
+  // la même partout dans l'app y compris ici en story : thème clair -> texte
+  // noir, thème sombre -> texte blanc. Réagit à chaque changement de
+  // segment/thème puisqu'on peut naviguer texte <-> photo sans refermer le
+  // viewer.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
-    const isPhoto = Boolean(current?.original?.photo_url)
     const isLight = document.documentElement.classList.contains('light')
-    const noteBg = getComputedStyle(document.documentElement)
-      .getPropertyValue('--accent').trim() || '#7c1a3a'
     const themeBg = isLight ? '#f5f5f5' : '#0a0a0a'
 
-    const barColor = isPhoto ? (isLight ? '#ffffff' : '#000000') : noteBg
-    // Icônes/texte de la barre : sombres sur fond blanc, clairs sur fond
-    // noir ou cramoisi (tous foncés), pour rester lisibles dans les 3 cas.
-    const barStyle = isPhoto && isLight ? Style.Dark : Style.Light
-    // true = icônes sombres (fond blanc), false = icônes claires (fond noir/cramoisi)
-    const iconsLight = isPhoto && isLight
-
     StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {})
-    StatusBar.setBackgroundColor({ color: barColor }).catch(() => {})
-    StatusBar.setStyle({ style: barStyle }).catch(() => {})
-    StatusBarIcons.setLight({ light: iconsLight }).catch(() => {})
+    StatusBar.setBackgroundColor({ color: themeBg }).catch(() => {})
+    StatusBar.setStyle({ style: isLight ? Style.Dark : Style.Light }).catch(() => {})
+    StatusBarIcons.setLight({ light: isLight }).catch(() => {})
     return () => {
       StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {})
       StatusBar.setBackgroundColor({ color: themeBg }).catch(() => {})
       StatusBar.setStyle({ style: isLight ? Style.Dark : Style.Light }).catch(() => {})
       StatusBarIcons.setLight({ light: isLight }).catch(() => {})
     }
-  }, [current?.original?.photo_url])
+  }, [current, groupIndex, segmentIndex])
   const note = current?.entry
   const author = current?.original?.users
 
