@@ -620,49 +620,57 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
           )
         ) : (
           <div className="flex items-center gap-2">
-            <input
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.key === 'Enter' && handleReply()}
-              placeholder="Répondre"
-              disabled={!canReply}
-              className="flex-1 min-w-0 bg-white/15 text-white placeholder-white/60 rounded-full px-4 h-11 outline-none text-body disabled:opacity-50"
-            />
-            {['😍', '😂', '😮'].map((emoji) => (
-              <button
-                key={emoji}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (canReply) handleReply(emoji)
-                }}
-                disabled={!canReply || sending}
-                className="text-2xl shrink-0 disabled:opacity-50"
-                aria-label={`Réagir avec ${emoji}`}
-              >
-                {emoji}
-              </button>
-            ))}
+            <div
+              className="flex-1 min-w-0 flex items-center rounded-full pr-1 pl-1"
+              style={{ background: 'var(--surface-secondary)' }}
+            >
+              <input
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.key === 'Enter' && handleReply()}
+                placeholder="Répondre"
+                disabled={!canReply}
+                className="flex-1 min-w-0 bg-transparent px-3 h-11 outline-none text-body disabled:opacity-50 placeholder:opacity-60"
+                style={{ color: 'var(--text-primary)' }}
+              />
+              {['😍', '😂', '😮'].map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (canReply) handleReply(emoji)
+                  }}
+                  disabled={!canReply || sending}
+                  className="text-xl w-9 h-9 flex items-center justify-center shrink-0 disabled:opacity-50"
+                  aria-label={`Réagir avec ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 handleRepost()
               }}
               disabled={reposted || isMine}
-              className="w-11 h-11 flex items-center justify-center rounded-full bg-white/15 disabled:opacity-40 text-white shrink-0"
+              className="w-11 h-11 flex items-center justify-center rounded-full disabled:opacity-40 shrink-0"
+              style={{ background: 'var(--surface-secondary)', color: 'var(--text-primary)' }}
               aria-label="Republier"
             >
-              <Repeat2 size={20} />
+              <Repeat2 size={19} />
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 handleLike()
               }}
-              className="w-11 h-11 flex items-center justify-center rounded-full bg-white/15 text-white shrink-0"
+              className="w-11 h-11 flex items-center justify-center rounded-full shrink-0"
+              style={{ background: 'var(--surface-secondary)', color: 'var(--text-primary)' }}
               aria-label="Aimer"
             >
-              <Heart size={20} fill={liked ? 'var(--accent)' : 'none'} stroke={liked ? 'var(--accent)' : 'white'} />
+              <Heart size={19} fill={liked ? 'var(--accent)' : 'none'} stroke={liked ? 'var(--accent)' : 'var(--text-primary)'} />
             </button>
           </div>
         )}
