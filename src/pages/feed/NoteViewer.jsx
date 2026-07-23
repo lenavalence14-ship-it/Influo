@@ -73,10 +73,18 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
   // fermeture, uniquement sur plateforme native (no-op sur le web).
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
+    // Couleur exacte du fond de la note (résout la variable CSS --accent)
+    const noteBg = getComputedStyle(document.documentElement)
+      .getPropertyValue('--accent').trim() || '#7c1a3a'
+    // Couleur du thème actif à restaurer à la fermeture (voir ThemeContext)
+    const isLight = document.documentElement.classList.contains('light')
+    const themeBg = isLight ? '#f5f5f5' : '#0a0a0a'
+
     StatusBar.setOverlaysWebView({ overlay: true })
-    StatusBar.setBackgroundColor({ color: '#5A0A2E' })
+    StatusBar.setBackgroundColor({ color: noteBg })
     return () => {
       StatusBar.setOverlaysWebView({ overlay: false })
+      StatusBar.setBackgroundColor({ color: themeBg })
     }
   }, [])
 
@@ -489,7 +497,10 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex flex-col select-none"
-      style={{ background: 'var(--accent, #7c1a3a)' }}
+      style={{
+        background: 'var(--accent, #7c1a3a)',
+        paddingTop: 'env(safe-area-inset-top, 24px)',
+      }}
     >
       {/* Barre de progression : UNIQUEMENT les segments du groupe courant */}
       <div className="flex gap-1 px-3 pt-3">
