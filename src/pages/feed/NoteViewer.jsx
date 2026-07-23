@@ -262,8 +262,9 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
     }
   }
 
-  const handleReply = async () => {
-    if (!replyText.trim() || !canReply || sending) return
+  const handleReply = async (textOverride) => {
+    const messageText = (textOverride ?? replyText).trim()
+    if (!messageText || !canReply || sending) return
     setSending(true)
 
     const myRole = profile.role
@@ -441,7 +442,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
     await supabase.from(messagesTable).insert({
       conversation_id: conversationId,
       sender_id: user.id,
-      contenu: replyText.trim(),
+      contenu: messageText,
       is_system: false,
       reply_to_note_id: current.original.id,
       reply_to_note_contenu: current.original.contenu,
@@ -499,42 +500,49 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
           <button onClick={onClose} className="w-9 h-9 flex items-center justify-center text-white shrink-0 -ml-1">
             <ArrowLeft size={22} />
           </button>
-        ) : current.kind === 'repost' && current.reposter ? (
-          <div className="flex items-center shrink-0">
-            <img
-              src={author?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${author?.id}`}
-              alt=""
-              onClick={(e) => {
-                e.stopPropagation()
-                onClose()
-                navigate(profileRoute(author.id, author.role))
-              }}
-              className="w-9 h-9 rounded-full object-cover border-2 cursor-pointer"
-              style={{ borderColor: 'white' }}
-            />
-            <img
-              src={current.reposter.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${current.reposter.id}`}
-              alt=""
-              onClick={(e) => {
-                e.stopPropagation()
-                onClose()
-                navigate(profileRoute(current.reposter.id, current.reposter.role))
-              }}
-              className="w-9 h-9 rounded-full object-cover border-2 -ml-3 cursor-pointer"
-              style={{ borderColor: 'white' }}
-            />
-          </div>
         ) : (
-          <img
-            src={author?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${author?.id}`}
-            alt=""
-            onClick={(e) => {
-              e.stopPropagation()
-              onClose()
-              navigate(profileRoute(author.id, author.role))
-            }}
-            className="w-9 h-9 rounded-full object-cover shrink-0 cursor-pointer"
-          />
+          <>
+            <button onClick={onClose} className="w-9 h-9 flex items-center justify-center text-white shrink-0 -ml-1">
+              <ArrowLeft size={22} />
+            </button>
+            {current.kind === 'repost' && current.reposter ? (
+              <div className="flex items-center shrink-0">
+                <img
+                  src={author?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${author?.id}`}
+                  alt=""
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onClose()
+                    navigate(profileRoute(author.id, author.role))
+                  }}
+                  className="w-9 h-9 rounded-full object-cover border-2 cursor-pointer"
+                  style={{ borderColor: 'white' }}
+                />
+                <img
+                  src={current.reposter.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${current.reposter.id}`}
+                  alt=""
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onClose()
+                    navigate(profileRoute(current.reposter.id, current.reposter.role))
+                  }}
+                  className="w-9 h-9 rounded-full object-cover border-2 -ml-3 cursor-pointer"
+                  style={{ borderColor: 'white' }}
+                />
+              </div>
+            ) : (
+              <img
+                src={author?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${author?.id}`}
+                alt=""
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClose()
+                  navigate(profileRoute(author.id, author.role))
+                }}
+                className="w-9 h-9 rounded-full object-cover shrink-0 cursor-pointer"
+              />
+            )}
+          </>
         )}
         {isMine && (
           <img
@@ -558,7 +566,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
             {timeAgo(note.created_at)}
           </p>
         </div>
-        {isMine ? (
+        {isMine && (
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -568,10 +576,6 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
             aria-label="Options de la note"
           >
             <MoreVertical size={20} />
-          </button>
-        ) : (
-          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center text-white">
-            <X size={22} />
           </button>
         )}
       </div>
@@ -591,30 +595,79 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
       </div>
 
       <div className="px-4 pb-[max(14px,env(safe-area-inset-bottom))] pt-2 flex flex-col gap-2.5">
-        {canReply && (
+        {isMine ? (
+          canReply && (
+            <div className="flex items-center gap-2">
+              <input
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.key === 'Enter' && handleReply()}
+                placeholder="Répondre à la note…"
+                className="flex-1 bg-white/15 text-white placeholder-white/60 rounded-full px-4 h-10 outline-none text-body"
+              />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleReply()
+                }}
+                disabled={!replyText.trim() || sending}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-white/15 disabled:opacity-40 text-white shrink-0"
+              >
+                <Send size={18} />
+              </button>
+            </div>
+          )
+        ) : (
           <div className="flex items-center gap-2">
             <input
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.key === 'Enter' && handleReply()}
-              placeholder="Répondre à la note…"
-              className="flex-1 bg-white/15 text-white placeholder-white/60 rounded-full px-4 h-10 outline-none text-body"
+              placeholder="Répondre"
+              disabled={!canReply}
+              className="flex-1 min-w-0 bg-white/15 text-white placeholder-white/60 rounded-full px-4 h-11 outline-none text-body disabled:opacity-50"
             />
+            {['😍', '😂', '😮'].map((emoji) => (
+              <button
+                key={emoji}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (canReply) handleReply(emoji)
+                }}
+                disabled={!canReply || sending}
+                className="text-2xl shrink-0 disabled:opacity-50"
+                aria-label={`Réagir avec ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                handleReply()
+                handleRepost()
               }}
-              disabled={!replyText.trim() || sending}
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-white/15 disabled:opacity-40 text-white shrink-0"
+              disabled={reposted || isMine}
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-white/15 disabled:opacity-40 text-white shrink-0"
+              aria-label="Republier"
             >
-              <Send size={18} />
+              <Repeat2 size={20} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleLike()
+              }}
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-white/15 text-white shrink-0"
+              aria-label="Aimer"
+            >
+              <Heart size={20} fill={liked ? 'var(--accent)' : 'none'} stroke={liked ? 'var(--accent)' : 'white'} />
             </button>
           </div>
         )}
 
-        {isMine ? (
+        {isMine && (
           <div className="flex items-center text-white">
             <button
               onClick={(e) => {
@@ -627,35 +680,11 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
               <span className="text-caption">{viewCount}</span>
             </button>
             {likeCount > 0 && (
-              <div className="flex items-center gap-1.5 ml-auto">
-                <Heart size={22} fill="white" stroke="white" />
-                <span className="text-caption">{likeCount}</span>
+              <div className="flex items-center gap-1.5 ml-auto bg-white rounded-full pl-2 pr-3 h-8">
+                <Heart size={18} fill="var(--accent)" stroke="var(--accent)" />
+                <span className="text-caption" style={{ color: 'var(--accent)' }}>{likeCount}</span>
               </div>
             )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-5 text-white">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleLike()
-              }}
-              className="flex items-center gap-1.5"
-            >
-              <Heart size={22} fill={liked ? 'white' : 'none'} />
-              {likeCount > 0 && <span className="text-caption">{likeCount}</span>}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleRepost()
-              }}
-              disabled={reposted}
-              className="flex items-center gap-1.5 disabled:opacity-50"
-            >
-              <Repeat2 size={22} />
-              <span className="text-caption">{reposted ? 'Republié' : 'Republier'}</span>
-            </button>
           </div>
         )}
       </div>
