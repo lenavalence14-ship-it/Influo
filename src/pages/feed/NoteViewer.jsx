@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { timeAgo } from '../../lib/time'
 import { profileRoute } from '../../lib/profileRoute'
+import { getFilterCss as getNoteFilterCss } from './editor/FilterPicker'
 
 const SEGMENT_DURATION_MS = 5000
 
@@ -608,16 +609,53 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
 
       {/* Zone tap gauche/droite + appui long = pause (comme les statuts WhatsApp) */}
       <div
-        className="flex-1 relative flex items-center justify-center px-8"
+        className="flex-1 relative flex items-center justify-center px-8 overflow-hidden"
         onClick={handleTap}
         onPointerDown={handlePauseStart}
         onPointerUp={handlePauseEnd}
         onPointerLeave={handlePauseEnd}
         onPointerCancel={handlePauseEnd}
       >
-        <p className="text-white text-2xl font-medium text-center leading-snug break-words">
-          {current.original.contenu}
-        </p>
+        {current.original.photo_url ? (
+          <div className="absolute inset-0">
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `url(${current.original.photo_url})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                filter: `blur(40px) ${getNoteFilterCss(current.original.filtre)}`,
+                transform: 'scale(1.2)',
+              }}
+            />
+            <div className="absolute inset-0 bg-black/30" />
+            <img
+              src={current.original.photo_url}
+              alt=""
+              className="relative z-10 w-full h-full object-contain select-none"
+              draggable={false}
+              style={{ filter: getNoteFilterCss(current.original.filtre) }}
+            />
+            {current.original.texte_overlay && (
+              <p
+                className="absolute z-20 text-center px-3 max-w-[80vw] whitespace-pre-wrap -translate-x-1/2 -translate-y-1/2"
+                style={{
+                  left: `${current.original.texte_x ?? 50}%`,
+                  top: `${current.original.texte_y ?? 50}%`,
+                  color: current.original.texte_couleur || '#ffffff',
+                  fontSize: 28,
+                  textShadow: '0 1px 6px rgba(0,0,0,0.5)',
+                }}
+              >
+                {current.original.texte_overlay}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-white text-2xl font-medium text-center leading-snug break-words">
+            {current.original.contenu}
+          </p>
+        )}
       </div>
 
       <div className="px-4 pb-[max(14px,env(safe-area-inset-bottom))] pt-2 flex flex-col gap-2.5">

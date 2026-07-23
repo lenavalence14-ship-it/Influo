@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { X } from 'lucide-react'
+import { X, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { compressImage } from '../../lib/mediaCompression'
+import PhotoNoteEditor from './PhotoNoteEditor'
 
 // Création (et édition) d'une note texte, façon "Nouvelle note"
 // Facebook/Messenger (image de référence fournie). Une note dure 24h puis
@@ -16,6 +18,10 @@ import { useAuth } from '../../contexts/AuthContext'
 // MODE ÉDITION : si l'URL contient ?edit=<noteId>, on charge le contenu de
 // cette note existante, on pré-remplit le champ, et "Partager" devient
 // "Enregistrer" -> update au lieu d'insert (expire_at n'est PAS prolongé).
+//
+// NOTE PHOTO : depuis cet écran, un bouton "Ajouter une photo" permet de
+// choisir une image du téléphone puis d'ouvrir PhotoNoteEditor (crop, texte,
+// filtre). Comme une note texte, une note photo expire au bout de 24h.
 export default function CreateNote() {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
@@ -24,6 +30,12 @@ export default function CreateNote() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const editId = searchParams.get('edit')
+  const fileInputRef = useRef(null)
+
+  // état de l'édition photo : null tant qu'aucune photo n'est choisie
+  const [photoFile, setPhotoFile] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(null)
+  const [photoEdit, setPhotoEdit] = useState(null) // { rotation, filtre, crop, texte }
 
   useEffect(() => {
     if (!editId) return
@@ -44,8 +56,59 @@ export default function CreateNote() {
     }
   }, [editId, user?.id])
 
+  const handlePickPhoto = (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setPhotoFile(file)
+    setPhotoPreview(URL.createObjectURL(file))
+  }
+
+  const handlePhotoEditorDone = (result) => {
+    setPhotoEdit(result)
+  }
+
+  const handlePhotoEditorCancel = () => {
+    setPhotoFile(null)
+    setPhotoPreview(null)
+    setPhotoEdit(null)
+  }
+
   const handlePublish = async () => {
-    if (!text.trim() || sending) return
+    if (sending) return
+
+    // Note photo
+    if (photoFile && photoEdit) {
+      setSending(true)
+      const compressed = await compressImage(photoFile)
+      const fileName = `${user.id}/note-${Date.now()}.jpg`
+      const { error: uploadError } = await supabase.storage.from('posts').upload(fileName, compressed)
+      if (uploadError) {
+        setSending(false)
+        return
+      }
+      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
+
+      const { error } = await supabase.from('notes').insert({
+        user_id: user.id,
+        contenu: photoEdit.texte?.contenu || ' ',
+        photo_url: urlData.publicUrl,
+        filtre: photoEdit.filtre,
+        crop: photoEdit.crop,
+        texte_overlay: photoEdit.texte?.contenu || null,
+        texte_x: photoEdit.texte?.x ?? 50,
+        texte_y: photoEdit.texte?.y ?? 50,
+        texte_couleur: photoEdit.texte?.couleur || '#ffffff',
+        texte_police: photoEdit.texte?.police || 'Inter',
+        expire_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      })
+      setSending(false)
+      if (!error) navigate(-1)
+      return
+    }
+
+    // Note texte (comportement existant)
+    if (!text.trim()) return
     setSending(true)
     const { error } = editId
       ? await supabase.from('notes').update({ contenu: text.trim() }).eq('id', editId).eq('user_id', user.id)
@@ -58,8 +121,31 @@ export default function CreateNote() {
     if (!error) navigate(-1)
   }
 
+  // Écran d'édition photo (crop / texte / filtre) affiché par-dessus tant
+  // qu'on n'a pas validé avec "Terminé" (photoEdit reste null jusque-là).
+  if (photoFile && !photoEdit) {
+    return (
+      <PhotoNoteEditor
+        file={photoFile}
+        previewUrl={photoPreview}
+        onCancel={handlePhotoEditorCancel}
+        onDone={handlePhotoEditorDone}
+      />
+    )
+  }
+
+  const canPublish = photoFile ? Boolean(photoEdit) : Boolean(text.trim())
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handlePickPhoto}
+      />
+
       <div className="flex items-center justify-between px-4 pt-[max(14px,env(safe-area-inset-top))] pb-3">
         <button onClick={() => navigate(-1)} className="w-9 h-9 flex items-center justify-center text-white">
           <X size={22} />
@@ -67,7 +153,7 @@ export default function CreateNote() {
         <p className="text-body-medium text-white">{editId ? 'Modifier la note' : 'Nouvelle note'}</p>
         <button
           onClick={handlePublish}
-          disabled={!text.trim() || sending || loading}
+          disabled={!canPublish || sending || loading}
           className="text-body-medium disabled:opacity-40"
           style={{ color: 'var(--accent)' }}
         >
@@ -75,29 +161,63 @@ export default function CreateNote() {
         </button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8">
-        <div className="relative">
-          {text.trim() && (
-            <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-[#3a3a3c] text-white rounded-3xl rounded-bl-md px-4 py-2.5 max-w-[240px] text-center text-body">
-              {text}
-            </div>
-          )}
-          <img
-            src={profile?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${user?.id}`}
-            alt=""
-            className="w-24 h-24 rounded-full object-cover"
+      {photoPreview ? (
+        <div className="flex-1 flex items-center justify-center px-8">
+          <div className="relative w-full aspect-[9/16] max-h-full rounded-2xl overflow-hidden">
+            <img
+              src={photoPreview}
+              alt=""
+              className="w-full h-full object-cover"
+              style={{
+                filter: photoEdit?.filtre ? undefined : undefined,
+                transform: photoEdit?.rotation ? `rotate(${photoEdit.rotation}deg)` : undefined,
+              }}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8">
+          <div className="relative">
+            {text.trim() && (
+              <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-[#3a3a3c] text-white rounded-3xl rounded-bl-md px-4 py-2.5 max-w-[240px] text-center text-body">
+                {text}
+              </div>
+            )}
+            <img
+              src={profile?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${user?.id}`}
+              alt=""
+              className="w-24 h-24 rounded-full object-cover"
+            />
+          </div>
+
+          <input
+            autoFocus
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Partagez vos idées…"
+            maxLength={100}
+            className="w-full bg-transparent text-white text-center text-body outline-none placeholder-white/50"
           />
         </div>
+      )}
 
-        <input
-          autoFocus
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Partagez vos idées…"
-          maxLength={100}
-          className="w-full bg-transparent text-white text-center text-body outline-none placeholder-white/50"
-        />
-      </div>
+      {!editId && (
+        <div className="px-4 pb-3">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full flex items-center gap-3 rounded-2xl px-4 py-3.5"
+            style={{ background: 'var(--surface-secondary, #1c1c1e)' }}
+          >
+            <span
+              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: 'var(--accent)' }}
+            >
+              <ImageIcon size={18} className="text-white" />
+            </span>
+            <span className="text-white text-body">Ajouter une photo</span>
+          </button>
+        </div>
+      )}
 
       <p className="text-center text-caption text-white/50 px-8 pb-[max(20px,env(safe-area-inset-bottom))]">
         Ta note est visible par tes contacts pendant 24 heures.
