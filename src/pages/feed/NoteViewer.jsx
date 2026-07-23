@@ -62,6 +62,31 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
   const [viewCount, setViewCount] = useState(0)
   const [showMenu, setShowMenu] = useState(false)
   const [direction, setDirection] = useState(1) // 1 = next (slide vers la gauche), -1 = prev (slide vers la droite)
+  const navigate = useNavigate()
+
+  const timerRef = useRef(null)
+  const remainingRef = useRef(SEGMENT_DURATION_MS)
+  const startedAtRef = useRef(0)
+
+  const group = groups[groupIndex]
+  const items = group?.items || []
+
+  // Précharge la photo suivante ET précédente (dans le groupe courant, ou le
+  // premier/dernier segment du groupe voisin en bout de liste) pour que le
+  // glissement ne montre jamais une image en train de charger : le
+  // navigateur a déjà l'image en cache au moment où le slide démarre.
+  useEffect(() => {
+    const preload = (url) => {
+      if (!url) return
+      const img = new Image()
+      img.src = url
+    }
+    const nextItem = items[segmentIndex + 1] || groups[groupIndex + 1]?.items?.[0]
+    const prevItem = items[segmentIndex - 1] || (groupIndex > 0 ? groups[groupIndex - 1]?.items?.at?.(-1) : undefined)
+    preload(nextItem?.original?.photo_url)
+    preload(prevItem?.original?.photo_url)
+  }, [groupIndex, segmentIndex, groups])
+  const current = items[segmentIndex]
 
   // Le fond flouté doit disparaître quand l'image nette (avec son zoom
   // choisi en édition) couvre déjà 100% du cadre dans les deux axes — sinon
@@ -107,32 +132,8 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
     window.addEventListener('resize', checkCoverage)
     return () => window.removeEventListener('resize', checkCoverage)
   }, [checkCoverage])
+
   const { user, profile } = useAuth()
-  const navigate = useNavigate()
-
-  const timerRef = useRef(null)
-  const remainingRef = useRef(SEGMENT_DURATION_MS)
-  const startedAtRef = useRef(0)
-
-  const group = groups[groupIndex]
-  const items = group?.items || []
-
-  // Précharge la photo suivante ET précédente (dans le groupe courant, ou le
-  // premier/dernier segment du groupe voisin en bout de liste) pour que le
-  // glissement ne montre jamais une image en train de charger : le
-  // navigateur a déjà l'image en cache au moment où le slide démarre.
-  useEffect(() => {
-    const preload = (url) => {
-      if (!url) return
-      const img = new Image()
-      img.src = url
-    }
-    const nextItem = items[segmentIndex + 1] || groups[groupIndex + 1]?.items?.[0]
-    const prevItem = items[segmentIndex - 1] || (groupIndex > 0 ? groups[groupIndex - 1]?.items?.at?.(-1) : undefined)
-    preload(nextItem?.original?.photo_url)
-    preload(prevItem?.original?.photo_url)
-  }, [groupIndex, segmentIndex, items, groups])
-  const current = items[segmentIndex]
 
   // Barre de statut système (heure, batterie, réseau) : on ne peut pas la
   // flouter (elle est rendue par Android/iOS, en dehors du DOM du
