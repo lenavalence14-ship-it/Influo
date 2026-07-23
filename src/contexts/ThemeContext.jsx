@@ -1,6 +1,14 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import { StatusBar, Style } from '@capacitor/status-bar'
+
+// Plugin natif (voir android/.../StatusBarIconsPlugin.java) : sur Android
+// 15+/16 avec edge-to-edge forcé par le système, StatusBar.setStyle /
+// setBackgroundColor du plugin officiel @capacitor/status-bar ne
+// fonctionnent plus de façon fiable. Ce petit plugin natif appelle
+// directement WindowInsetsControllerCompat, seule méthode encore
+// supportée pour choisir des icônes claires ou sombres.
+const StatusBarIcons = registerPlugin('StatusBarIcons')
 
 const ThemeContext = createContext()
 
@@ -36,8 +44,14 @@ export function ThemeProvider({ children }) {
 
     // Android natif (Capacitor) : la meta tag ci-dessus n'a aucun effet, il faut appeler le plugin directement
     if (Capacitor.isNativePlatform()) {
-      StatusBar.setBackgroundColor({ color })
-      StatusBar.setStyle({ style: theme === 'light' ? Style.Dark : Style.Light })
+      // Fallback historique : sans effet réel sur Android 15+/16 (edge-to-edge
+      // forcé), mais inoffensif et potentiellement encore utile sur d'anciens
+      // appareils / iOS.
+      StatusBar.setBackgroundColor({ color }).catch(() => {})
+      StatusBar.setStyle({ style: theme === 'light' ? Style.Dark : Style.Light }).catch(() => {})
+      // Méthode fiable sur Android récent : icônes sombres en thème clair,
+      // icônes claires en thème sombre.
+      StatusBarIcons.setLight({ light: theme === 'light' }).catch(() => {})
     }
   }, [theme])
 

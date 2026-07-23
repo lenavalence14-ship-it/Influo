@@ -2,8 +2,10 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { X, Heart, Repeat2, Send, Eye, ArrowLeft, MoreVertical } from 'lucide-react'
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import { StatusBar, Style } from '@capacitor/status-bar'
+
+const StatusBarIcons = registerPlugin('StatusBarIcons')
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { timeAgo } from '../../lib/time'
@@ -154,14 +156,18 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
     // Icônes/texte de la barre : sombres sur fond blanc, clairs sur fond
     // noir ou cramoisi (tous foncés), pour rester lisibles dans les 3 cas.
     const barStyle = isPhoto && isLight ? Style.Dark : Style.Light
+    // true = icônes sombres (fond blanc), false = icônes claires (fond noir/cramoisi)
+    const iconsLight = isPhoto && isLight
 
-    StatusBar.setOverlaysWebView({ overlay: true })
-    StatusBar.setBackgroundColor({ color: barColor })
-    StatusBar.setStyle({ style: barStyle })
+    StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {})
+    StatusBar.setBackgroundColor({ color: barColor }).catch(() => {})
+    StatusBar.setStyle({ style: barStyle }).catch(() => {})
+    StatusBarIcons.setLight({ light: iconsLight }).catch(() => {})
     return () => {
-      StatusBar.setOverlaysWebView({ overlay: false })
-      StatusBar.setBackgroundColor({ color: themeBg })
-      StatusBar.setStyle({ style: isLight ? Style.Dark : Style.Light })
+      StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {})
+      StatusBar.setBackgroundColor({ color: themeBg }).catch(() => {})
+      StatusBar.setStyle({ style: isLight ? Style.Dark : Style.Light }).catch(() => {})
+      StatusBarIcons.setLight({ light: isLight }).catch(() => {})
     }
   }, [current?.original?.photo_url])
   const note = current?.entry
@@ -723,7 +729,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
             animate={{ x: 0, opacity: 1 }}
             exit={(dir) => ({ x: dir > 0 ? '-100%' : '100%', opacity: 0.6 })}
             transition={{ type: 'tween', duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute inset-0"
+            className="absolute inset-0 flex items-center justify-center"
           >
         {current.original.photo_url ? (() => {
           let noteCrop = current.original.crop
