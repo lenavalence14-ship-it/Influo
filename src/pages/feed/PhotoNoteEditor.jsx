@@ -25,7 +25,7 @@ export function getFontStyle(key) {
 // Fond flouté + image en object-contain : reproduit le rendu WhatsApp/Instagram
 // pour une image qui ne remplit pas tout l'écran (même logique utilisée ici
 // pendant l'édition et dans NoteViewer pour l'affichage final).
-function BlurredPhoto({ src, filterCss, rotation, children }) {
+function BlurredPhoto({ src, filterCss, rotation, zoom = 1, children }) {
   return (
     <div className="relative w-full h-full overflow-hidden bg-black">
       <div
@@ -44,7 +44,7 @@ function BlurredPhoto({ src, filterCss, rotation, children }) {
         alt=""
         className="relative z-10 w-full h-full object-contain select-none"
         draggable={false}
-        style={{ filter: filterCss, transform: `rotate(${rotation}deg)` }}
+        style={{ filter: filterCss, transform: `rotate(${rotation}deg) scale(${zoom})` }}
       />
       <div className="absolute inset-0 z-20">{children}</div>
     </div>
@@ -67,6 +67,13 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
 
   const [rotation, setRotation] = useState(0) // 0, 90, 180, 270
   const [filtre, setFiltre] = useState(null)
+
+  // Zoom (pincer à 2 doigts) : appliqué uniquement à l'image nette, PAS au
+  // fond flouté (qui reste toujours à scale(1.2)). zoom=1 = image en taille
+  // "contain" par défaut. Plus on zoome, plus l'image remplit le cadre et
+  // moins il reste de flou visible autour, jusqu'à recouvrir tout le cadre.
+  const [zoom, setZoom] = useState(1)
+  const pinchState = useRef(null) // { startDist, startZoom }
 
   // Recadrage : rectangle en % relatif au conteneur image, ajusté à la main.
   const [crop, setCrop] = useState({ x: 0, y: 0, w: 100, h: 100 })
@@ -91,8 +98,36 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
       rotation,
       filtre,
       crop,
+      zoom,
       texte: textEl,
     })
+  }
+
+  // ---- pincer-zoomer (écran principal uniquement) ----
+  const ZOOM_MIN = 1
+  const ZOOM_MAX = 3
+
+  const pinchDistance = (touches) => {
+    const [a, b] = touches
+    return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY)
+  }
+
+  const handlePinchStart = (e) => {
+    if (e.touches.length !== 2) return
+    pinchState.current = { startDist: pinchDistance(e.touches), startZoom: zoom }
+  }
+
+  const handlePinchMove = (e) => {
+    if (e.touches.length !== 2 || !pinchState.current) return
+    e.preventDefault()
+    const { startDist, startZoom } = pinchState.current
+    const dist = pinchDistance(e.touches)
+    const ratio = dist / startDist
+    setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, startZoom * ratio)))
+  }
+
+  const handlePinchEnd = (e) => {
+    if (e.touches.length < 2) pinchState.current = null
   }
 
   // ---- écran crop ----
@@ -368,8 +403,8 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
           </div>
         </div>
 
-        <div className="flex-1 relative overflow-hidden">
-          <BlurredPhoto src={previewUrl} filterCss={filterCss} rotation={rotation}>
+        <div className="flex-1 relative overflow-hidden" style={cropStyle}>
+          <BlurredPhoto src={previewUrl} filterCss={filterCss} rotation={rotation} zoom={zoom}>
             <div className="absolute inset-0 flex items-center justify-center px-8 pointer-events-none">
               <textarea
                 autoFocus
@@ -431,8 +466,15 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
         </div>
       </div>
 
-      <div className="flex-1 relative overflow-hidden" style={cropStyle}>
-        <BlurredPhoto src={previewUrl} filterCss={filterCss} rotation={rotation}>
+      <div
+        className="flex-1 relative overflow-hidden"
+        style={cropStyle}
+        onTouchStart={handlePinchStart}
+        onTouchMove={handlePinchMove}
+        onTouchEnd={handlePinchEnd}
+        onTouchCancel={handlePinchEnd}
+      >
+        <BlurredPhoto src={previewUrl} filterCss={filterCss} rotation={rotation} zoom={zoom}>
           {textEl && (
             <DraggableElement element={textEl} onMove={moveText}>
               <p

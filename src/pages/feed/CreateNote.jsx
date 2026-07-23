@@ -88,6 +88,7 @@ export default function CreateNote() {
         photo_url: urlData.publicUrl,
         filtre: editedResult.filtre,
         crop: editedResult.crop,
+        zoom: editedResult.zoom ?? 1,
         texte_overlay: editedResult.texte?.contenu || null,
         texte_x: editedResult.texte?.x ?? 50,
         texte_y: editedResult.texte?.y ?? 50,

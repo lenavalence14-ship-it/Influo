@@ -656,6 +656,9 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
             try { noteCrop = JSON.parse(noteCrop) } catch { noteCrop = null }
           }
           const hasValidCrop = noteCrop && typeof noteCrop.w === 'number' && typeof noteCrop.h === 'number'
+          const noteZoom = typeof current.original.zoom === 'number' && current.original.zoom > 0
+            ? current.original.zoom
+            : 1
           return (
           <div
             className="absolute inset-0"
@@ -672,7 +675,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
               alt=""
               className="relative z-10 w-full h-full object-contain select-none"
               draggable={false}
-              style={{ filter: getNoteFilterCss(current.original.filtre) }}
+              style={{ filter: getNoteFilterCss(current.original.filtre), transform: `scale(${noteZoom})` }}
             />
             {current.original.texte_overlay && (
               <p
