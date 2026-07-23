@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { X, Heart, Repeat2, Send, Eye, ArrowLeft, MoreVertical } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
+import { StatusBar } from '@capacitor/status-bar'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { timeAgo } from '../../lib/time'
@@ -64,6 +66,18 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
   const timerRef = useRef(null)
   const remainingRef = useRef(SEGMENT_DURATION_MS)
   const startedAtRef = useRef(0)
+
+  // Plein écran natif : la note doit couvrir tout l'écran, y compris la
+  // zone habituellement occupée par la barre de statut système (heure,
+  // batterie, réseau). On la masque à l'ouverture et on la restaure à la
+  // fermeture, uniquement sur plateforme native (no-op sur le web).
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    StatusBar.hide()
+    return () => {
+      StatusBar.show()
+    }
+  }, [])
 
   const group = groups[groupIndex]
   const items = group?.items || []

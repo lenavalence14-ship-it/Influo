@@ -3,6 +3,7 @@
 	"appName": "Influo",
 	"webDir": "dist",
 	"server": {
-		"androidScheme": "https"
+		"androidScheme": "https",
+		"url": "https://influo-7yfp.onrender.com"
 	}
 }
