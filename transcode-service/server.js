@@ -37,11 +37,15 @@ const SHARED_SECRET = process.env.TRANSCODE_SHARED_SECRET
 
 const BUCKET = 'posts'
 
-// Les 3 qualités demandées. maxrate/bufsize bornent le débit pour un streaming
-// stable sur réseau mobile instable (évite les pics de débit qui font stutter).
+// Les 3 qualités demandées. Le bitrate du 360p est volontairement plus élevé
+// que "l'usage" habituel pour ce niveau : garder la résolution basse (donc
+// légère à transférer) tout en montant le débit évite l'effet flou/pâteux
+// que donne un 360p trop compressé. C'est le compromis qui se rapproche le
+// plus, sans CDN dédié, de ce que fait Instagram : rester lisible même sur
+// mauvaise connexion, quitte à peser un peu plus lourd que le minimum.
 const RENDITIONS = [
-  { name: '360p', height: 360, videoBitrate: '800k', maxrate: '856k', bufsize: '1200k', audioBitrate: '96k' },
-  { name: '480p', height: 480, videoBitrate: '1400k', maxrate: '1498k', bufsize: '2100k', audioBitrate: '128k' },
+  { name: '360p', height: 360, videoBitrate: '1000k', maxrate: '1070k', bufsize: '1500k', audioBitrate: '96k' },
+  { name: '480p', height: 480, videoBitrate: '1600k', maxrate: '1712k', bufsize: '2400k', audioBitrate: '128k' },
   { name: '720p', height: 720, videoBitrate: '2800k', maxrate: '2996k', bufsize: '4200k', audioBitrate: '128k' },
 ]
 
@@ -79,7 +83,10 @@ async function transcodeToHls(inputPath, outDir) {
     await import('fs/promises').then((fs) => fs.mkdir(renditionDir, { recursive: true }))
 
     // -vf scale : redimensionne en gardant le ratio, hauteur fixée à r.height
-    // -hls_time 4 : segments de 4s, bon compromis démarrage rapide / overhead
+    // -hls_time 2 : segments de 2s. Plus petit que le standard (souvent 4-6s),
+    // pour que le tout premier segment arrive vite même sur connexion lente —
+    // c'est le levier le plus direct pour réduire le temps avant 1ère image nette,
+    // au prix d'un (léger) overhead de conteneur supplémentaire par segment.
     // -hls_playlist_type vod : playlist figée (vidéo déjà uploadée, pas de live)
     await runFFmpeg([
       '-i', inputPath,
@@ -87,7 +94,7 @@ async function transcodeToHls(inputPath, outDir) {
       '-c:v', 'h264', '-profile:v', 'main', '-preset', 'veryfast',
       '-b:v', r.videoBitrate, '-maxrate', r.maxrate, '-bufsize', r.bufsize,
       '-c:a', 'aac', '-b:a', r.audioBitrate, '-ac', '2',
-      '-hls_time', '4',
+      '-hls_time', '2',
       '-hls_playlist_type', 'vod',
       '-hls_segment_filename', path.join(renditionDir, 'seg_%03d.ts'),
       path.join(renditionDir, 'index.m3u8'),
