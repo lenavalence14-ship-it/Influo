@@ -4,6 +4,7 @@ import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
+import BackButtonHandler from './components/BackButtonHandler'
 import MyProfileRouter from './components/MyProfileRouter'
 import MyDashboardRouter from './components/MyDashboardRouter'
 
@@ -219,6 +220,7 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
+          <BackButtonHandler />
           <AppRoutes />
         </BrowserRouter>
       </AuthProvider>
