@@ -618,17 +618,24 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
       >
         {current.original.photo_url ? (
           <div className="absolute inset-0">
+            {/* -px-8 pour annuler le padding horizontal du conteneur parent
+                (zone de tap) : sans ça, le flou ne remplissait pas toute la
+                largeur de l'écran et laissait deux bandes cramoisies sur les
+                côtés. */}
             <div
-              className="absolute inset-0"
+              className="absolute -inset-y-0 -inset-x-8"
               style={{
                 backgroundImage: `url(${current.original.photo_url})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                filter: `blur(40px) ${getNoteFilterCss(current.original.filtre)}`,
+                filter: (() => {
+                  const f = getNoteFilterCss(current.original.filtre)
+                  return f && f !== 'none' ? `blur(40px) ${f}` : 'blur(40px)'
+                })(),
                 transform: 'scale(1.2)',
               }}
             />
-            <div className="absolute inset-0 bg-black/30" />
+            <div className="absolute -inset-y-0 -inset-x-8 bg-black/30" />
             <img
               src={current.original.photo_url}
               alt=""

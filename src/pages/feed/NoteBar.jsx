@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import NoteViewer from './NoteViewer'
 import StoryRing from './StoryRing'
 import { profileRoute } from '../../lib/profileRoute'
+import { useIsUploadingNote } from '../../contexts/NoteUploadContext'
 
 // Remplace StoryBar : plus de story photo/vidéo, seulement des notes texte 24h.
 //
@@ -60,6 +61,7 @@ export default function NoteBar() {
   const queryClient = useQueryClient()
   const scrollRef = useRef(null)
   const rafRef = useRef(null)
+  const isUploadingMyNote = useIsUploadingNote(user?.id)
 
   const { data: rawNotes = [] } = useQuery({
     queryKey: ['notes'],
@@ -227,6 +229,7 @@ export default function NoteBar() {
               photoUrl={myPhotoUrl}
               fallbackSeed={user?.id}
               hasStory={hasMyActiveNote}
+              uploading={isUploadingMyNote}
               rotate={tilts.mine || 0}
             />
           </div>

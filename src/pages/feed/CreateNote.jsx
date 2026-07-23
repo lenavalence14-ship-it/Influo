@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { compressImage } from '../../lib/mediaCompression'
 import PhotoNoteEditor from './PhotoNoteEditor'
+import { useNoteUpload } from '../../contexts/NoteUploadContext'
 
 // Création (et édition) d'une note texte, façon "Nouvelle note"
 // Facebook/Messenger (image de référence fournie). Une note dure 24h puis
@@ -31,11 +32,14 @@ export default function CreateNote() {
   const [searchParams] = useSearchParams()
   const editId = searchParams.get('edit')
   const fileInputRef = useRef(null)
+  const { startUpload, finishUpload } = useNoteUpload()
 
-  // état de l'édition photo : null tant qu'aucune photo n'est choisie
+  // état de l'édition photo : null tant qu'aucune photo n'est choisie.
+  // Il n'y a plus d'état "photoEdit" intermédiaire : dès que l'éditeur photo
+  // valide avec "Publier", la note part directement en fond (voir
+  // handlePhotoEditorDone) et cet écran redevient vide.
   const [photoFile, setPhotoFile] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
-  const [photoEdit, setPhotoEdit] = useState(null) // { rotation, filtre, crop, texte }
 
   useEffect(() => {
     if (!editId) return
@@ -64,50 +68,55 @@ export default function CreateNote() {
     setPhotoPreview(URL.createObjectURL(file))
   }
 
+  // Publication réelle d'une note photo : compression + upload + insert.
+  // Volontairement PAS awaité par l'appelant (fire-and-forget) : l'écran se
+  // ferme immédiatement après l'appel et l'utilisateur revient au feed,
+  // pendant que ceci continue en arrière-plan. startUpload/finishUpload
+  // pilotent l'anneau lumineux tournant autour de l'avatar pendant ce temps.
+  const publishPhotoNoteInBackground = async (userId, editedResult) => {
+    startUpload(userId)
+    try {
+      const compressed = await compressImage(editedResult.file)
+      const fileName = `${userId}/note-${Date.now()}.jpg`
+      const { error: uploadError } = await supabase.storage.from('posts').upload(fileName, compressed)
+      if (uploadError) return
+      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
+
+      await supabase.from('notes').insert({
+        user_id: userId,
+        contenu: editedResult.texte?.contenu || ' ',
+        photo_url: urlData.publicUrl,
+        filtre: editedResult.filtre,
+        crop: editedResult.crop,
+        texte_overlay: editedResult.texte?.contenu || null,
+        texte_x: editedResult.texte?.x ?? 50,
+        texte_y: editedResult.texte?.y ?? 50,
+        texte_couleur: editedResult.texte?.couleur || '#ffffff',
+        texte_police: editedResult.texte?.police || 'Inter',
+        expire_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      })
+    } finally {
+      finishUpload(userId)
+    }
+  }
+
+  // Appelé quand on appuie sur "Publier" dans l'éditeur photo (plus d'écran
+  // intermédiaire pour les photos) : on lance la publication en tâche de
+  // fond et on ferme tout de suite l'éditeur pour revenir au feed.
   const handlePhotoEditorDone = (result) => {
-    setPhotoEdit(result)
+    publishPhotoNoteInBackground(user.id, result)
+    navigate(-1)
   }
 
   const handlePhotoEditorCancel = () => {
     setPhotoFile(null)
     setPhotoPreview(null)
-    setPhotoEdit(null)
   }
 
+  // Note texte uniquement désormais (le cas photo est géré directement par
+  // handlePhotoEditorDone ci-dessus, sans repasser par cet écran).
   const handlePublish = async () => {
     if (sending) return
-
-    // Note photo
-    if (photoFile && photoEdit) {
-      setSending(true)
-      const compressed = await compressImage(photoFile)
-      const fileName = `${user.id}/note-${Date.now()}.jpg`
-      const { error: uploadError } = await supabase.storage.from('posts').upload(fileName, compressed)
-      if (uploadError) {
-        setSending(false)
-        return
-      }
-      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
-
-      const { error } = await supabase.from('notes').insert({
-        user_id: user.id,
-        contenu: photoEdit.texte?.contenu || ' ',
-        photo_url: urlData.publicUrl,
-        filtre: photoEdit.filtre,
-        crop: photoEdit.crop,
-        texte_overlay: photoEdit.texte?.contenu || null,
-        texte_x: photoEdit.texte?.x ?? 50,
-        texte_y: photoEdit.texte?.y ?? 50,
-        texte_couleur: photoEdit.texte?.couleur || '#ffffff',
-        texte_police: photoEdit.texte?.police || 'Inter',
-        expire_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      })
-      setSending(false)
-      if (!error) navigate(-1)
-      return
-    }
-
-    // Note texte (comportement existant)
     if (!text.trim()) return
     setSending(true)
     const { error } = editId
@@ -122,8 +131,10 @@ export default function CreateNote() {
   }
 
   // Écran d'édition photo (crop / texte / filtre) affiché par-dessus tant
-  // qu'on n'a pas validé avec "Terminé" (photoEdit reste null jusque-là).
-  if (photoFile && !photoEdit) {
+  // qu'une photo est en cours de choix. Dès que "Publier" est pressé dans
+  // l'éditeur, handlePhotoEditorDone publie en fond et quitte cet écran :
+  // on ne revient donc jamais ici avec une photo "validée en attente".
+  if (photoFile) {
     return (
       <PhotoNoteEditor
         file={photoFile}
@@ -134,7 +145,7 @@ export default function CreateNote() {
     )
   }
 
-  const canPublish = photoFile ? Boolean(photoEdit) : Boolean(text.trim())
+  const canPublish = Boolean(text.trim())
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
@@ -161,22 +172,7 @@ export default function CreateNote() {
         </button>
       </div>
 
-      {photoPreview ? (
-        <div className="flex-1 flex items-center justify-center px-8">
-          <div className="relative w-full aspect-[9/16] max-h-full rounded-2xl overflow-hidden">
-            <img
-              src={photoPreview}
-              alt=""
-              className="w-full h-full object-cover"
-              style={{
-                filter: photoEdit?.filtre ? undefined : undefined,
-                transform: photoEdit?.rotation ? `rotate(${photoEdit.rotation}deg)` : undefined,
-              }}
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8">
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8">
           <div className="relative">
             {text.trim() && (
               <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-[#3a3a3c] text-white rounded-3xl rounded-bl-md px-4 py-2.5 max-w-[240px] text-center text-body">
@@ -199,14 +195,13 @@ export default function CreateNote() {
             className="w-full bg-transparent text-white text-center text-body outline-none placeholder-white/50"
           />
         </div>
-      )}
 
       {!editId && (
         <div className="px-4 pb-3">
           <button
             onClick={() => fileInputRef.current?.click()}
             className="w-full flex items-center gap-3 rounded-2xl px-4 py-3.5"
-            style={{ background: 'var(--surface-secondary, #1c1c1e)' }}
+            style={{ background: '#1c1c1e' }}
           >
             <span
               className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"

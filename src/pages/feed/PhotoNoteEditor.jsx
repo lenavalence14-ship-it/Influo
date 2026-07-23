@@ -34,7 +34,7 @@ function BlurredPhoto({ src, filterCss, rotation, children }) {
           backgroundImage: `url(${src})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          filter: `blur(40px) ${filterCss !== 'none' ? filterCss : ''}`,
+          filter: filterCss && filterCss !== 'none' ? `blur(40px) ${filterCss}` : 'blur(40px)',
           transform: 'scale(1.2)',
         }}
       />
@@ -80,6 +80,10 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
 
   const filterCss = getFilterCss(filtre)
 
+  // Appelé par "Publier" sur l'écran principal : on ne repasse plus par un
+  // second écran de confirmation (CreateNote) pour les photos. onDone
+  // déclenche directement la publication en arrière-plan et referme tout de
+  // suite l'éditeur (cf. CreateNote.handlePhotoEditorDone).
   const handleDone = () => {
     onDone({
       file,
@@ -94,6 +98,8 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
   // ---- écran crop ----
   const cropAreaRef = useRef(null)
   const dragState = useRef(null)
+  const pendingEvent = useRef(null)
+  const rafId = useRef(null)
 
   const startDrag = (handle) => (e) => {
     e.stopPropagation()
@@ -101,52 +107,74 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
     dragState.current = { handle, startX: point.clientX, startY: point.clientY, start: { ...draftCrop } }
   }
 
-  const onDragMove = useCallback((e) => {
-    if (!dragState.current || !cropAreaRef.current) return
-    const point = e.touches ? e.touches[0] : e
+  // Calcule le nouveau crop à partir d'un event brut. Pure, pas de setState
+  // ici : appelée uniquement depuis la boucle rAF ci-dessous pour ne faire
+  // qu'UN SEUL re-render par frame d'écran, au lieu d'un par event
+  // pointermove (qui peut fire beaucoup plus vite que 60fps sur mobile et
+  // rendait le glissé saccadé).
+  const computeNextCrop = (point) => {
     const rect = cropAreaRef.current.getBoundingClientRect()
     const dx = ((point.clientX - dragState.current.startX) / rect.width) * 100
     const dy = ((point.clientY - dragState.current.startY) / rect.height) * 100
     const { handle, start } = dragState.current
 
-    setDraftCrop((prev) => {
-      let { x, y, w, h } = start
-      if (handle === 'move') {
-        x = Math.max(0, Math.min(100 - w, start.x + dx))
-        y = Math.max(0, Math.min(100 - h, start.y + dy))
-      } else {
-        if (handle.includes('l')) {
-          const newX = Math.max(0, Math.min(start.x + start.w - 10, start.x + dx))
-          w = start.w - (newX - start.x)
-          x = newX
-        }
-        if (handle.includes('r')) {
-          w = Math.max(10, Math.min(100 - start.x, start.w + dx))
-        }
-        if (handle.includes('t')) {
-          const newY = Math.max(0, Math.min(start.y + start.h - 10, start.y + dy))
-          h = start.h - (newY - start.y)
-          y = newY
-        }
-        if (handle.includes('b')) {
-          h = Math.max(10, Math.min(100 - start.y, start.h + dy))
-        }
+    let { x, y, w, h } = start
+    if (handle === 'move') {
+      x = Math.max(0, Math.min(100 - w, start.x + dx))
+      y = Math.max(0, Math.min(100 - h, start.y + dy))
+    } else {
+      if (handle.includes('l')) {
+        const newX = Math.max(0, Math.min(start.x + start.w - 10, start.x + dx))
+        w = start.w - (newX - start.x)
+        x = newX
       }
-      return { x, y, w, h }
-    })
+      if (handle.includes('r')) {
+        w = Math.max(10, Math.min(100 - start.x, start.w + dx))
+      }
+      if (handle.includes('t')) {
+        const newY = Math.max(0, Math.min(start.y + start.h - 10, start.y + dy))
+        h = start.h - (newY - start.y)
+        y = newY
+      }
+      if (handle.includes('b')) {
+        h = Math.max(10, Math.min(100 - start.y, start.h + dy))
+      }
+    }
+    return { x, y, w, h }
+  }
+
+  const flushDrag = useCallback(() => {
+    rafId.current = null
+    if (!dragState.current || !cropAreaRef.current || !pendingEvent.current) return
+    const next = computeNextCrop(pendingEvent.current)
+    setDraftCrop(next)
   }, [])
+
+  const onDragMove = useCallback((e) => {
+    if (!dragState.current || !cropAreaRef.current) return
+    pendingEvent.current = e.touches ? e.touches[0] : e
+    if (rafId.current == null) {
+      rafId.current = requestAnimationFrame(flushDrag)
+    }
+  }, [flushDrag])
 
   const endDrag = useCallback(() => {
     dragState.current = null
+    pendingEvent.current = null
+    if (rafId.current != null) {
+      cancelAnimationFrame(rafId.current)
+      rafId.current = null
+    }
   }, [])
 
   useEffect(() => {
     if (screen !== 'crop') return
-    window.addEventListener('pointermove', onDragMove)
+    window.addEventListener('pointermove', onDragMove, { passive: true })
     window.addEventListener('pointerup', endDrag)
     return () => {
       window.removeEventListener('pointermove', onDragMove)
       window.removeEventListener('pointerup', endDrag)
+      if (rafId.current != null) cancelAnimationFrame(rafId.current)
     }
   }, [screen, onDragMove, endDrag])
 
@@ -314,8 +342,8 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
                 onChange={(e) => setTextDraft(e.target.value)}
                 placeholder="Ajouter du texte"
                 rows={2}
-                className="pointer-events-auto w-full bg-transparent text-center outline-none resize-none placeholder-white/70"
-                style={{ color: textColor, fontSize: 28, ...getFontStyle(textFont) }}
+                className="note-text-input pointer-events-auto w-full bg-transparent text-center outline-none resize-none"
+                style={{ color: textColor, fontSize: 28, textShadow: '0 1px 6px rgba(0,0,0,0.6)', ...getFontStyle(textFont) }}
               />
             </div>
           </BlurredPhoto>
@@ -407,7 +435,7 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
           Filtres
         </button>
         <button onClick={handleDone} className="text-body-medium px-2 py-2" style={{ color: 'var(--accent)' }}>
-          Terminé
+          Publier
         </button>
       </div>
 
@@ -415,6 +443,10 @@ export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) 
         @keyframes slideUpPanel {
           from { transform: translateY(100%); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
+        }
+        .note-text-input::placeholder {
+          color: rgba(255, 255, 255, 0.75);
+          text-shadow: 0 1px 6px rgba(0,0,0,0.6);
         }
       `}</style>
     </div>

@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { NoteUploadProvider } from './contexts/NoteUploadContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
 import BackButtonHandler from './components/BackButtonHandler'
@@ -219,10 +220,12 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <BackButtonHandler />
-          <AppRoutes />
-        </BrowserRouter>
+        <NoteUploadProvider>
+          <BrowserRouter>
+            <BackButtonHandler />
+            <AppRoutes />
+          </BrowserRouter>
+        </NoteUploadProvider>
       </AuthProvider>
     </ThemeProvider>
   )
