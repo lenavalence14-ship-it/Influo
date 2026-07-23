@@ -10,6 +10,19 @@ import https from 'https'
 const app = express()
 app.use(express.json())
 
+// CORS : sans ça, le navigateur bloque silencieusement (erreur "Failed to fetch")
+// toute requête venant du frontend (origine différente : influo-7yfp.onrender.com
+// appelle influo-transcode.onrender.com). On autorise largement ici car ce endpoint
+// est déjà protégé par le secret partagé (voir vérif plus bas), donc ouvrir CORS
+// ne l'expose pas davantage.
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*')
+  res.header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+  res.header('Access-Control-Allow-Headers', 'Content-Type')
+  if (req.method === 'OPTIONS') return res.sendStatus(204)
+  next()
+})
+
 // Clé service_role : nécessaire pour écrire dans Storage et mettre à jour
 // post_medias sans passer par les policies RLS pensées pour le client.
 // Ne JAMAIS exposer cette clé côté frontend — elle ne vit que sur ce serveur.
