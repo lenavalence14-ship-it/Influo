@@ -3,7 +3,21 @@
 export async function compressImage(file, { maxDimension = 1920, quality = 0.82 } = {}) {
   if (!file.type.startsWith('image/')) return file
 
-  const bitmap = await createImageBitmap(file)
+  let bitmap
+  try {
+    bitmap = await createImageBitmap(file)
+  } catch (err) {
+    // "The source image could not be decoded" arrive typiquement sur un
+    // format que le décodeur natif du WebView ne gère pas (HEIC/HEIF le
+    // plus souvent, exporté par défaut par certains téléphones/galeries),
+    // ou un fichier corrompu. On le signale clairement plutôt que de
+    // laisser planter avec un message générique du navigateur.
+    throw new Error(
+      `Impossible de lire cette photo (format "${file.type || 'inconnu'}" non supporté). ` +
+      `Essaie une autre photo, ou vérifie que ton téléphone exporte en JPEG plutôt qu'en HEIC ` +
+      `(Réglages > Appareil photo > Formats > "Compatibilité maximale" sur iPhone).`
+    )
+  }
   let { width, height } = bitmap
 
   if (width > maxDimension || height > maxDimension) {
