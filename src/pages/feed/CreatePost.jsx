@@ -210,49 +210,14 @@ export default function CreatePost() {
     navigate('/')
   }
 
-  if (loadingExisting) {
-    return (
-      <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
-        <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
-      </div>
-    )
-  }
+  // (le spinner de chargement est rendu plus bas, après tous les Hooks)
 
   // ============================================================
   // ÉCRAN 1 — SÉLECTION
   // ============================================================
-  if (step === 'select') {
-    return (
-      <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col">
-        <header className="flex items-center justify-between px-4 pt-3 pb-2 h-14 shrink-0">
-          <button onClick={() => navigate(-1)} aria-label="Fermer" className="w-9 h-9 flex items-center justify-center">
-            <X size={22} />
-          </button>
-          <span className="text-body-medium">Nouvelle publication</span>
-          <div className="w-9" />
-        </header>
-
-        <label className="flex-1 flex flex-col items-center justify-center px-6 gap-4 cursor-pointer">
-          <div className="aspect-square w-full max-w-[380px] rounded-2xl border-2 border-dashed border-white/15 bg-white/[0.04] flex flex-col items-center justify-center gap-3 text-white/50">
-            <ImageIcon size={30} />
-            <span className="text-body text-center px-6">Choisir des photos ou vidéos</span>
-          </div>
-          <span className="text-caption text-white/40 text-center max-w-[280px]">
-            Ouvre la galerie de ton téléphone — tu peux sélectionner plusieurs fichiers
-          </span>
-          <input
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            onChange={handleFilesChange}
-            className="hidden"
-          />
-        </label>
-      </div>
-    )
-  }
-
-  // ---- écran crop : drag du cadre à la main ----
+  // (le contenu est rendu plus bas, après tous les Hooks, pour respecter
+  // les règles des Hooks React : ils doivent être appelés dans le même
+  // ordre à chaque rendu, donc aucun `return` avant eux)
   const cropAreaRef = useRef(null)
   const dragState = useRef(null)
   const pendingEvent = useRef(null)
@@ -375,6 +340,51 @@ export default function CreatePost() {
       setTextEl(null)
     }
     setStep('edit')
+  }
+
+  // ============================================================
+  // CHARGEMENT (édition d'un post existant)
+  // ============================================================
+  if (loadingExisting) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+      </div>
+    )
+  }
+
+  // ============================================================
+  // ÉCRAN 1 — SÉLECTION
+  // ============================================================
+  if (step === 'select') {
+    return (
+      <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col">
+        <header className="flex items-center justify-between px-4 pt-3 pb-2 h-14 shrink-0">
+          <button onClick={() => navigate(-1)} aria-label="Fermer" className="w-9 h-9 flex items-center justify-center">
+            <X size={22} />
+          </button>
+          <span className="text-body-medium">Nouvelle publication</span>
+          <div className="w-9" />
+        </header>
+
+        <label className="flex-1 flex flex-col items-center justify-center px-6 gap-4 cursor-pointer">
+          <div className="aspect-square w-full max-w-[380px] rounded-2xl border-2 border-dashed border-white/15 bg-white/[0.04] flex flex-col items-center justify-center gap-3 text-white/50">
+            <ImageIcon size={30} />
+            <span className="text-body text-center px-6">Choisir des photos ou vidéos</span>
+          </div>
+          <span className="text-caption text-white/40 text-center max-w-[280px]">
+            Ouvre la galerie de ton téléphone — tu peux sélectionner plusieurs fichiers
+          </span>
+          <input
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            onChange={handleFilesChange}
+            className="hidden"
+          />
+        </label>
+      </div>
+    )
   }
 
   // ============================================================
