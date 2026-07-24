@@ -3,6 +3,7 @@ import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft, Plus, Volum
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { useStatusBarStyle } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import CommentsSheet from './CommentsSheet'
@@ -54,6 +55,7 @@ async function fetchReels(userId) {
 }
 
 export default function ReelsViewer() {
+  useStatusBarStyle('light') // fond toujours sombre → icônes blanches
   const { user } = useAuth()
   const { postId } = useParams()
   const navigate = useNavigate()

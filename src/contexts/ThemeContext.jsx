@@ -40,71 +40,29 @@ export function ThemeProvider({ children }) {
 
     if (!Capacitor.isNativePlatform()) return
 
-    // Règle: les icônes de la status bar doivent toujours être la couleur
-    // inverse du fond RÉELLEMENT affiché sous elles à cet instant précis
-    // (pas du thème global de l'app). On lit donc en continu la couleur de
-    // fond effective au sommet de l'écran, et on en déduit le style
-    // d'icônes opposé. Marche pour toute page sans qu'aucune page n'ait à
-    // s'en occuper individuellement.
-
-    const parseRgb = (str) => {
-      const m = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/)
-      if (!m) return null
-      return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)]
-    }
-
-    const isLightColor = ([r, g, b]) => {
-      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-      return luminance > 0.5
-    }
-
-    const getTopBackgroundColor = () => {
-      const x = window.innerWidth / 2
-      const y = 4
-      const stack = document.elementsFromPoint(x, y)
-      for (const el of stack) {
-        const bg = getComputedStyle(el).backgroundColor
-        const rgb = parseRgb(bg)
-        if (rgb && !/rgba\([^)]*,\s*0\s*\)/.test(bg)) {
-          return rgb
-        }
-      }
-      return null
-    }
-
-    let lastStyle = null
-    const applyStatusBar = () => {
-      const rgb = getTopBackgroundColor()
-      const light = rgb ? isLightColor(rgb) : theme === 'light'
-      const style = light ? Style.Dark : Style.Light
-      if (style !== lastStyle) {
-        StatusBar.setStyle({ style }).catch(() => {})
-        lastStyle = style
-      }
-      StatusBar.setBackgroundColor({ color }).catch(() => {})
-    }
-
-    applyStatusBar()
-    const retry = setTimeout(applyStatusBar, 400)
-    const observer = new MutationObserver(() => applyStatusBar())
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] })
-    const interval = setInterval(applyStatusBar, 500)
-    window.addEventListener('statusbar-reapply', applyStatusBar)
-
-    return () => {
-      clearTimeout(retry)
-      clearInterval(interval)
-      observer.disconnect()
-      window.removeEventListener('statusbar-reapply', applyStatusBar)
-    }
+    // Réglage par défaut basé sur le thème global. Un écran avec un fond fixe
+    // différent du thème (ex: NoteViewer toujours sombre) doit appeler
+    // setStatusBarStyle lui-même via useStatusBarStyle ci-dessous — comme le
+    // fait n'importe quelle app native normale (chaque écran déclare sa
+    // propre couleur de status bar, pas de détection automatique).
+    StatusBar.setStyle({ style: theme === 'light' ? Style.Dark : Style.Light }).catch(() => {})
   }, [theme])
 
   const toggleTheme = () => {
     setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
   }
 
+  // API simple: un écran appelle setStatusBarStyle('light') s'il a un fond
+  // sombre (→ icônes blanches), ou 'dark' s'il a un fond clair (→ icônes
+  // noires). À utiliser dans un useEffect avec cleanup qui restaure l'état
+  // précédent au démontage (voir useStatusBarStyle).
+  const setStatusBarStyle = (mode) => {
+    if (!Capacitor.isNativePlatform()) return
+    StatusBar.setStyle({ style: mode === 'light' ? Style.Light : Style.Dark }).catch(() => {})
+  }
+
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme, setStatusBarStyle }}>
       {children}
     </ThemeContext.Provider>
   )
@@ -112,4 +70,20 @@ export function ThemeProvider({ children }) {
 
 export function useTheme() {
   return useContext(ThemeContext)
+}
+
+// À appeler dans un écran dont le fond est fixe et différent du thème
+// global de l'app (ex: NoteViewer, ReelsViewer — toujours sombres, quel que
+// soit le thème actif). mode: 'light' (fond sombre → icônes blanches) ou
+// 'dark' (fond clair → icônes noires).
+// Exemple: useStatusBarStyle('light') en haut de NoteViewer.jsx
+export function useStatusBarStyle(mode) {
+  const { theme, setStatusBarStyle } = useTheme()
+  useEffect(() => {
+    setStatusBarStyle(mode)
+    return () => {
+      // en quittant l'écran, on restaure le style correspondant au thème global
+      setStatusBarStyle(theme === 'light' ? 'dark' : 'light')
+    }
+  }, [mode])
 }

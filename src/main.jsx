@@ -8,8 +8,12 @@ import './index.css'
 import App from './App.jsx'
 
 if (Capacitor.isNativePlatform()) {
-  // empêche le contenu web de passer sous la barre de statut système
-  StatusBar.setOverlaysWebView({ overlay: false })
+  // Approche standard des apps natives: le contenu passe SOUS la status bar
+  // (overlay actif), la barre est transparente, et chaque écran gère son
+  // propre padding via env(safe-area-inset-top) (déjà en place partout).
+  // Chaque écran déclare explicitement sa couleur d'icônes au lieu de la
+  // deviner par lecture de pixels.
+  StatusBar.setOverlaysWebView({ overlay: true })
 }
 
 // Le service worker de la PWA peut garder en cache une ancienne version du HTML/JS/CSS,
