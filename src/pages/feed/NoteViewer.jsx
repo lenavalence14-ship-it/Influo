@@ -240,6 +240,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
     }
 
     if (!audioUrl || !audio) {
+      audio?.pause()
       startTimer(getSegmentDurationMs(item))
       return clearTimer
     }
