@@ -43,14 +43,28 @@ export function ThemeProvider({ children }) {
     // sur son état précédent, ce qui donnait l'impression d'un bug
     // intermittent où la barre "oublie" de changer de couleur. On catch et
     // on retente une fois après un court délai.
-    if (Capacitor.isNativePlatform()) {
-      const applyStatusBar = () => {
-        StatusBar.setBackgroundColor({ color }).catch(() => {})
-        StatusBar.setStyle({ style: theme === 'light' ? Style.Dark : Style.Light }).catch(() => {})
-      }
-      applyStatusBar()
-      const retry = setTimeout(applyStatusBar, 400)
-      return () => clearTimeout(retry)
+    if (!Capacitor.isNativePlatform()) return
+
+    const applyStatusBar = () => {
+      StatusBar.setBackgroundColor({ color }).catch(() => {})
+      StatusBar.setStyle({ style: theme === 'light' ? Style.Dark : Style.Light }).catch(() => {})
+    }
+    applyStatusBar()
+    const retry = setTimeout(applyStatusBar, 400)
+
+    // ThemeContext est l'UNIQUE responsable de la couleur/style de la barre
+    // de statut, partout dans l'app. D'autres composants peuvent avoir
+    // besoin de faire basculer l'overlay plein écran (ex: NoteViewer pour
+    // que les photos remplissent tout l'écran) — ce qui peut réinitialiser
+    // la couleur/style côté natif Android. Plutôt que de laisser ces
+    // composants dupliquer leur propre logique couleur (source de bugs
+    // intermittents constatés avant), ils émettent juste un événement
+    // 'statusbar-reapply' pour demander à ThemeContext de réappliquer SA
+    // version, une fois l'overlay stabilisé.
+    window.addEventListener('statusbar-reapply', applyStatusBar)
+    return () => {
+      clearTimeout(retry)
+      window.removeEventListener('statusbar-reapply', applyStatusBar)
     }
   }, [theme])
 
