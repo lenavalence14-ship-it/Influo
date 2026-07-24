@@ -52,17 +52,22 @@ export function ThemeProvider({ children }) {
     setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
   }
 
-  // API simple: un écran appelle setStatusBarStyle('light') s'il a un fond
-  // sombre (→ icônes blanches), ou 'dark' s'il a un fond clair (→ icônes
-  // noires). À utiliser dans un useEffect avec cleanup qui restaure l'état
-  // précédent au démontage (voir useStatusBarStyle).
-  const setStatusBarStyle = (mode) => {
+  // API pour les écrans plein écran (NoteViewer, ReelsViewer) qui ne
+  // peuvent pas deviner la couleur du contenu posté par l'utilisateur :
+  // on masque entièrement la status bar plutôt que de choisir une couleur
+  // d'icônes au hasard.
+  const hideStatusBar = () => {
     if (!Capacitor.isNativePlatform()) return
-    StatusBar.setStyle({ style: mode === 'light' ? Style.Light : Style.Dark }).catch(() => {})
+    StatusBar.hide().catch(() => {})
+  }
+  const showStatusBar = () => {
+    if (!Capacitor.isNativePlatform()) return
+    StatusBar.show().catch(() => {})
+    StatusBar.setStyle({ style: theme === 'light' ? Style.Dark : Style.Light }).catch(() => {})
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme, setStatusBarStyle }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme, hideStatusBar, showStatusBar }}>
       {children}
     </ThemeContext.Provider>
   )
@@ -72,18 +77,17 @@ export function useTheme() {
   return useContext(ThemeContext)
 }
 
-// À appeler dans un écran dont le fond est fixe et différent du thème
-// global de l'app (ex: NoteViewer, ReelsViewer — toujours sombres, quel que
-// soit le thème actif). mode: 'light' (fond sombre → icônes blanches) ou
-// 'dark' (fond clair → icônes noires).
-// Exemple: useStatusBarStyle('light') en haut de NoteViewer.jsx
-export function useStatusBarStyle(mode) {
-  const { theme, setStatusBarStyle } = useTheme()
+// À appeler dans un écran plein écran dont le contenu peut être n'importe
+// quelle couleur (posté par l'utilisateur) : NoteViewer, ReelsViewer.
+// On ne peut pas deviner la bonne couleur d'icônes, donc on masque
+// entièrement la status bar tant que l'écran est affiché, et on la
+// réaffiche (avec le style du thème global) en le quittant.
+export function useFullscreenStatusBar() {
+  const { hideStatusBar, showStatusBar } = useTheme()
   useEffect(() => {
-    setStatusBarStyle(mode)
+    hideStatusBar()
     return () => {
-      // en quittant l'écran, on restaure le style correspondant au thème global
-      setStatusBarStyle(theme === 'light' ? 'dark' : 'light')
+      showStatusBar()
     }
-  }, [mode])
+  }, [])
 }

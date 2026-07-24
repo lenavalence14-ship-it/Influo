@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { X, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { useStatusBarStyle } from '../../contexts/ThemeContext'
+import { useFullscreenStatusBar } from '../../contexts/ThemeContext'
 import { compressImage, trimAudio } from '../../lib/mediaCompression'
 import PhotoNoteEditor from './PhotoNoteEditor'
 import { useNoteUpload } from '../../contexts/NoteUploadContext'
@@ -25,7 +25,7 @@ import { useNoteUpload } from '../../contexts/NoteUploadContext'
 // choisir une image du téléphone puis d'ouvrir PhotoNoteEditor (crop, texte,
 // filtre). Comme une note texte, une note photo expire au bout de 24h.
 export default function CreateNote() {
-  useStatusBarStyle('light') // fond toujours sombre → icônes blanches
+  useFullscreenStatusBar() // plein écran, aucune icône (couleur du contenu imprévisible)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(false)
