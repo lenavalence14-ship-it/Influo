@@ -81,6 +81,7 @@ export default function CreateNote() {
       const { error: uploadError } = await supabase.storage.from('posts').upload(fileName, compressed)
       if (uploadError) {
         console.error('Échec upload photo de note :', uploadError)
+        alert('DEBUG - échec upload photo : ' + (uploadError.message || JSON.stringify(uploadError)))
         window.dispatchEvent(new CustomEvent('note-publish-failed', { detail: { reason: 'photo' } }))
         return
       }
@@ -102,6 +103,7 @@ export default function CreateNote() {
             .upload(audioFileName, trimmed)
           if (audioUploadError) {
             console.error('Échec upload musique de note :', audioUploadError)
+            alert('DEBUG - échec upload audio : ' + (audioUploadError.message || JSON.stringify(audioUploadError)))
             window.dispatchEvent(new CustomEvent('note-publish-failed', { detail: { reason: 'audio-upload' } }))
           } else {
             const { data: audioUrlData } = supabase.storage.from('posts').getPublicUrl(audioFileName)
@@ -113,6 +115,7 @@ export default function CreateNote() {
           // annuler silencieusement — mieux vaut une note photo sans son
           // qu'aucune note du tout.
           console.error('Échec découpage musique de note :', trimError)
+          alert('DEBUG - échec découpage audio (trimAudio) : ' + (trimError.message || String(trimError)))
           window.dispatchEvent(new CustomEvent('note-publish-failed', { detail: { reason: 'audio-trim' } }))
         }
       }
@@ -136,10 +139,12 @@ export default function CreateNote() {
       })
       if (insertError) {
         console.error('Échec publication note :', insertError)
+        alert('DEBUG - échec insert note : ' + (insertError.message || JSON.stringify(insertError)))
         window.dispatchEvent(new CustomEvent('note-publish-failed', { detail: { reason: 'insert' } }))
       }
     } catch (err) {
       console.error('Échec inattendu publication note :', err)
+      alert('DEBUG - échec inattendu : ' + (err.message || String(err)))
       window.dispatchEvent(new CustomEvent('note-publish-failed', { detail: { reason: 'unknown' } }))
     } finally {
       finishUpload(userId)
