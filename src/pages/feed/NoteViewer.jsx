@@ -240,7 +240,16 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
     }
 
     if (!audioUrl || !audio) {
-      audio?.pause()
+      // Vide bien audio.src (pas juste pause) : sinon un audio.play() lancé
+      // ailleurs (ex: l'effet pause/reprise ci-dessous, déclenché par un
+      // appui long sur CETTE note sans musique) peut relancer l'ancienne
+      // musique de la note précédente, puisque l'élément <audio> garde sa
+      // dernière source tant qu'on ne l'efface pas explicitement.
+      if (audio) {
+        audio.pause()
+        audio.removeAttribute('src')
+        audio.load()
+      }
       startTimer(getSegmentDurationMs(item))
       return clearTimer
     }
@@ -285,14 +294,19 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
   }, [groupIndex, segmentIndex])
 
   // Pause / reprise (appui long) : synchronise le son avec le timer visuel.
+  // Vérifie aussi que le segment COURANT a bien de la musique (pas juste
+  // que audio.src existe) : double sécurité contre une relecture d'un
+  // fichier audio resté chargé par erreur d'un segment précédent.
   useEffect(() => {
     const audio = audioRef.current
-    if (!audio || !audio.src) return
+    const hasMusicNow = !!items[segmentIndex]?.original?.audio_url
+    if (!audio || !audio.src || !hasMusicNow) return
     if (paused) {
       audio.pause()
     } else {
       audio.play().catch(() => {})
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paused])
 
   const handlePauseStart = () => {
@@ -1052,4 +1066,4 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
       )}
     </motion.div>
   )
-} 
+}
