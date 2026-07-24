@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core'
+import { Capacitor, registerPlugin } from '@capacitor/core'
+
+const StatusBarIcons = registerPlugin('StatusBarIcons')
 
 const ThemeContext = createContext()
 
@@ -40,8 +42,11 @@ export function ThemeProvider({ children }) {
 
     if (!Capacitor.isNativePlatform()) return
 
-    SystemBars.setStyle({
-      style: theme === 'light' ? SystemBarsStyle.Dark : SystemBarsStyle.Light,
+    // thème clair -> fond clair + icônes sombres (light: true)
+    // thème sombre -> fond sombre + icônes claires (light: false)
+    StatusBarIcons.setLight({
+      light: theme === 'light',
+      backgroundColor: color,
     }).catch(() => {})
   }, [theme])
 
