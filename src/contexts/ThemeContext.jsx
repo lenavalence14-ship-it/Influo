@@ -34,10 +34,23 @@ export function ThemeProvider({ children }) {
       appleMeta.setAttribute('content', theme === 'light' ? 'default' : 'black-translucent')
     }
 
-    // Android natif (Capacitor) : la meta tag ci-dessus n'a aucun effet, il faut appeler le plugin directement
+    // Android natif (Capacitor) : la meta tag ci-dessus n'a aucun effet, il faut appeler le plugin directement.
+    // IMPORTANT : ces appels peuvent échouer silencieusement (pont natif pas
+    // encore prêt au tout début du montage, notamment en mode server.url où
+    // le WebView charge du contenu distant — le pont Capacitor peut être
+    // légèrement en retard par rapport au JS). Sans .catch(), une promesse
+    // rejetée disparaît sans rien faire : le style de la barre reste bloqué
+    // sur son état précédent, ce qui donnait l'impression d'un bug
+    // intermittent où la barre "oublie" de changer de couleur. On catch et
+    // on retente une fois après un court délai.
     if (Capacitor.isNativePlatform()) {
-      StatusBar.setBackgroundColor({ color })
-      StatusBar.setStyle({ style: theme === 'light' ? Style.Light : Style.Dark })
+      const applyStatusBar = () => {
+        StatusBar.setBackgroundColor({ color }).catch(() => {})
+        StatusBar.setStyle({ style: theme === 'light' ? Style.Dark : Style.Light }).catch(() => {})
+      }
+      applyStatusBar()
+      const retry = setTimeout(applyStatusBar, 400)
+      return () => clearTimeout(retry)
     }
   }, [theme])
 
