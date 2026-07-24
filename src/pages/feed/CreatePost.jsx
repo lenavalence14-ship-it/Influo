@@ -102,26 +102,30 @@ export default function CreatePost() {
   const moveText = (_id, x, y) => setTextEl((prev) => (prev ? { ...prev, x, y } : prev))
 
   // --- publication ---
+  const [publishError, setPublishError] = useState(null)
+
   const handlePublish = async () => {
     if (!isEditing && files.length === 0) return
     setLoading(true)
+    setPublishError(null)
 
     const commonFields = {
       legende,
       crop_format: format,
-      rotation,
-      crop,
       filtre,
       texte_overlay: textEl?.contenu || null,
       texte_x: textEl?.x ?? null,
       texte_y: textEl?.y ?? null,
       texte_couleur: textEl?.couleur || null,
-      texte_police: textEl?.police || null,
     }
 
     if (isEditing) {
-      await supabase.from('posts').update(commonFields).eq('id', postId)
+      const { error: updateError } = await supabase.from('posts').update(commonFields).eq('id', postId)
       setLoading(false)
+      if (updateError) {
+        setPublishError(updateError.message)
+        return
+      }
       navigate(-1)
       return
     }
@@ -139,6 +143,7 @@ export default function CreatePost() {
 
     if (error) {
       setLoading(false)
+      setPublishError(error.message)
       return
     }
 
@@ -626,12 +631,12 @@ export default function CreatePost() {
       <div className="flex-1 relative overflow-hidden" style={cropStyle}>
         <div className="relative w-full h-full bg-black">
           {mainIsVideo ? (
-            <video src={mainPreview} className="w-full h-full object-contain" controls autoPlay playsInline style={{ filter: filterCss }} />
+            <video key={mainPreview} src={mainPreview} className="w-full h-full object-contain" controls autoPlay playsInline style={{ filter: filterCss }} />
           ) : isCarrousel ? (
-            <div className="grid grid-cols-3 gap-1 w-full h-full">
+            <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory">
               {displayMedias.map((p, i) => (
-                <div key={i} className="aspect-square overflow-hidden">
-                  <img src={p} alt="" className="w-full h-full object-cover" style={{ filter: filterCss }} />
+                <div key={i} className="w-full h-full shrink-0 snap-center">
+                  <img src={p} alt="" className="w-full h-full object-contain select-none" draggable={false} style={{ filter: filterCss }} />
                 </div>
               ))}
             </div>
@@ -674,6 +679,12 @@ export default function CreatePost() {
           className="w-full rounded-2xl px-4 py-3 bg-white/10 text-white outline-none resize-none text-body placeholder:text-white/50"
         />
       </div>
+
+      {publishError && (
+        <div className="px-4 pt-2">
+          <p className="text-caption text-red-400">{publishError}</p>
+        </div>
+      )}
 
       <div
         className="flex items-center justify-between px-4 pt-2"
