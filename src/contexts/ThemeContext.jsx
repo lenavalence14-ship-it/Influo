@@ -40,11 +40,12 @@ export function ThemeProvider({ children }) {
 
     if (!Capacitor.isNativePlatform()) return
 
-    // Réglage par défaut basé sur le thème global. Un écran avec un fond fixe
-    // différent du thème (ex: NoteViewer toujours sombre) doit appeler
-    // setStatusBarStyle lui-même via useStatusBarStyle ci-dessous — comme le
-    // fait n'importe quelle app native normale (chaque écran déclare sa
-    // propre couleur de status bar, pas de détection automatique).
+    // Une seule règle, appliquée partout dans l'app sans exception (feed,
+    // NoteViewer, ReelsViewer, tout écran) : l'app reste toujours affichée
+    // SOUS la status bar (pas d'overlay, pas de plein écran caché — voir
+    // main.jsx: setOverlaysWebView({ overlay: false })). Le fond de la barre
+    // suit le thème, et les icônes sont toujours la couleur opposée au fond.
+    StatusBar.setBackgroundColor({ color }).catch(() => {})
     StatusBar.setStyle({ style: theme === 'light' ? Style.Dark : Style.Light }).catch(() => {})
   }, [theme])
 
@@ -52,22 +53,8 @@ export function ThemeProvider({ children }) {
     setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
   }
 
-  // API pour les écrans plein écran (NoteViewer, ReelsViewer) qui ne
-  // peuvent pas deviner la couleur du contenu posté par l'utilisateur :
-  // on masque entièrement la status bar plutôt que de choisir une couleur
-  // d'icônes au hasard.
-  const hideStatusBar = () => {
-    if (!Capacitor.isNativePlatform()) return
-    StatusBar.hide().catch(() => {})
-  }
-  const showStatusBar = () => {
-    if (!Capacitor.isNativePlatform()) return
-    StatusBar.show().catch(() => {})
-    StatusBar.setStyle({ style: theme === 'light' ? Style.Dark : Style.Light }).catch(() => {})
-  }
-
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme, hideStatusBar, showStatusBar }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   )
@@ -75,19 +62,4 @@ export function ThemeProvider({ children }) {
 
 export function useTheme() {
   return useContext(ThemeContext)
-}
-
-// À appeler dans un écran plein écran dont le contenu peut être n'importe
-// quelle couleur (posté par l'utilisateur) : NoteViewer, ReelsViewer.
-// On ne peut pas deviner la bonne couleur d'icônes, donc on masque
-// entièrement la status bar tant que l'écran est affiché, et on la
-// réaffiche (avec le style du thème global) en le quittant.
-export function useFullscreenStatusBar() {
-  const { hideStatusBar, showStatusBar } = useTheme()
-  useEffect(() => {
-    hideStatusBar()
-    return () => {
-      showStatusBar()
-    }
-  }, [])
 }

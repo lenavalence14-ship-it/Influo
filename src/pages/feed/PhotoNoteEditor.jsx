@@ -3,7 +3,6 @@ import { Music, RotateCcw, X } from 'lucide-react'
 import FilterPicker, { getFilterCss } from './editor/FilterPicker'
 import DraggableElement from './editor/DraggableElement'
 import MusicPicker from './editor/MusicPicker'
-import { useFullscreenStatusBar } from '../../contexts/ThemeContext'
 
 // Polices proposées à l'écran 4 (façon Instagram), un sous-ensemble sûr et
 // disponible nativement / déjà chargé par l'app (pas de police externe à
@@ -64,7 +63,6 @@ function BlurredPhoto({ src, filterCss, rotation, zoom = 1, children }) {
  * reçoit ici le résultat (fichier + filtre + texte + rotation) via onDone.
  */
 export default function PhotoNoteEditor({ file, previewUrl, onCancel, onDone }) {
-  useFullscreenStatusBar() // plein écran, aucune icône (couleur du contenu imprévisible)
   const [screen, setScreen] = useState('main') // 'main' | 'crop' | 'texte'
   const [showFilters, setShowFilters] = useState(false)
   const [showMusicPanel, setShowMusicPanel] = useState(false)

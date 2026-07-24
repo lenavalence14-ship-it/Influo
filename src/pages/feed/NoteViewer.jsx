@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { X, Heart, Repeat2, Send, Eye, ArrowLeft, MoreVertical, Music } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { useFullscreenStatusBar } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { timeAgo } from '../../lib/time'
 import { profileRoute } from '../../lib/profileRoute'
@@ -57,7 +56,6 @@ function getSegmentDurationMs(item) {
 // depuis laquelle on a republié) puisque NoteBar affiche tous les items de
 // tous les utilisateurs.
 export default function NoteViewer({ groups, startGroupIndex, onClose }) {
-  useFullscreenStatusBar() // plein écran, aucune icône (couleur du contenu imprévisible)
   const [groupIndex, setGroupIndex] = useState(startGroupIndex)
   const [segmentIndex, setSegmentIndex] = useState(0)
   const [paused, setPaused] = useState(false)
