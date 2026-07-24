@@ -164,6 +164,16 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
   // noir, thème sombre -> texte blanc. Réagit à chaque changement de
   // segment/thème puisqu'on peut naviguer texte <-> photo sans refermer le
   // viewer.
+  //
+  // IMPORTANT au démontage : on NE réapplique PAS ici notre propre
+  // couleur/style — ThemeContext gère déjà ça de façon globale et a son
+  // propre useEffect qui tourne indépendamment. Si les deux réappliquent
+  // chacun leur version en même temps (ex: à la fermeture du viewer), l'un
+  // peut écraser l'autre selon l'ordre d'exécution des promesses async
+  // (aucun des deux n'est garanti de gagner) — c'est cette course qui
+  // donnait l'impression d'un bug intermittent de couleur de barre de
+  // statut. Ici on se contente de désactiver l'overlay ; la couleur/style
+  // eux-mêmes restent la responsabilité exclusive de ThemeContext.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
     const isLight = document.documentElement.classList.contains('light')
@@ -173,9 +183,14 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
     StatusBar.setBackgroundColor({ color: themeBg }).catch(() => {})
     StatusBar.setStyle({ style: isLight ? Style.Dark : Style.Light }).catch(() => {})
     return () => {
-      StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {})
-      StatusBar.setBackgroundColor({ color: themeBg }).catch(() => {})
-      StatusBar.setStyle({ style: isLight ? Style.Dark : Style.Light }).catch(() => {})
+      const stillLight = document.documentElement.classList.contains('light')
+      const stillBg = stillLight ? '#f5f5f5' : '#0a0a0a'
+      StatusBar.setOverlaysWebView({ overlay: false })
+        .then(() => {
+          StatusBar.setBackgroundColor({ color: stillBg }).catch(() => {})
+          StatusBar.setStyle({ style: stillLight ? Style.Dark : Style.Light }).catch(() => {})
+        })
+        .catch(() => {})
     }
   }, [current, groupIndex, segmentIndex])
   const note = current?.entry
