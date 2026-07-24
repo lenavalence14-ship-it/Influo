@@ -14,8 +14,11 @@ import { getFilterCss } from './editor/FilterPicker'
 
 const cropClasses = {
   carre: 'aspect-square',
+  vertical: 'aspect-[4/5]',
+  paysage: 'aspect-[4/3]',
+  // valeurs héritées d'un ancien système de format, gardées pour l'affichage
+  // des posts déjà publiés avec ces valeurs en base
   horizontal: 'aspect-[4/3]',
-  vertical: 'aspect-[2/3]',
   vertical_45: 'aspect-[4/5]',
 }
 
@@ -66,9 +69,11 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false 
     onDeleted?.(post.id)
   }
 
-  const mediaUrl = post.post_medias?.[0]?.media_url
-  const thumbnailUrl = post.post_medias?.[0]?.thumbnail_url
-  const isVideo = post.type === 'video' || post.post_medias?.[0]?.media_type === 'video'
+  const allMedias = post.post_medias || []
+  const isCarrousel = allMedias.length > 1
+  const mediaUrl = allMedias[0]?.media_url
+  const thumbnailUrl = allMedias[0]?.thumbnail_url
+  const isVideo = post.type === 'video' || allMedias[0]?.media_type === 'video'
 
   // Monte le <video> dans le DOM dès que la carte est à moins de ~1 écran de distance
   // du viewport (lazy loading + préchargement de "la vidéo visible et la suivante").
@@ -199,6 +204,23 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false 
                   {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
                 </button>
               </>
+            ) : isCarrousel ? (
+              <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory">
+                {allMedias
+                  .slice()
+                  .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+                  .map((m, i) => (
+                    <img
+                      key={i}
+                      src={m.media_url}
+                      alt=""
+                      loading={priority && i === 0 ? 'eager' : 'lazy'}
+                      decoding="async"
+                      className="w-full h-full object-cover shrink-0 snap-center"
+                      style={{ filter: getFilterCss(post.filtre) }}
+                    />
+                  ))}
+              </div>
             ) : (
               <img
                 src={mediaUrl}
