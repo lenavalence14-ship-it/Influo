@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { X, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { compressImage } from '../../lib/mediaCompression'
+import { compressImage, trimAudio } from '../../lib/mediaCompression'
 import PhotoNoteEditor from './PhotoNoteEditor'
 import { useNoteUpload } from '../../contexts/NoteUploadContext'
 
@@ -79,28 +79,45 @@ export default function CreateNote() {
       const compressed = await compressImage(editedResult.file)
       const fileName = `${userId}/note-${Date.now()}.jpg`
       const { error: uploadError } = await supabase.storage.from('posts').upload(fileName, compressed)
-      if (uploadError) return
+      if (uploadError) {
+        console.error('Échec upload photo de note :', uploadError)
+        window.dispatchEvent(new CustomEvent('note-publish-failed', { detail: { reason: 'photo' } }))
+        return
+      }
       const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
 
-      // Musique (optionnelle) : on upload le fichier audio SOURCE tel quel
-      // (pas de découpe côté client, voir MusicPicker) et on stocke juste le
-      // point de départ + la durée du passage choisi. NoteViewer se charge
-      // de positionner la lecture sur ce passage.
+      // Musique (optionnelle) : on ne garde QUE le passage choisi par
+      // l'utilisateur (15 ou 20s, via MusicPicker) — le fichier est
+      // réellement découpé ici (trimAudio, Web Audio API) avant l'upload,
+      // au lieu d'envoyer le morceau source entier. audio_start reste à 0
+      // puisque le fichier uploadé DÉMARRE déjà au bon endroit.
       let audioUrl = null
       const musique = editedResult.musique
       if (musique?.file) {
-        const ext = musique.file.name?.split('.').pop() || 'mp3'
-        const audioFileName = `${userId}/note-audio-${Date.now()}.${ext}`
-        const { error: audioUploadError } = await supabase.storage
-          .from('posts')
-          .upload(audioFileName, musique.file)
-        if (!audioUploadError) {
-          const { data: audioUrlData } = supabase.storage.from('posts').getPublicUrl(audioFileName)
-          audioUrl = audioUrlData.publicUrl
+        try {
+          const trimmed = await trimAudio(musique.file, musique.start, musique.duration)
+          const audioFileName = `${userId}/note-audio-${Date.now()}.wav`
+          const { error: audioUploadError } = await supabase.storage
+            .from('posts')
+            .upload(audioFileName, trimmed)
+          if (audioUploadError) {
+            console.error('Échec upload musique de note :', audioUploadError)
+            window.dispatchEvent(new CustomEvent('note-publish-failed', { detail: { reason: 'audio-upload' } }))
+          } else {
+            const { data: audioUrlData } = supabase.storage.from('posts').getPublicUrl(audioFileName)
+            audioUrl = audioUrlData.publicUrl
+          }
+        } catch (trimError) {
+          // Le découpage a échoué (fichier corrompu, format non décodable) :
+          // on publie quand même la note SANS musique plutôt que de tout
+          // annuler silencieusement — mieux vaut une note photo sans son
+          // qu'aucune note du tout.
+          console.error('Échec découpage musique de note :', trimError)
+          window.dispatchEvent(new CustomEvent('note-publish-failed', { detail: { reason: 'audio-trim' } }))
         }
       }
 
-      await supabase.from('notes').insert({
+      const { error: insertError } = await supabase.from('notes').insert({
         user_id: userId,
         contenu: editedResult.texte?.contenu || ' ',
         photo_url: urlData.publicUrl,
@@ -113,10 +130,17 @@ export default function CreateNote() {
         texte_couleur: editedResult.texte?.couleur || '#ffffff',
         texte_police: editedResult.texte?.police || 'Inter',
         audio_url: audioUrl,
-        audio_start: audioUrl ? musique.start : null,
+        audio_start: audioUrl ? 0 : null,
         audio_duration: audioUrl ? musique.duration : null,
         expire_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       })
+      if (insertError) {
+        console.error('Échec publication note :', insertError)
+        window.dispatchEvent(new CustomEvent('note-publish-failed', { detail: { reason: 'insert' } }))
+      }
+    } catch (err) {
+      console.error('Échec inattendu publication note :', err)
+      window.dispatchEvent(new CustomEvent('note-publish-failed', { detail: { reason: 'unknown' } }))
     } finally {
       finishUpload(userId)
     }
