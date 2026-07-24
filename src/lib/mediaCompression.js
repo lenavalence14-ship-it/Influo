@@ -1,5 +1,26 @@
 // Compresse une image en la redimensionnant si trop grande et en la réencodant en JPEG qualité 82%.
 // Rapide, aucune dépendance externe (Canvas natif du navigateur).
+// Repli de décodage via un élément <img> classique + object URL, pour les
+// cas où createImageBitmap échoue sur un fichier pourtant valide (limite
+// mémoire WebView sur gros JPEG notamment). Retourne un objet compatible
+// avec l'usage qu'en fait compressImage (width/height + dessinable via
+// drawImage), sans dépendre de createImageBitmap.
+function decodeViaImageElement(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(img)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('decodeViaImageElement: échec de chargement'))
+    }
+    img.src = url
+  })
+}
+
 export async function compressImage(file, { maxDimension = 1920, quality = 0.82 } = {}) {
   if (!file.type.startsWith('image/')) return file
 
@@ -7,16 +28,26 @@ export async function compressImage(file, { maxDimension = 1920, quality = 0.82 
   try {
     bitmap = await createImageBitmap(file)
   } catch (err) {
-    // "The source image could not be decoded" arrive typiquement sur un
-    // format que le décodeur natif du WebView ne gère pas (HEIC/HEIF le
-    // plus souvent, exporté par défaut par certains téléphones/galeries),
-    // ou un fichier corrompu. On le signale clairement plutôt que de
-    // laisser planter avec un message générique du navigateur.
-    throw new Error(
-      `Impossible de lire cette photo (format "${file.type || 'inconnu'}" non supporté). ` +
-      `Essaie une autre photo, ou vérifie que ton téléphone exporte en JPEG plutôt qu'en HEIC ` +
-      `(Réglages > Appareil photo > Formats > "Compatibilité maximale" sur iPhone).`
-    )
+    // createImageBitmap peut échouer sur un JPEG pourtant valide si le
+    // fichier est volumineux (grosse résolution, plusieurs Mo) : certains
+    // WebView Android ont une limite mémoire plus stricte pour cette API
+    // précise que pour le décodage classique via <img>. On retente donc
+    // avec HTMLImageElement + canvas, qui passe par un chemin de décodage
+    // différent et s'en sort souvent mieux sur ces gros fichiers.
+    console.warn('createImageBitmap a échoué, tentative de repli via <img> :', err)
+    try {
+      bitmap = await decodeViaImageElement(file)
+    } catch (fallbackErr) {
+      // Les deux méthodes de décodage ont échoué : on ne bloque JAMAIS la
+      // publication pour un utilisateur final qui ne peut rien faire de ce
+      // genre d'erreur technique. On publie le fichier original tel quel,
+      // non compressé — une photo plus lourde publiée vaut largement mieux
+      // qu'une publication qui échoue silencieusement ou avec un message
+      // incompréhensible. Le seul coût est un upload/stockage un peu plus
+      // gros dans ce cas, pas une perte de fonctionnalité pour la personne.
+      console.error('Compression impossible (2 méthodes échouées), publication du fichier original :', fallbackErr)
+      return file
+    }
   }
   let { width, height } = bitmap
 
