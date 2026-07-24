@@ -2,8 +2,6 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { X, Heart, Repeat2, Send, Eye, ArrowLeft, MoreVertical, Music } from 'lucide-react'
-import { Capacitor } from '@capacitor/core'
-import { StatusBar } from '@capacitor/status-bar'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { timeAgo } from '../../lib/time'
@@ -158,28 +156,6 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
 
   const { user, profile } = useAuth()
 
-  // Overlay plein écran pendant qu'on regarde une note : le WebView passe
-  // sous la barre de statut système (heure, batterie, réseau) pour que la
-  // photo remplisse tout l'écran. C'est la SEULE chose que NoteViewer gère
-  // ici — la couleur et le style (clair/sombre) de la barre de statut sont
-  // gérés exclusivement par ThemeContext, globalement, pour toute l'app y
-  // compris ici. Avant, NoteViewer dupliquait aussi la couleur/style en plus
-  // de l'overlay, ce qui créait une course avec ThemeContext (les deux
-  // réappliquaient leur propre version en parallèle, sans coordination) —
-  // d'où des couleurs de barre parfois incohérentes. Maintenant NoteViewer
-  // ne touche plus qu'à l'overlay, ThemeContext reste l'unique source de
-  // vérité pour la couleur/style, partout, y compris en story.
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return
-    StatusBar.setOverlaysWebView({ overlay: true })
-      .then(() => window.dispatchEvent(new Event('statusbar-reapply')))
-      .catch(() => {})
-    return () => {
-      StatusBar.setOverlaysWebView({ overlay: false })
-        .then(() => window.dispatchEvent(new Event('statusbar-reapply')))
-        .catch(() => {})
-    }
-  }, [])
   const note = current?.entry
   const author = current?.original?.users
 
