@@ -1051,4 +1051,4 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
       )}
     </motion.div>
   )
-}
+} 
