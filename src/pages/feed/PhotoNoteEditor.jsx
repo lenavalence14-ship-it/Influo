@@ -7,7 +7,7 @@ import MusicPicker from './editor/MusicPicker'
 // Polices proposées à l'écran 4 (façon Instagram), un sous-ensemble sûr et
 // disponible nativement / déjà chargé par l'app (pas de police externe à
 // charger en plus pour rester léger).
-const FONTS = [
+export const FONTS = [
   { key: 'Inter', label: 'Aa', style: { fontFamily: 'Inter, sans-serif', fontWeight: 600 } },
   { key: 'serif', label: 'Aa', style: { fontFamily: 'Georgia, serif', fontWeight: 700 } },
   { key: 'mono', label: 'Aa', style: { fontFamily: 'monospace', fontWeight: 600 } },

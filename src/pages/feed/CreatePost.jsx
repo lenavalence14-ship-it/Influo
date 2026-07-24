@@ -1,105 +1,80 @@
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useCallback, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import {
-  Image as ImageIcon, X, Type, Check, Music, Sticker, Sparkles,
-  PenLine, AtSign, MoreHorizontal, ChevronDown, ChevronUp, Plus, Send,
-} from 'lucide-react'
+import { Image as ImageIcon, X, RotateCcw, Check } from 'lucide-react'
 import { compressImage, compressVideo, generateVideoThumbnail } from '../../lib/mediaCompression'
 import { triggerHlsTranscode } from '../../lib/hlsTranscode'
-import DrawCanvas from './editor/DrawCanvas'
 import FilterPicker, { getFilterCss } from './editor/FilterPicker'
-import StickerPicker from './editor/StickerPicker'
-import MentionPicker from './editor/MentionPicker'
 import DraggableElement from './editor/DraggableElement'
+import { FONTS, getFontStyle } from './PhotoNoteEditor'
 
-const FORMATS = [
-  { value: 'carre', label: '1:1', aspect: 'aspect-square' },
-  { value: 'horizontal', label: '4:3', aspect: 'aspect-[4/3]' },
-  { value: 'vertical', label: '2:3', aspect: 'aspect-[2/3]' },
-  { value: 'vertical_45', label: '4:5', aspect: 'aspect-[4/5]' },
+const RATIOS = [
+  { value: 'carre', label: 'Carré', aspect: 'aspect-square' },
+  { value: 'vertical', label: 'Vertical', aspect: 'aspect-[4/5]' },
+  { value: 'paysage', label: 'Paysage', aspect: 'aspect-[4/3]' },
 ]
+
+// anciens posts publiés avec un ancien système de format : on les fait
+// retomber sur le ratio encore existant le plus proche, uniquement pour
+// l'affichage dans CET éditeur (n'affecte pas l'affichage publié ailleurs).
+const LEGACY_FORMAT_MAP = { horizontal: 'paysage', vertical_45: 'vertical' }
 
 const TEXT_COLORS = ['#ffffff', '#000000', '#f43f5e', '#3b82f6', '#22c55e', '#eab308']
 
-const PRIMARY_TOOLS = [
-  { key: 'audio', icon: Music, label: 'Audio' },
-  { key: 'texte', icon: Type, label: 'Texte' },
-  { key: 'stickers', icon: Sticker, label: 'Superposition' },
-  { key: 'filtre', icon: Sparkles, label: 'Filtre' },
-]
-
-const MORE_TOOLS = [
-  { key: 'dessiner', icon: PenLine, label: 'Dessiner' },
-  { key: 'mentionner', icon: AtSign, label: 'Mentionner' },
-]
-
-let uid = 0
-const nextId = () => `el_${Date.now()}_${uid++}`
-
 export default function CreatePost() {
-  const [searchParams] = useSearchParams()
   const { postId } = useParams()
   const isEditing = Boolean(postId)
   const { influencerProfile } = useAuth()
   const navigate = useNavigate()
 
-  const [isStory, setIsStory] = useState(searchParams.get('type') === 'story')
   const [loadingExisting, setLoadingExisting] = useState(isEditing)
 
-  const [step, setStep] = useState(isEditing ? 'edit' : 'select')
+  const [step, setStep] = useState(isEditing ? 'edit' : 'select') // 'select' | 'edit' | 'crop' | 'texte'
+  const [showFilters, setShowFilters] = useState(false)
   const [files, setFiles] = useState([])
   const [previews, setPreviews] = useState([])
   const [existingMediaUrls, setExistingMediaUrls] = useState([])
   const [existingMediaTypes, setExistingMediaTypes] = useState([])
   const [legende, setLegende] = useState('')
-  const [format, setFormat] = useState(isStory ? 'vertical' : 'carre')
+  const [format, setFormat] = useState('carre')
   const [loading, setLoading] = useState(false)
 
-  // outils actifs
-  const [activeTool, setActiveTool] = useState(null) // 'texte' | 'stickers' | 'filtre' | 'dessiner' | 'mentionner' | null
-  const [showMore, setShowMore] = useState(false)
+  const [rotation, setRotation] = useState(0)
+  const [filtre, setFiltre] = useState(null)
 
-  // éléments superposés multiples (texte, sticker, mention)
-  const [elements, setElements] = useState([])
-  const [editingTextId, setEditingTextId] = useState(null)
+  // recadrage manuel : rectangle en % relatif au conteneur image
+  const [crop, setCrop] = useState({ x: 0, y: 0, w: 100, h: 100 })
+  const [draftCrop, setDraftCrop] = useState(crop)
+
+  // texte superposé (un seul, déplaçable, comme dans l'éditeur de note)
+  const [textEl, setTextEl] = useState(null) // { contenu, x, y, couleur, police }
   const [textDraft, setTextDraft] = useState('')
   const [textColor, setTextColor] = useState('#ffffff')
-
-  // filtre + dessin
-  const [filtre, setFiltre] = useState(null)
-  const [dessinDataUrl, setDessinDataUrl] = useState(null)
-  const [dessinFile, setDessinFile] = useState(null)
-
-  const canvasRef = useRef(null)
-  const [canvasSize, setCanvasSize] = useState({ width: 400, height: 700 })
+  const [textFont, setTextFont] = useState('Inter')
 
   useEffect(() => {
     if (!isEditing) return
     const loadPost = async () => {
       const { data } = await supabase
         .from('posts')
-      .select('*, post_medias(media_url, media_type, position)')
+        .select('*, post_medias(media_url, media_type, position)')
         .eq('id', postId)
         .maybeSingle()
 
       if (data) {
-        setIsStory(data.type === 'story')
         setLegende(data.legende || '')
-        setFormat(data.crop_format || (data.type === 'story' ? 'vertical' : 'carre'))
+        const savedFormat = data.crop_format
+        setFormat(LEGACY_FORMAT_MAP[savedFormat] || savedFormat || 'carre')
         setFiltre(data.filtre || null)
-        setElements(Array.isArray(data.elements) ? data.elements : [])
-        // rétrocompatibilité : ancien texte simple -> élément
-        if (data.texte_overlay && (!data.elements || data.elements.length === 0)) {
-          setElements([{
-            id: nextId(),
-            type: 'texte',
-            x: data.texte_x ?? 50,
-            y: data.texte_y ?? 50,
+        if (data.texte_overlay) {
+          setTextEl({
             contenu: data.texte_overlay,
             couleur: data.texte_couleur || '#ffffff',
-          }])
+            police: data.texte_police || 'Inter',
+            x: data.texte_x ?? 50,
+            y: data.texte_y ?? 50,
+          })
         }
         const sorted = [...(data.post_medias || [])].sort((a, b) => a.position - b.position)
         setExistingMediaUrls(sorted.map((m) => m.media_url))
@@ -122,83 +97,26 @@ export default function CreatePost() {
   const mainIsVideo = isEditing ? existingMediaTypes[0] === 'video' : isVideoFile(files[0])
   const displayMedias = isEditing ? existingMediaUrls : previews
   const mainPreview = displayMedias[0]
+  const isCarrousel = !mainIsVideo && displayMedias.length > 1
 
-  // --- gestion des éléments ---
-  const addTextElement = () => {
-    setTextDraft('')
-    setTextColor('#ffffff')
-    const id = nextId()
-    setElements((els) => [...els, { id, type: 'texte', x: 50, y: 50, contenu: '', couleur: '#ffffff' }])
-    setEditingTextId(id)
-    setActiveTool('texte')
-  }
-
-  const commitTextEdit = () => {
-    if (!editingTextId) return
-    setElements((els) =>
-      textDraft.trim()
-        ? els.map((el) => (el.id === editingTextId ? { ...el, contenu: textDraft, couleur: textColor } : el))
-        : els.filter((el) => el.id !== editingTextId)
-    )
-    setEditingTextId(null)
-    setActiveTool(null)
-  }
-
-  const addSticker = (emoji) => {
-    setElements((els) => [...els, { id: nextId(), type: 'sticker', x: 50, y: 40, contenu: emoji }])
-  }
-
-  const addMention = (user) => {
-    setElements((els) => [...els, { id: nextId(), type: 'mention', x: 50, y: 30, contenu: user.nom_complet, userId: user.id }])
-    setActiveTool(null)
-  }
-
-  const moveElement = (id, x, y) => {
-    setElements((els) => els.map((el) => (el.id === id ? { ...el, x, y } : el)))
-  }
-
-  const handleElementTap = (el) => {
-    if (el.type === 'texte') {
-      setTextDraft(el.contenu)
-      setTextColor(el.couleur || '#ffffff')
-      setEditingTextId(el.id)
-      setActiveTool('texte')
-    }
-  }
-
-  const handleToolClick = (key) => {
-    setShowMore(false)
-    if (key === 'texte') {
-      addTextElement()
-      return
-    }
-    setActiveTool((cur) => (cur === key ? null : key))
-  }
+  const moveText = (_id, x, y) => setTextEl((prev) => (prev ? { ...prev, x, y } : prev))
 
   // --- publication ---
   const handlePublish = async () => {
     if (!isEditing && files.length === 0) return
     setLoading(true)
 
-    let dessinUrl = null
-    if (dessinFile) {
-      const fileName = `${influencerProfile.id}/dessin-${Date.now()}.png`
-      await supabase.storage.from('posts').upload(fileName, dessinFile)
-      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
-      dessinUrl = urlData.publicUrl
-    }
-
     const commonFields = {
-      legende: isStory ? null : legende,
+      legende,
       crop_format: format,
-      elements,
+      rotation,
+      crop,
       filtre,
-      dessin_url: dessinUrl,
-      // rétrocompat : on garde aussi le premier élément texte dans les anciennes colonnes
-      texte_overlay: elements.find((e) => e.type === 'texte')?.contenu || null,
-      texte_x: elements.find((e) => e.type === 'texte')?.x ?? null,
-      texte_y: elements.find((e) => e.type === 'texte')?.y ?? null,
-      texte_couleur: elements.find((e) => e.type === 'texte')?.couleur || null,
+      texte_overlay: textEl?.contenu || null,
+      texte_x: textEl?.x ?? null,
+      texte_y: textEl?.y ?? null,
+      texte_couleur: textEl?.couleur || null,
+      texte_police: textEl?.police || null,
     }
 
     if (isEditing) {
@@ -213,8 +131,7 @@ export default function CreatePost() {
       .from('posts')
       .insert({
         influenceur_id: influencerProfile.id,
-        type: isStory ? 'story' : hasVideo ? 'video' : files.length > 1 ? 'carrousel' : 'photo',
-        expire_at: isStory ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null,
+        type: hasVideo ? 'video' : files.length > 1 ? 'carrousel' : 'photo',
         ...commonFields,
       })
       .select()
@@ -293,17 +210,6 @@ export default function CreatePost() {
     navigate('/')
   }
 
-  const handleDessinExport = async (dataUrl) => {
-    setDessinDataUrl(dataUrl)
-    if (!dataUrl) {
-      setDessinFile(null)
-      return
-    }
-    const res = await fetch(dataUrl)
-    const blob = await res.blob()
-    setDessinFile(new File([blob], 'dessin.png', { type: 'image/png' }))
-  }
-
   if (loadingExisting) {
     return (
       <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
@@ -322,24 +228,22 @@ export default function CreatePost() {
           <button onClick={() => navigate(-1)} aria-label="Fermer" className="w-9 h-9 flex items-center justify-center">
             <X size={22} />
           </button>
-          <span className="text-body-medium">{isStory ? 'Nouvelle story' : 'Nouvelle publication'}</span>
+          <span className="text-body-medium">Nouvelle publication</span>
           <div className="w-9" />
         </header>
 
         <label className="flex-1 flex flex-col items-center justify-center px-6 gap-4 cursor-pointer">
-          <div className={`${isStory ? 'aspect-[9/16] max-h-[55vh]' : 'aspect-square'} w-full max-w-[380px] rounded-2xl border-2 border-dashed border-white/15 bg-white/[0.04] flex flex-col items-center justify-center gap-3 text-white/50`}>
+          <div className="aspect-square w-full max-w-[380px] rounded-2xl border-2 border-dashed border-white/15 bg-white/[0.04] flex flex-col items-center justify-center gap-3 text-white/50">
             <ImageIcon size={30} />
-            <span className="text-body text-center px-6">
-              Choisir {isStory ? 'une photo ou vidéo' : 'des photos ou vidéos'}
-            </span>
+            <span className="text-body text-center px-6">Choisir des photos ou vidéos</span>
           </div>
           <span className="text-caption text-white/40 text-center max-w-[280px]">
-            Ouvre la galerie de ton téléphone{!isStory ? ' — tu peux sélectionner plusieurs fichiers' : ''}
+            Ouvre la galerie de ton téléphone — tu peux sélectionner plusieurs fichiers
           </span>
           <input
             type="file"
             accept="image/*,video/*"
-            multiple={!isStory}
+            multiple
             onChange={handleFilesChange}
             className="hidden"
           />
@@ -348,249 +252,447 @@ export default function CreatePost() {
     )
   }
 
-  // ============================================================
-  // ÉCRAN 2 — ÉDITION
-  // ============================================================
-  const filterCss = getFilterCss(filtre)
+  // ---- écran crop : drag du cadre à la main ----
+  const cropAreaRef = useRef(null)
+  const dragState = useRef(null)
+  const pendingEvent = useRef(null)
+  const rafId = useRef(null)
 
-  return (
-    <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col">
-      {/* barre du haut : miniature + nom + bouton + */}
-      <header className="flex items-center gap-3 px-4 pt-3 pb-2 h-14 shrink-0">
-        <button
-          onClick={() => (isEditing ? navigate(-1) : setStep('select'))}
-          aria-label="Retour"
-          className="w-9 h-9 -ml-1 flex items-center justify-center shrink-0"
-        >
-          <X size={22} />
-        </button>
-        <div className="flex items-center gap-2 flex-1 min-w-0 bg-white/10 rounded-full pl-1 pr-3 py-1">
-          <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-neutral-800">
-            {mainIsVideo ? (
-              <video src={mainPreview} className="w-full h-full object-cover" muted />
-            ) : (
-              <img src={mainPreview} alt="" className="w-full h-full object-cover" />
-            )}
-          </div>
-          <span className="text-[13px] text-white/90 truncate">
-            {isStory ? 'Nouvelle story' : 'Nouvelle publication'}
-          </span>
-        </div>
-        <button
-          disabled
-          aria-label="Ajouter un média — bientôt disponible"
-          className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center text-white/30 shrink-0"
-        >
-          <Plus size={16} />
-        </button>
-      </header>
+  const startDrag = (handle) => (e) => {
+    e.stopPropagation()
+    const point = e.touches ? e.touches[0] : e
+    dragState.current = { handle, startX: point.clientX, startY: point.clientY, start: { ...draftCrop } }
+  }
 
-      {/* zone médiane : canvas photo avec tous les overlays, commun à post et story */}
-      <main className="flex-1 min-h-0 relative overflow-hidden">
-        <div
-          ref={canvasRef}
-          className="absolute inset-0 flex items-center justify-center px-4"
-          onClick={() => activeTool === 'texte' && editingTextId && commitTextEdit()}
-        >
-          <div className={`relative w-full ${isStory ? 'h-full max-w-none' : 'max-w-[380px]'}`}>
+  const computeNextCrop = (point) => {
+    const rect = cropAreaRef.current.getBoundingClientRect()
+    const dx = ((point.clientX - dragState.current.startX) / rect.width) * 100
+    const dy = ((point.clientY - dragState.current.startY) / rect.height) * 100
+    const { handle, start } = dragState.current
+
+    let { x, y, w, h } = start
+    if (handle === 'move') {
+      x = Math.max(0, Math.min(100 - w, start.x + dx))
+      y = Math.max(0, Math.min(100 - h, start.y + dy))
+    } else {
+      if (handle.includes('l')) {
+        const newX = Math.max(0, Math.min(start.x + start.w - 10, start.x + dx))
+        w = start.w - (newX - start.x)
+        x = newX
+      }
+      if (handle.includes('r')) {
+        w = Math.max(10, Math.min(100 - start.x, start.w + dx))
+      }
+      if (handle.includes('t')) {
+        const newY = Math.max(0, Math.min(start.y + start.h - 10, start.y + dy))
+        h = start.h - (newY - start.y)
+        y = newY
+      }
+      if (handle.includes('b')) {
+        h = Math.max(10, Math.min(100 - start.y, start.h + dy))
+      }
+    }
+    return { x, y, w, h }
+  }
+
+  const flushDrag = useCallback(() => {
+    rafId.current = null
+    if (!dragState.current || !cropAreaRef.current || !pendingEvent.current) return
+    setDraftCrop(computeNextCrop(pendingEvent.current))
+  }, [])
+
+  const onDragMove = useCallback((e) => {
+    if (!dragState.current || !cropAreaRef.current) return
+    pendingEvent.current = e.touches ? e.touches[0] : e
+    if (rafId.current == null) rafId.current = requestAnimationFrame(flushDrag)
+  }, [flushDrag])
+
+  const endDrag = useCallback(() => {
+    dragState.current = null
+    pendingEvent.current = null
+    if (rafId.current != null) {
+      cancelAnimationFrame(rafId.current)
+      rafId.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    if (step !== 'crop') return
+    window.addEventListener('pointermove', onDragMove, { passive: true })
+    window.addEventListener('pointerup', endDrag)
+    return () => {
+      window.removeEventListener('pointermove', onDragMove)
+      window.removeEventListener('pointerup', endDrag)
+      if (rafId.current != null) cancelAnimationFrame(rafId.current)
+    }
+  }, [step, onDragMove, endDrag])
+
+  const openCrop = () => {
+    setDraftCrop(crop)
+    setStep('crop')
+  }
+  const cancelCrop = () => setStep('edit')
+  const confirmCrop = () => {
+    setCrop(draftCrop)
+    setStep('edit')
+  }
+
+  // choix d'un ratio : recadre le cadre, centré, à cette proportion — reste
+  // ensuite ajustable à la main comme un crop normal
+  const applyRatio = (ratioValue) => {
+    setFormat(ratioValue)
+    const targets = { carre: 1, vertical: 4 / 5, paysage: 4 / 3 }
+    const target = targets[ratioValue]
+    if (!target || !cropAreaRef.current) return
+    const rect = cropAreaRef.current.getBoundingClientRect()
+    const containerRatio = rect.width / rect.height
+    let w = 100, h = 100
+    if (target > containerRatio) {
+      h = (containerRatio / target) * 100
+    } else {
+      w = (target / containerRatio) * 100
+    }
+    setDraftCrop({ x: (100 - w) / 2, y: (100 - h) / 2, w, h })
+  }
+
+  // ---- écran texte ----
+  const openTexte = () => {
+    setTextDraft(textEl?.contenu || '')
+    setTextColor(textEl?.couleur || '#ffffff')
+    setTextFont(textEl?.police || 'Inter')
+    setStep('texte')
+  }
+  const confirmTexte = () => {
+    if (textDraft.trim()) {
+      setTextEl((prev) => ({
+        contenu: textDraft,
+        couleur: textColor,
+        police: textFont,
+        x: prev?.x ?? 50,
+        y: prev?.y ?? 50,
+      }))
+    } else {
+      setTextEl(null)
+    }
+    setStep('edit')
+  }
+
+  // ============================================================
+  // ÉCRAN CROP — cadre manuel + choix de ratio
+  // ============================================================
+  const cropStyle = {
+    clipPath: `inset(${crop.y}% ${100 - crop.x - crop.w}% ${100 - crop.y - crop.h}% ${crop.x}%)`,
+  }
+
+  if (step === 'crop') {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-black select-none">
+        <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+          <div ref={cropAreaRef} className="relative w-full h-full">
+            <img
+              src={mainPreview}
+              alt=""
+              className="w-full h-full object-contain opacity-30"
+              draggable={false}
+              style={{ transform: `rotate(${rotation}deg)` }}
+            />
             <div
-              className={`relative w-full overflow-hidden bg-neutral-900 ${
-                isStory ? 'h-full rounded-none' : `${FORMATS.find((f) => f.value === format)?.aspect} rounded-2xl`
-              }`}
+              className="absolute inset-0"
+              style={{
+                clipPath: `inset(${draftCrop.y}% ${100 - draftCrop.x - draftCrop.w}% ${100 - draftCrop.y - draftCrop.h}% ${draftCrop.x}%)`,
+              }}
             >
-              {mainIsVideo ? (
-                <video src={mainPreview} className="w-full h-full object-cover" controls autoPlay playsInline style={{ filter: filterCss }} />
-              ) : !isStory && displayMedias.length > 1 ? (
-                <div className="grid grid-cols-3 gap-1 w-full h-full">
-                  {displayMedias.map((p, i) => (
-                    <div key={i} className="aspect-square overflow-hidden">
-                      <img src={p} alt="" className="w-full h-full object-cover" style={{ filter: filterCss }} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <img src={mainPreview} alt="" className="w-full h-full object-cover select-none" draggable={false} style={{ filter: filterCss }} />
-              )}
-
-              {dessinDataUrl && (
-                <img src={dessinDataUrl} alt="" className="absolute inset-0 w-full h-full pointer-events-none" />
-              )}
-
-              {elements.map((el) => (
-                <DraggableElement key={el.id} element={el} onMove={moveElement} onTap={handleElementTap}>
-                  {el.type === 'texte' && el.id !== editingTextId && (
-                    <p
-                      className="text-center font-semibold px-2 max-w-[80vw] whitespace-pre-wrap"
-                      style={{ color: el.couleur, fontSize: '26px', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}
-                    >
-                      {el.contenu}
-                    </p>
-                  )}
-                  {el.type === 'sticker' && <span className="text-5xl">{el.contenu}</span>}
-                  {el.type === 'mention' && (
-                    <span className="bg-black/40 backdrop-blur px-3 py-1.5 rounded-full text-body-medium text-white">
-                      @{el.contenu}
-                    </span>
-                  )}
-                </DraggableElement>
-              ))}
-
-              <DrawCanvas
-                active={activeTool === 'dessiner'}
-                width={canvasSize.width}
-                height={canvasSize.height}
-                onExport={handleDessinExport}
+              <img
+                src={mainPreview}
+                alt=""
+                className="w-full h-full object-contain"
+                draggable={false}
+                style={{ transform: `rotate(${rotation}deg)` }}
               />
             </div>
 
-            {isEditing && !isStory && (
-              <p className="text-white/40 text-caption text-center mt-3">
-                Pour changer la photo, supprime cette publication et republie.
-              </p>
-            )}
-          </div>
+            <div
+              className="absolute border-2 border-white"
+              style={{
+                left: `${draftCrop.x}%`,
+                top: `${draftCrop.y}%`,
+                width: `${draftCrop.w}%`,
+                height: `${draftCrop.h}%`,
+                zIndex: 1,
+              }}
+              onPointerDown={startDrag('move')}
+            >
+              <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none">
+                {Array.from({ length: 9 }).map((_, i) => (
+                  <div key={i} className="border border-white/40" />
+                ))}
+              </div>
 
-          {/* barre d'icônes verticale flottante, façon Instagram, commune à post et story */}
-          <div className="absolute top-3 right-3 flex flex-col items-end gap-5 z-10">
-            {PRIMARY_TOOLS.map(({ key, icon: Icon, label }) => (
-              <button
-                key={key}
-                onClick={(e) => { e.stopPropagation(); handleToolClick(key) }}
-                className="flex items-center gap-2"
-              >
-                <span className="text-[13px] text-white whitespace-nowrap">{label}</span>
-                <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${activeTool === key ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
-                  <Icon size={17} />
-                </span>
-              </button>
-            ))}
+              {['t', 'b', 'l', 'r'].map((h) => {
+                const isVertical = h === 't' || h === 'b'
+                return (
+                  <div
+                    key={h}
+                    onPointerDown={startDrag(h)}
+                    className="absolute touch-none"
+                    style={{
+                      zIndex: 2,
+                      left: isVertical ? 16 : h === 'l' ? -22 : undefined,
+                      right: isVertical ? 16 : h === 'r' ? -22 : undefined,
+                      top: !isVertical ? 16 : h === 't' ? -22 : undefined,
+                      bottom: !isVertical ? 16 : h === 'b' ? -22 : undefined,
+                      width: isVertical ? undefined : 44,
+                      height: isVertical ? 44 : undefined,
+                      cursor: isVertical ? 'ns-resize' : 'ew-resize',
+                    }}
+                  />
+                )
+              })}
 
-            <button onClick={(e) => { e.stopPropagation(); setShowMore((s) => !s) }} className="flex items-center gap-2">
-              <span className="text-[13px] text-white whitespace-nowrap">Plus</span>
-              <span className="w-9 h-9 rounded-full bg-black/40 text-white flex items-center justify-center shrink-0">
-                <MoreHorizontal size={17} />
-              </span>
-            </button>
-
-            {showMore && MORE_TOOLS.map(({ key, icon: Icon, label }) => (
-              <button
-                key={key}
-                onClick={(e) => { e.stopPropagation(); handleToolClick(key) }}
-                className="flex items-center gap-2"
-              >
-                <span className="text-[13px] text-white whitespace-nowrap">{label}</span>
-                <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${activeTool === key ? 'bg-white text-black' : 'bg-black/40 text-white'}`}>
-                  <Icon size={17} />
-                </span>
-              </button>
-            ))}
+              {['tl', 'tr', 'bl', 'br'].map((h) => (
+                <div
+                  key={h}
+                  onPointerDown={startDrag(h)}
+                  className="absolute w-11 h-11 -m-[22px] touch-none"
+                  style={{
+                    zIndex: 3,
+                    left: h.includes('l') ? 0 : undefined,
+                    right: h.includes('r') ? 0 : undefined,
+                    top: h.includes('t') ? 0 : undefined,
+                    bottom: h.includes('b') ? 0 : undefined,
+                    cursor: h === 'tl' || h === 'br' ? 'nwse-resize' : 'nesw-resize',
+                  }}
+                >
+                  <div className="w-6 h-6 border-white m-[10px]" style={{
+                    borderTopWidth: h.includes('t') ? 3 : 0,
+                    borderBottomWidth: h.includes('b') ? 3 : 0,
+                    borderLeftWidth: h.includes('l') ? 3 : 0,
+                    borderRightWidth: h.includes('r') ? 3 : 0,
+                  }} />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </main>
 
-      {/* panneau d'outil actif (texte, stickers, filtre, mentionner) */}
-      {activeTool === 'texte' && editingTextId && (
-        <div className="px-4 pb-3 shrink-0">
-          <div className="flex items-center gap-2 mb-2">
+        {/* choix de ratio, en plus du cadre manuel */}
+        <div className="flex gap-2 px-4 pb-2">
+          {RATIOS.map((r) => (
+            <button
+              key={r.value}
+              onClick={() => applyRatio(r.value)}
+              className={`flex-1 rounded-2xl py-3 text-caption-medium transition-colors ${
+                format === r.value ? 'bg-white text-black' : 'bg-white/10 text-white'
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-center pb-2">
+          <button
+            onClick={() => setRotation((r) => (r + 90) % 360)}
+            className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center text-white"
+          >
+            <RotateCcw size={20} />
+          </button>
+        </div>
+
+        <div
+          className="flex items-center justify-between px-6 pb-6 pt-2"
+          style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+        >
+          <button onClick={cancelCrop} className="text-body-medium" style={{ color: 'var(--accent)' }}>
+            Annuler
+          </button>
+          <button onClick={confirmCrop} className="text-body-medium" style={{ color: 'var(--accent)' }}>
+            Terminé
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ============================================================
+  // ÉCRAN TEXTE — Aa, polices, couleur
+  // ============================================================
+  const filterCss = getFilterCss(filtre)
+
+  if (step === 'texte') {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-black select-none">
+        <div
+          className="flex items-center justify-between px-4 pt-[max(14px,env(safe-area-inset-top))] pb-3"
+          style={{ paddingTop: 'max(14px, env(safe-area-inset-top))' }}
+        >
+          <button onClick={confirmTexte} className="text-white text-body-medium">
+            Terminé
+          </button>
+          <div className="flex items-center gap-2">
             {TEXT_COLORS.map((c) => (
               <button
                 key={c}
                 onClick={() => setTextColor(c)}
-                className={`w-7 h-7 rounded-full border-2 ${textColor === c ? 'border-white' : 'border-transparent'}`}
+                className={`w-6 h-6 rounded-full border-2 ${textColor === c ? 'border-white' : 'border-transparent'}`}
                 style={{ backgroundColor: c }}
               />
             ))}
           </div>
-          <input
-            value={textDraft}
-            onChange={(e) => setTextDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && commitTextEdit()}
-            placeholder="Ajouter du texte..."
-            autoFocus
-            className="w-full h-12 rounded-2xl px-4 bg-white/10 text-white outline-none text-body placeholder:text-white/50"
-          />
-          <div className="flex justify-end mt-2">
-            <button onClick={commitTextEdit} className="text-white text-body-medium px-3 py-1.5">Terminé</button>
+        </div>
+
+        <div className="flex-1 relative overflow-hidden" style={cropStyle}>
+          <div className="relative w-full h-full flex items-center justify-center bg-black">
+            <img
+              src={mainPreview}
+              alt=""
+              className="w-full h-full object-contain select-none"
+              draggable={false}
+              style={{ filter: filterCss, transform: `rotate(${rotation}deg)` }}
+            />
+            <div className="absolute inset-0 flex items-center justify-center px-8 pointer-events-none">
+              <textarea
+                autoFocus
+                value={textDraft}
+                onChange={(e) => setTextDraft(e.target.value)}
+                placeholder="Ajouter du texte"
+                rows={2}
+                className="note-text-input pointer-events-auto w-full bg-transparent text-center outline-none resize-none"
+                style={{ color: textColor, fontSize: 28, textShadow: '0 1px 6px rgba(0,0,0,0.6)', ...getFontStyle(textFont) }}
+              />
+            </div>
           </div>
         </div>
-      )}
 
-      {activeTool === 'stickers' && (
-        <div className="shrink-0 border-t border-white/10">
-          <StickerPicker onPick={addSticker} />
+        <div className="flex gap-3 overflow-x-auto px-4 py-4 shrink-0">
+          {FONTS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setTextFont(f.key)}
+              className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 ${
+                textFont === f.key ? 'bg-white text-black' : 'bg-white/10 text-white'
+              }`}
+              style={f.style}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
+    )
+  }
 
-      {activeTool === 'filtre' && (
-        <div className="shrink-0 border-t border-white/10">
+  // ============================================================
+  // ÉCRAN PRINCIPAL
+  // ============================================================
+  return (
+    <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col select-none">
+      <div
+        className="flex items-center justify-between px-4 pb-3"
+        style={{ paddingTop: 'max(14px, env(safe-area-inset-top))' }}
+      >
+        <button
+          onClick={() => (isEditing ? navigate(-1) : setStep('select'))}
+          className="w-9 h-9 flex items-center justify-center text-white"
+        >
+          <X size={22} />
+        </button>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={openCrop}
+            className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white"
+          >
+            <RotateCcw size={18} />
+          </button>
+          <button
+            onClick={openTexte}
+            className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white font-semibold text-[15px]"
+          >
+            Aa
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 relative overflow-hidden" style={cropStyle}>
+        <div className="relative w-full h-full bg-black">
+          {mainIsVideo ? (
+            <video src={mainPreview} className="w-full h-full object-contain" controls autoPlay playsInline style={{ filter: filterCss }} />
+          ) : isCarrousel ? (
+            <div className="grid grid-cols-3 gap-1 w-full h-full">
+              {displayMedias.map((p, i) => (
+                <div key={i} className="aspect-square overflow-hidden">
+                  <img src={p} alt="" className="w-full h-full object-cover" style={{ filter: filterCss }} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <img
+              src={mainPreview}
+              alt=""
+              className="w-full h-full object-contain select-none"
+              draggable={false}
+              style={{ filter: filterCss, transform: `rotate(${rotation}deg)` }}
+            />
+          )}
+
+          {textEl && (
+            <DraggableElement element={textEl} onMove={moveText}>
+              <p
+                className="text-center px-3 max-w-[80vw] whitespace-pre-wrap"
+                style={{ color: textEl.couleur, fontSize: 28, textShadow: '0 1px 6px rgba(0,0,0,0.5)', ...getFontStyle(textEl.police) }}
+              >
+                {textEl.contenu}
+              </p>
+            </DraggableElement>
+          )}
+        </div>
+      </div>
+
+      {showFilters && (
+        <div className="shrink-0 bg-black/95 pt-2" style={{ animation: 'slideUpPanel 0.2s ease-out' }}>
+          <p className="text-center text-white/60 text-caption pb-1">Filtres</p>
           <FilterPicker imageUrl={mainPreview} isVideo={mainIsVideo} value={filtre} onChange={setFiltre} />
         </div>
       )}
 
-      {activeTool === 'mentionner' && (
-        <div className="shrink-0 border-t border-white/10">
-          <MentionPicker onPick={addMention} />
-        </div>
-      )}
+      <div className="px-4 pt-2">
+        <textarea
+          value={legende}
+          onChange={(e) => setLegende(e.target.value)}
+          rows={2}
+          placeholder="Écris une légende..."
+          className="w-full rounded-2xl px-4 py-3 bg-white/10 text-white outline-none resize-none text-body placeholder:text-white/50"
+        />
+      </div>
 
-      {/* pied : ratio (post uniquement) + légende + publier */}
-      {!isStory && (
-        <footer className="shrink-0 px-4 pb-6 pt-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
-          <div className="flex gap-2 mb-3">
-            {FORMATS.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setFormat(f.value)}
-                className={`flex-1 rounded-2xl py-3 text-caption-medium transition-colors ${
-                  format === f.value ? 'bg-white text-black' : 'bg-white/10 text-white'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          <textarea
-            value={legende}
-            onChange={(e) => setLegende(e.target.value)}
-            rows={2}
-            placeholder="Écris une légende..."
-            className="w-full rounded-2xl px-4 py-3 bg-white/10 text-white outline-none resize-none text-body placeholder:text-white/50 mb-3"
-          />
-
-          <button
-            onClick={handlePublish}
-            disabled={loading}
-            className="w-full h-12 rounded-full bg-white text-black text-body-medium disabled:opacity-40 flex items-center justify-center gap-2"
-          >
-            {loading ? 'Enregistrement...' : (
-              <>
-                <Check size={18} strokeWidth={2.5} /> {isEditing ? 'Enregistrer' : 'Publier'}
-              </>
-            )}
-          </button>
-        </footer>
-      )}
-
-      {/* story : bouton Publier flottant, pas de pied de page qui rogne la photo */}
-      {isStory && (
-        <div
-          className="shrink-0 px-4 pb-6 pt-3"
-          style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+      <div
+        className="flex items-center justify-between px-4 pt-2"
+        style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+      >
+        <button onClick={() => (isEditing ? navigate(-1) : setStep('select'))} className="text-white text-body-medium px-2 py-2">
+          Annuler
+        </button>
+        <button
+          onClick={() => setShowFilters((s) => !s)}
+          className="text-white text-body-medium px-2 py-2"
         >
-          <button
-            onClick={handlePublish}
-            disabled={loading}
-            className="w-full h-12 rounded-full bg-white text-black text-body-medium disabled:opacity-40 flex items-center justify-center gap-2"
-          >
-            {loading ? 'Publication...' : (
-              <>
-                <Send size={16} /> {isEditing ? 'Enregistrer' : 'Publier'}
-              </>
-            )}
-          </button>
-        </div>
-      )}
+          Filtres
+        </button>
+        <button onClick={handlePublish} disabled={loading} className="text-body-medium px-2 py-2 disabled:opacity-40" style={{ color: 'var(--accent)' }}>
+          {loading ? '...' : isEditing ? 'Enregistrer' : 'Publier'}
+        </button>
+      </div>
+
+      <style>{`
+        @keyframes slideUpPanel {
+          from { transform: translateY(100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        .note-text-input::placeholder {
+          color: rgba(255, 255, 255, 0.75);
+          text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+        }
+      `}</style>
     </div>
   )
 }
