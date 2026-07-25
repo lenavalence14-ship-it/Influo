@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft, Plus, Volume2, VolumeX, Play, Pause } from 'lucide-react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -57,6 +57,7 @@ export default function ReelsViewer() {
   const { user } = useAuth()
   const { postId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const containerRef = useRef(null)
   const videoRefs = useRef([])
   const hasScrolledToStart = useRef(false)
@@ -159,6 +160,30 @@ export default function ReelsViewer() {
     const video = videoRefs.current[activeIndex]
     if (video) video.muted = muted
   }, [muted, activeIndex])
+
+  // Coupe la vidéo active dès que l'onglet Réels quitte l'écran, y compris
+  // quand ce n'est pas un vrai démontage : la route /video est gardée en vie
+  // par KeepAliveTabs (display:none au lieu d'être démontée), donc sans ceci
+  // la vidéo et son son continuaient de tourner en arrière-plan — que ce
+  // soit après avoir quitté l'app (onglet navigateur/app masqué) OU après
+  // avoir simplement basculé sur un autre onglet interne (Feed, Recherche…)
+  // sans changer de tab navigateur, cas que visibilitychange seul ne couvre
+  // pas puisque le document reste visible.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden) {
+        videoRefs.current.forEach((video) => video?.pause())
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
+
+  useEffect(() => {
+    if (location.pathname !== '/video' && !location.pathname.startsWith('/video/')) {
+      videoRefs.current.forEach((video) => video?.pause())
+    }
+  }, [location.pathname])
 
   if (loading) {
     return (

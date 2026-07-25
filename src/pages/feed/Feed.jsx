@@ -26,7 +26,7 @@ async function fetchFeedPage({ userId, pageParam = 0 }) {
   const { data, error } = await supabase
     .from('posts')
     .select(`
-      id, legende, crop_format, type, created_at, commande_id, filtre,
+      id, legende, crop_format, crop_x, crop_y, crop_w, crop_h, type, created_at, commande_id, filtre,
       post_medias(media_url, media_type, thumbnail_url, position),
       profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
       client:client_id(id, nom_complet, photo_url),
@@ -66,6 +66,7 @@ export default function Feed() {
   // l'active pour toutes, sans pour autant les jouer toutes en même temps
   // (seule la vidéo réellement visible à l'écran joue, voir PostCard)
   const [feedMuted, setFeedMuted] = useState(true)
+  const toggleFeedMuted = useCallback(() => setFeedMuted((m) => !m), [])
 
   const {
     data,
@@ -217,7 +218,7 @@ export default function Feed() {
               onDeleted={handleDeleted}
               priority={i < 2}
               muted={feedMuted}
-              onToggleMute={() => setFeedMuted((m) => !m)}
+              onToggleMute={toggleFeedMuted}
             />
           ))}
           {hasNextPage && (

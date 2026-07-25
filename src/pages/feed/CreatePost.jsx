@@ -71,6 +71,14 @@ export default function CreatePost() {
         setLegende(data.legende || '')
         const savedFormat = data.crop_format
         setFormat(savedFormat === 'vertical_45' ? 'vertical' : savedFormat || 'carre')
+        if (
+          data.crop_x != null && data.crop_y != null &&
+          data.crop_w != null && data.crop_h != null
+        ) {
+          const savedCrop = { x: data.crop_x, y: data.crop_y, w: data.crop_w, h: data.crop_h }
+          setCrop(savedCrop)
+          setDraftCrop(savedCrop)
+        }
         setFiltre(data.filtre || null)
         if (data.texte_overlay) {
           setTextEl({
@@ -108,8 +116,21 @@ export default function CreatePost() {
   const isVideoFile = (f) => f?.type?.startsWith('video/')
   const mainIsVideo = isEditing ? existingMediaTypes[0] === 'video' : isVideoFile(files[0])
   const displayMedias = isEditing ? existingMediaUrls : previews
+  // Type par média (pas seulement le premier) : nécessaire pour un carrousel
+  // mixte photos+vidéos — avant ce correctif, seul existingMediaTypes[0] (ou
+  // files[0]) était regardé, donc dès que le PREMIER fichier était une photo,
+  // isCarrousel passait à true mais chaque item du carrousel était quand même
+  // rendu comme <img>, y compris les vidéos, qui s'affichaient donc figées
+  // (juste la première frame, aucune lecture).
+  const displayMediaTypes = isEditing
+    ? existingMediaTypes
+    : files.map((f) => (isVideoFile(f) ? 'video' : 'image'))
   const mainPreview = displayMedias[0]
-  const isCarrousel = !mainIsVideo && displayMedias.length > 1
+  // Un carrousel peut désormais contenir une vidéo (pas seulement en position
+  // 0) : la condition ne dépend donc plus de mainIsVideo, seulement du nombre
+  // de fichiers. mainIsVideo ne sert plus qu'à choisir l'écran plein cadre
+  // pour le cas vidéo UNIQUE (1 seul fichier, qui est une vidéo).
+  const isCarrousel = displayMedias.length > 1
 
   const moveText = (_id, x, y) => setTextEl((prev) => (prev ? { ...prev, x, y } : prev))
 
@@ -124,6 +145,10 @@ export default function CreatePost() {
     const commonFields = {
       legende,
       crop_format: format,
+      crop_x: crop.x,
+      crop_y: crop.y,
+      crop_w: crop.w,
+      crop_h: crop.h,
       filtre,
       texte_overlay: textEl?.contenu || null,
       texte_x: textEl?.x ?? null,
@@ -148,7 +173,13 @@ export default function CreatePost() {
       .from('posts')
       .insert({
         influenceur_id: influencerProfile.id,
-        type: hasVideo ? 'video' : files.length > 1 ? 'carrousel' : 'photo',
+        // Priorité au carrousel dès qu'il y a plusieurs fichiers, même si l'un
+        // d'eux est une vidéo : sinon 'video' l'emportait toujours sur
+        // 'carrousel' (hasVideo testé en premier), et PostCard n'affichait
+        // alors QUE le premier média (allMedias[0]) au lieu du carrousel
+        // complet — la vidéo mélangée dans un carrousel de plusieurs fichiers
+        // faisait disparaître les autres photos du post publié.
+        type: files.length > 1 ? 'carrousel' : hasVideo ? 'video' : 'photo',
         ...commonFields,
       })
       .select()
@@ -673,7 +704,7 @@ export default function CreatePost() {
 
       <div className={`flex-1 relative ${isCarrousel ? '' : 'overflow-hidden'}`} style={isCarrousel ? undefined : cropStyle}>
         <div className="relative w-full h-full bg-black">
-          {mainIsVideo ? (
+          {mainIsVideo && !isCarrousel ? (
             isEditing && existingHls?.status === 'ready' && existingHls?.playlistUrl ? (
               <HlsVideo
                 videoRef={videoRef}
@@ -693,11 +724,24 @@ export default function CreatePost() {
             )
           ) : isCarrousel ? (
             <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory">
-              {displayMedias.map((p, i) => (
-                <div key={i} className="w-full h-full shrink-0 snap-center">
-                  <img src={p} alt="" className="w-full h-full object-contain select-none" draggable={false} style={{ filter: filterCss }} />
-                </div>
-              ))}
+              {displayMedias.map((p, i) =>
+                displayMediaTypes[i] === 'video' ? (
+                  <div key={i} className="w-full h-full shrink-0 snap-center">
+                    <video
+                      src={p}
+                      className="w-full h-full object-contain"
+                      style={{ filter: filterCss }}
+                      controls
+                      playsInline
+                      preload="metadata"
+                    />
+                  </div>
+                ) : (
+                  <div key={i} className="w-full h-full shrink-0 snap-center">
+                    <img src={p} alt="" className="w-full h-full object-contain select-none" draggable={false} style={{ filter: filterCss }} />
+                  </div>
+                )
+              )}
             </div>
           ) : (
             <img

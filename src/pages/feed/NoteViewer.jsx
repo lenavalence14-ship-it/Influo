@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { X, Heart, Repeat2, Send, Eye, ArrowLeft, MoreVertical, Music } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -71,6 +71,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
   const [showMenu, setShowMenu] = useState(false)
   const [direction, setDirection] = useState(1) // 1 = next (slide vers la gauche), -1 = prev (slide vers la droite)
   const navigate = useNavigate()
+  const location = useLocation()
 
   const timerRef = useRef(null)
   const remainingRef = useRef(SEGMENT_DURATION_MS)
@@ -175,7 +176,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
       setGroupIndex((g) => g + 1)
       setSegmentIndex(0)
     } else {
-      onClose()
+      closeAndStop()
     }
   }, [segmentIndex, items.length, groupIndex, groups.length, onClose])
 
@@ -270,6 +271,50 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupIndex, segmentIndex])
+
+  // Coupe le son immédiatement si l'app/onglet passe en arrière-plan (Home,
+  // changement d'app, écran verrouillé) — sans ça l'audio d'une note reste
+  // audible même app minimisée, tant que le composant reste monté (ce qui
+  // arrive avec KeepAliveTabs : NoteBar n'est jamais démonté en changeant
+  // d'onglet, donc son <audio> continuait de jouer si on quittait l'app en
+  // plein visionnage sans fermer le viewer explicitement au préalable).
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden) {
+        audioRef.current?.pause()
+        handlePauseStart()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Même logique que ci-dessus mais pour un changement d'onglet interne
+  // (Feed -> Recherche, etc.) : NoteBar vit dans Feed ('/'), gardé monté par
+  // KeepAliveTabs, donc quitter le Feed sans fermer explicitement le viewer
+  // laissait la musique tourner tant qu'on ne revenait pas sur '/'.
+  useEffect(() => {
+    if (location.pathname !== '/') {
+      audioRef.current?.pause()
+      handlePauseStart()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname])
+
+  // Coupe le son dès la fermeture du viewer, avant même que l'animation de
+  // sortie de motion.div ne finisse de démonter le composant (AnimatePresence
+  // garde le composant vivant le temps du fade-out).
+  const closeAndStop = useCallback(() => {
+    const audio = audioRef.current
+    if (audio) {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+    }
+    clearTimer()
+    closeAndStop()
+  }, [onClose])
 
   // Pause / reprise (appui long) : synchronise le son avec le timer visuel.
   // Vérifie aussi que le segment COURANT a bien de la musique (pas juste
@@ -430,7 +475,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
       setGroupIndex((g) => g + 1)
       setSegmentIndex(0)
     } else {
-      onClose()
+      closeAndStop()
     }
   }
 
@@ -630,7 +675,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
       conversations_sociale: `/messages/sociale/${conversationId}`,
       conversations_influenceur: `/messages/influenceur/${conversationId}`,
     }
-    onClose()
+    closeAndStop()
     navigate(routeByTable[table])
   }
 
@@ -717,7 +762,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
                   alt=""
                   onClick={(e) => {
                     e.stopPropagation()
-                    onClose()
+                    closeAndStop()
                     navigate(profileRoute(author.id, author.role))
                   }}
                   className="w-9 h-9 rounded-full object-cover border-2 cursor-pointer"
@@ -728,7 +773,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
                   alt=""
                   onClick={(e) => {
                     e.stopPropagation()
-                    onClose()
+                    closeAndStop()
                     navigate(profileRoute(current.reposter.id, current.reposter.role))
                   }}
                   className="w-9 h-9 rounded-full object-cover border-2 -ml-3 cursor-pointer"
@@ -741,7 +786,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
                 alt=""
                 onClick={(e) => {
                   e.stopPropagation()
-                  onClose()
+                  closeAndStop()
                   navigate(profileRoute(author.id, author.role))
                 }}
                 className="w-9 h-9 rounded-full object-cover shrink-0 cursor-pointer"
@@ -981,7 +1026,7 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
             <button
               onClick={() => {
                 setShowMenu(false)
-                onClose()
+                closeAndStop()
                 navigate(`/notes/nouvelle?edit=${note.id}`)
               }}
               className="w-full text-left px-4 py-3.5 text-body"

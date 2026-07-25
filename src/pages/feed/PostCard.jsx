@@ -20,6 +20,24 @@ const cropClasses = {
   vertical_45: 'aspect-[4/5]',
 }
 
+// Reproduit exactement le rendu de l'écran de recadrage (CreatePost.jsx) :
+// image en object-contain dans le cadre, puis clip-path inset() sur le
+// rectangle choisi (crop_x/y/w/h, en % du cadre). Sans ça, le feed retombait
+// sur un object-cover centré générique, qui ne correspond jamais au cadrage
+// précis validé dans l'éditeur (recadrage manuel écrasé). Retourne null si
+// aucun crop précis n'a été enregistré (post publié avant cette fonctionnalité,
+// ou crop plein cadre par défaut) : le feed retombe alors sur object-cover.
+function getCropRectStyle(post) {
+  const { crop_x: x, crop_y: y, crop_w: w, crop_h: h } = post
+  if (x == null || y == null || w == null || h == null) return null
+  // Crop plein cadre (0,0,100,100) : équivalent à pas de crop, pas la peine
+  // de passer par le clip-path (object-cover suffit et coûte moins cher).
+  if (x === 0 && y === 0 && w === 100 && h === 100) return null
+  return {
+    clipPath: `inset(${y}% ${100 - x - w}% ${100 - y - h}% ${x}%)`,
+  }
+}
+
 function PostCard({ post, onDeleted, autoOpenComments = false, priority = false, muted: mutedProp, onToggleMute: onToggleMuteProp }) {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -225,17 +243,32 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
                   onScroll={handleCarrouselScroll}
                   className="flex w-full h-full overflow-x-auto snap-x snap-mandatory"
                 >
-                  {sortedMedias.map((m, i) => (
-                    <img
-                      key={i}
-                      src={m.media_url}
-                      alt=""
-                      loading={priority && i === 0 ? 'eager' : 'lazy'}
-                      decoding="async"
-                      className="w-full h-full object-cover shrink-0 snap-center"
-                      style={{ filter: getFilterCss(post.filtre) }}
-                    />
-                  ))}
+                  {sortedMedias.map((m, i) =>
+                    m.media_type === 'video' ? (
+                      <video
+                        key={i}
+                        src={m.media_url}
+                        poster={m.thumbnail_url || undefined}
+                        className="w-full h-full object-cover shrink-0 snap-center"
+                        style={{ filter: getFilterCss(post.filtre) }}
+                        muted
+                        loop
+                        playsInline
+                        controls
+                        preload="metadata"
+                      />
+                    ) : (
+                      <img
+                        key={i}
+                        src={m.media_url}
+                        alt=""
+                        loading={priority && i === 0 ? 'eager' : 'lazy'}
+                        decoding="async"
+                        className="w-full h-full object-cover shrink-0 snap-center"
+                        style={{ filter: getFilterCss(post.filtre) }}
+                      />
+                    )
+                  )}
                 </div>
 
                 {/* compteur photo visitée / total, façon Instagram */}
@@ -272,14 +305,21 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
                 </div>
               </>
             ) : (
-              <img
-                src={mediaUrl}
-                alt=""
-                loading={priority ? 'eager' : 'lazy'}
-                decoding="async"
-                className="w-full h-full object-cover"
-                style={{ filter: getFilterCss(post.filtre) }}
-              />
+              (() => {
+                const cropRectStyle = getCropRectStyle(post)
+                return (
+                  <div className="w-full h-full relative overflow-hidden" style={cropRectStyle || undefined}>
+                    <img
+                      src={mediaUrl}
+                      alt=""
+                      loading={priority ? 'eager' : 'lazy'}
+                      decoding="async"
+                      className={`w-full h-full ${cropRectStyle ? 'object-contain' : 'object-cover'}`}
+                      style={{ filter: getFilterCss(post.filtre) }}
+                    />
+                  </div>
+                )
+              })()
             )}
           </div>
         )}
@@ -377,5 +417,7 @@ export default memo(PostCard, (prev, next) => (
   prev.post === next.post &&
   prev.onDeleted === next.onDeleted &&
   prev.autoOpenComments === next.autoOpenComments &&
-  prev.priority === next.priority
+  prev.priority === next.priority &&
+  prev.muted === next.muted &&
+  prev.onToggleMute === next.onToggleMute
 ))
