@@ -1,3 +1,41 @@
+// Lit les dimensions naturelles (largeur/hauteur en pixels) d'un fichier image
+// ou vidéo, nécessaires au système de crop zoom/pan : le zoom minimum autorisé
+// (qui garantit qu'aucun espace vide n'apparaît dans le cadre) dépend du ratio
+// réel du média par rapport au ratio du cadre choisi, donc il faut connaître
+// ces dimensions AVANT de calculer quoi que ce soit côté édition ou stockage.
+export async function getMediaDimensions(file) {
+  if (file.type.startsWith('image/')) {
+    try {
+      const bitmap = await createImageBitmap(file)
+      const { width, height } = bitmap
+      bitmap.close?.()
+      return { width, height }
+    } catch {
+      const img = await decodeViaImageElement(file)
+      return { width: img.width, height: img.height }
+    }
+  }
+
+  if (file.type.startsWith('video/')) {
+    const url = URL.createObjectURL(file)
+    try {
+      const video = document.createElement('video')
+      video.src = url
+      video.muted = true
+      video.playsInline = true
+      await new Promise((resolve, reject) => {
+        video.onloadedmetadata = resolve
+        video.onerror = reject
+      })
+      return { width: video.videoWidth, height: video.videoHeight }
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }
+
+  return { width: null, height: null }
+}
+
 // Compresse une image en la redimensionnant si trop grande et en la réencodant en JPEG qualité 82%.
 // Rapide, aucune dépendance externe (Canvas natif du navigateur).
 // Repli de décodage via un élément <img> classique + object URL, pour les

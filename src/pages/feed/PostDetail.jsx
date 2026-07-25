@@ -20,8 +20,8 @@ export default function PostDetail() {
       const { data, error } = await supabase
         .from('posts')
         .select(`
-          id, legende, crop_format, crop_x, crop_y, crop_w, crop_h, type, created_at, commande_id,
-          post_medias(media_url, media_type, thumbnail_url, position),
+          id, legende, crop_format, type, created_at, commande_id, filtre,
+          post_medias(media_url, media_type, thumbnail_url, position, filtre, zoom, offset_x, offset_y, natural_width, natural_height),
           profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
           client:client_id(id, nom_complet, photo_url),
           commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)

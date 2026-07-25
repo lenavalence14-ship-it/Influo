@@ -11,32 +11,24 @@ import CommentsSheet from './CommentsSheet'
 import { useActiveStories } from '../../hooks/useActiveStories'
 import { timeAgo } from '../../lib/time'
 import { getFilterCss } from './editor/FilterPicker'
+import { CROP_ASPECT_CLASSES, getCropTransformStyle } from '../../lib/mediaCrop'
 
-const cropClasses = {
-  carre: 'aspect-square',
-  vertical: 'aspect-[9/16]',
-  horizontal: 'aspect-[4/3]',
-  // ancienne valeur héritée (anciens posts publiés en 4:5 avant le passage à 9:16) :
-  // on garde ce ratio pour eux spécifiquement, pas pour 'vertical' qui est désormais 9:16
-  vertical_45: 'aspect-[4/5]',
-}
+const cropClasses = CROP_ASPECT_CLASSES
 
-// Reproduit exactement le rendu de l'écran de recadrage (CreatePost.jsx) :
-// image en object-contain dans le cadre, puis clip-path inset() sur le
-// rectangle choisi (crop_x/y/w/h, en % du cadre). Sans ça, le feed retombait
-// sur un object-cover centré générique, qui ne correspond jamais au cadrage
-// précis validé dans l'éditeur (recadrage manuel écrasé). Retourne null si
-// aucun crop précis n'a été enregistré (post publié avant cette fonctionnalité,
-// ou crop plein cadre par défaut) : le feed retombe alors sur object-cover.
-function getCropRectStyle(post) {
-  const { crop_x: x, crop_y: y, crop_w: w, crop_h: h } = post
-  if (x == null || y == null || w == null || h == null) return null
-  // Crop plein cadre (0,0,100,100) : équivalent à pas de crop, pas la peine
-  // de passer par le clip-path (object-cover suffit et coûte moins cher).
-  if (x === 0 && y === 0 && w === 100 && h === 100) return null
-  return {
-    clipPath: `inset(${y}% ${100 - x - w}% ${100 - y - h}% ${x}%)`,
-  }
+// Style de rendu d'UN média précis (photo ou vidéo), à partir de son crop
+// zoom/pan stocké en base (post_medias.zoom/offset_x/offset_y/natural_width/
+// natural_height). C'est la MÊME fonction (getCropTransformStyle, lib/mediaCrop)
+// qu'utilise l'éditeur en aperçu temps réel : le feed ne recalcule jamais un
+// cadrage différent, il rejoue exactement celui choisi à la publication.
+function getMediaCropStyle(media, cropFormat) {
+  return getCropTransformStyle({
+    naturalWidth: media?.natural_width,
+    naturalHeight: media?.natural_height,
+    cropFormat,
+    zoom: media?.zoom,
+    offsetX: media?.offset_x,
+    offsetY: media?.offset_y,
+  })
 }
 
 function PostCard({ post, onDeleted, autoOpenComments = false, priority = false, muted: mutedProp, onToggleMute: onToggleMuteProp }) {
@@ -211,8 +203,8 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
                       alt=""
                       loading={priority ? 'eager' : 'lazy'}
                       decoding="async"
-                      className="w-full h-full object-cover"
-                      style={{ filter: getFilterCss(post.filtre) }}
+                      className="absolute inset-0"
+                      style={{ ...getMediaCropStyle(allMedias[0], post.crop_format), filter: getFilterCss(post.filtre) }}
                     />
                   )}
                   {mediaMounted && (
@@ -220,8 +212,8 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
                       ref={videoRef}
                       src={mediaUrl}
                       poster={thumbnailUrl || undefined}
-                      className="w-full h-full object-cover"
-                      style={{ filter: getFilterCss(post.filtre) }}
+                      className="absolute inset-0"
+                      style={{ ...getMediaCropStyle(allMedias[0], post.crop_format), filter: getFilterCss(post.filtre) }}
                       muted={muted}
                       loop
                       playsInline
@@ -244,32 +236,32 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
                   onScroll={handleCarrouselScroll}
                   className="flex w-full h-full overflow-x-auto snap-x snap-mandatory"
                 >
-                  {sortedMedias.map((m, i) =>
-                    m.media_type === 'video' ? (
-                      <video
-                        key={i}
-                        src={m.media_url}
-                        poster={m.thumbnail_url || undefined}
-                        className="w-full h-full object-cover shrink-0 snap-center"
-                        style={{ filter: getFilterCss(post.filtre) }}
-                        muted
-                        loop
-                        playsInline
-                        controls
-                        preload="metadata"
-                      />
-                    ) : (
-                      <img
-                        key={i}
-                        src={m.media_url}
-                        alt=""
-                        loading={priority && i === 0 ? 'eager' : 'lazy'}
-                        decoding="async"
-                        className="w-full h-full object-cover shrink-0 snap-center"
-                        style={{ filter: getFilterCss(post.filtre) }}
-                      />
-                    )
-                  )}
+                  {sortedMedias.map((m, i) => (
+                    <div key={i} className="relative w-full h-full shrink-0 snap-center overflow-hidden">
+                      {m.media_type === 'video' ? (
+                        <video
+                          src={m.media_url}
+                          poster={m.thumbnail_url || undefined}
+                          className="absolute inset-0"
+                          style={{ ...getMediaCropStyle(m, post.crop_format), filter: getFilterCss(m.filtre ?? post.filtre) }}
+                          muted
+                          loop
+                          playsInline
+                          controls
+                          preload="metadata"
+                        />
+                      ) : (
+                        <img
+                          src={m.media_url}
+                          alt=""
+                          loading={priority && i === 0 ? 'eager' : 'lazy'}
+                          decoding="async"
+                          className="absolute inset-0 select-none"
+                          style={{ ...getMediaCropStyle(m, post.crop_format), filter: getFilterCss(m.filtre ?? post.filtre) }}
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
 
                 {/* compteur photo visitée / total, façon Instagram */}
@@ -306,21 +298,16 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
                 </div>
               </>
             ) : (
-              (() => {
-                const cropRectStyle = getCropRectStyle(post)
-                return (
-                  <div className="w-full h-full relative overflow-hidden" style={cropRectStyle || undefined}>
-                    <img
-                      src={mediaUrl}
-                      alt=""
-                      loading={priority ? 'eager' : 'lazy'}
-                      decoding="async"
-                      className={`w-full h-full ${cropRectStyle ? 'object-contain' : 'object-cover'}`}
-                      style={{ filter: getFilterCss(post.filtre) }}
-                    />
-                  </div>
-                )
-              })()
+              <div className="w-full h-full relative overflow-hidden">
+                <img
+                  src={mediaUrl}
+                  alt=""
+                  loading={priority ? 'eager' : 'lazy'}
+                  decoding="async"
+                  className="absolute inset-0 select-none"
+                  style={{ ...getMediaCropStyle(allMedias[0], post.crop_format), filter: getFilterCss(post.filtre) }}
+                />
+              </div>
             )}
           </div>
         )}

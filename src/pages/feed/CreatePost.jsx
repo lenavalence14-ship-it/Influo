@@ -3,13 +3,14 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Image as ImageIcon, X, RotateCcw, Check } from 'lucide-react'
-import { compressImage, compressVideo, generateVideoThumbnail } from '../../lib/mediaCompression'
+import { compressImage, compressVideo, generateVideoThumbnail, getMediaDimensions } from '../../lib/mediaCompression'
 import { triggerHlsTranscode } from '../../lib/hlsTranscode'
 import FilterPicker, { getFilterCss } from './editor/FilterPicker'
 import DraggableElement from './editor/DraggableElement'
 import { FONTS, getFontStyle } from './PhotoNoteEditor'
 import HlsVideo from '../../components/HlsVideo'
 import { usePostUpload } from '../../contexts/PostUploadContext'
+import { CROP_ASPECT_CLASSES, getCropTransformStyle, getMinZoom, clampZoom, clampOffset } from '../../lib/mediaCrop'
 
 const RATIOS = [
   { value: 'carre', label: 'Carré', aspect: 'aspect-square' },
@@ -17,25 +18,10 @@ const RATIOS = [
   { value: 'horizontal', label: 'Paysage', aspect: 'aspect-[4/3]' },
 ]
 
-// Classes aspect-ratio par format, utilisées pour que le cadre d'édition adopte
-// directement le ratio cible (comme le fait déjà le feed via cropClasses dans
-// PostCard.jsx), au lieu de partir d'un cadre plein-écran (flex-1, proche du
-// carré) puis d'y superposer un clip-path : cette dernière approche produisait
-// un rendu flou/déformé dès que le ratio choisi n'était pas carré, car l'image
-// est en object-contain DANS LE GRAND CADRE, pas dans le rectangle réellement
-// découpé — donc la portion visible n'a jamais le ratio net attendu.
-const EDIT_ASPECT_CLASSES = {
-  carre: 'aspect-square',
-  vertical: 'aspect-[9/16]',
-  horizontal: 'aspect-[4/3]',
-  vertical_45: 'aspect-[4/5]',
-}
-
-// anciens posts publiés avec un ancien système de format : on les fait
-// retomber sur le ratio encore existant le plus proche, uniquement pour
-// l'affichage dans CET éditeur (n'affecte pas l'affichage publié ailleurs).
-// note : les valeurs de RATIOS (carre/vertical/horizontal) correspondent
-// directement à l'enum crop_format existant en base — aucun mapping nécessaire
+// Classes aspect-ratio par format, pour que le cadre d'édition adopte
+// directement le ratio cible -- identiques à CROP_ASPECT_CLASSES (mediaCrop.js),
+// réutilisées telles quelles pour rester alignées avec le rendu du feed.
+const EDIT_ASPECT_CLASSES = CROP_ASPECT_CLASSES
 
 const TEXT_COLORS = ['#ffffff', '#000000', '#f43f5e', '#3b82f6', '#22c55e', '#eab308']
 
@@ -60,18 +46,23 @@ export default function CreatePost() {
   const [format, setFormat] = useState('carre')
   const [loading, setLoading] = useState(false)
 
-  // Recadrage (crop_x/y/w/h), format (crop_format) et rotation restent des réglages
-  // GLOBAUX au post entier : le carrousel s'affiche dans un seul cadre à l'aspect-ratio
-  // uniforme, donc ces réglages ne peuvent pas être différents d'un média à l'autre.
+  // Rotation : reste un réglage global au post (rare en pratique, une seule
+  // valeur suffit). Le ratio (format) est commun au carrousel (nécessaire pour
+  // un affichage uniforme des cadres), mais le CROP réel -- zoom + position de
+  // l'image dans ce cadre -- est désormais INDÉPENDANT par média, comme le
+  // filtre et le texte : chaque photo/vidéo du carrousel garde son propre
+  // cadrage, même si toutes partagent le même ratio final.
   const [rotation, setRotation] = useState(0)
-  const [crop, setCrop] = useState({ x: 0, y: 0, w: 100, h: 100 })
-  const [draftCrop, setDraftCrop] = useState(crop)
 
-  // Filtre et texte superposé, en revanche, sont désormais INDÉPENDANTS par média :
-  // un tableau, un élément par item du carrousel (index aligné sur displayMedias/
-  // sortedMedias). Pour un post simple (pas de carrousel), seul l'index 0 est utilisé.
-  // C'est le cœur du correctif demandé : avant, un seul filtre/texte s'appliquait à
-  // TOUS les médias du carrousel, sans possibilité de les éditer séparément.
+  // cropsParMedia[i] = { zoom, offsetX, offsetY, naturalWidth, naturalHeight }
+  // naturalWidth/Height sont nécessaires pour calculer le zoom minimum qui
+  // garantit qu'aucun espace vide n'apparaît (cf lib/mediaCrop.js).
+  const [cropsParMedia, setCropsParMedia] = useState([])
+  const [draftCropActive, setDraftCropActive] = useState({ zoom: 1, offsetX: 0, offsetY: 0 })
+
+  // Filtre et texte superposé sont INDÉPENDANTS par média : un tableau, un
+  // élément par item du carrousel (index aligné sur displayMedias/sortedMedias).
+  // Pour un post simple (pas de carrousel), seul l'index 0 est utilisé.
   const [filtresParMedia, setFiltresParMedia] = useState([])
   const [textesParMedia, setTextesParMedia] = useState([]) // { contenu, x, y, couleur, police } | null, par index
 
@@ -103,31 +94,44 @@ export default function CreatePost() {
     })
   }
 
+  // Crop (zoom/pan) du média actuellement affiché/édité. Défaut : zoom minimum
+  // (calculé dès que naturalWidth/Height sont connus), centré -- garantit qu'à
+  // l'ouverture d'un média jamais encore recadré, l'image remplit déjà tout le
+  // cadre sans espace vide.
+  const cropActif = cropsParMedia[activeMediaIndex] ?? { zoom: 1, offsetX: 0, offsetY: 0, naturalWidth: null, naturalHeight: null }
+  const setCropMedia = (index, updater) => {
+    setCropsParMedia((prev) => {
+      const next = [...prev]
+      const current = next[index] ?? { zoom: 1, offsetX: 0, offsetY: 0, naturalWidth: null, naturalHeight: null }
+      next[index] = typeof updater === 'function' ? updater(current) : { ...current, ...updater }
+      return next
+    })
+  }
+
   useEffect(() => {
     if (!isEditing) return
     const loadPost = async () => {
       const { data } = await supabase
         .from('posts')
-        .select('*, post_medias(id, media_url, media_type, position, hls_status, hls_playlist_url, thumbnail_url, filtre, crop_format, crop_x, crop_y, crop_w, crop_h, texte_overlay, texte_x, texte_y, texte_couleur, texte_police)')
+        .select('*, post_medias(id, media_url, media_type, position, hls_status, hls_playlist_url, thumbnail_url, filtre, crop_format, zoom, offset_x, offset_y, natural_width, natural_height, texte_overlay, texte_x, texte_y, texte_couleur, texte_police)')
         .eq('id', postId)
         .maybeSingle()
 
       if (data) {
         setLegende(data.legende || '')
-        const savedFormat = data.crop_format
-        setFormat(savedFormat || 'carre')
-        if (
-          data.crop_x != null && data.crop_y != null &&
-          data.crop_w != null && data.crop_h != null
-        ) {
-          const savedCrop = { x: data.crop_x, y: data.crop_y, w: data.crop_w, h: data.crop_h }
-          setCrop(savedCrop)
-          setDraftCrop(savedCrop)
-        }
+        setFormat(data.crop_format || 'carre')
         const sorted = [...(data.post_medias || [])].sort((a, b) => a.position - b.position)
         setExistingMediaUrls(sorted.map((m) => m.media_url))
         setExistingMediaIds(sorted.map((m) => m.id))
         setExistingMediaTypes(sorted.map((m) => m.media_type || 'image'))
+        // Crop zoom/pan par média : chaque item du carrousel garde le sien.
+        setCropsParMedia(sorted.map((m) => ({
+          zoom: m.zoom ?? 1,
+          offsetX: m.offset_x ?? 0,
+          offsetY: m.offset_y ?? 0,
+          naturalWidth: m.natural_width ?? null,
+          naturalHeight: m.natural_height ?? null,
+        })))
         // Filtre par média : chaque item du carrousel garde le sien (post_medias.filtre).
         // Fallback sur l'ancien filtre unique du post (data.filtre) pour un média qui
         // n'aurait pas encore de filtre propre enregistré (posts publiés avant ce
@@ -176,8 +180,29 @@ export default function CreatePost() {
     setPreviews(selected.map((f) => URL.createObjectURL(f)))
     setFiltresParMedia(selected.map(() => null))
     setTextesParMedia(selected.map(() => null))
+    // Crop par défaut : zoom minimum (rempli sans espace vide), centré. Les
+    // dimensions naturelles sont encore inconnues à cet instant (lues de façon
+    // asynchrone juste après) ; getCropTransformStyle traite naturalWidth/Height
+    // nuls comme "zoom 1, pas de contrainte" en attendant, donc aucun flash
+    // incohérent à l'écran.
+    setCropsParMedia(selected.map(() => ({ zoom: 1, offsetX: 0, offsetY: 0, naturalWidth: null, naturalHeight: null })))
     setActiveMediaIndex(0)
     setStep('edit')
+
+    // Lecture des dimensions réelles en arrière-plan, par fichier : dès qu'elles
+    // sont connues, le zoom minimum peut être calculé correctement pour CE média.
+    selected.forEach((file, i) => {
+      getMediaDimensions(file).then(({ width, height }) => {
+        if (!width || !height) return
+        setCropsParMedia((prev) => {
+          const next = [...prev]
+          const current = next[i] ?? { zoom: 1, offsetX: 0, offsetY: 0 }
+          const minZoom = getMinZoom(width, height, format)
+          next[i] = { ...current, naturalWidth: width, naturalHeight: height, zoom: Math.max(current.zoom, minZoom) }
+          return next
+        })
+      })
+    })
   }
 
   const isVideoFile = (f) => f?.type?.startsWith('video/')
@@ -214,18 +239,14 @@ export default function CreatePost() {
     setLoading(true)
     setPublishError(null)
 
-    // Champs réellement globaux au post : la légende, et le cadre de recadrage
-    // (crop_format + rectangle), qui s'applique uniformément à tout le carrousel
-    // puisque l'affichage se fait dans un seul cadre à ratio fixe. Le filtre et le
-    // texte overlay, eux, sont désormais indépendants par média (voir plus bas,
-    // écrits directement sur chaque ligne post_medias).
+    // Champs réellement globaux au post : la légende, et le ratio (crop_format)
+    // -- commun au carrousel puisque tous ses éléments s'affichent au même
+    // format. Le crop réel (zoom/pan), comme le filtre et le texte overlay,
+    // est désormais indépendant par média, écrit directement sur chaque ligne
+    // post_medias (voir plus bas).
     const commonFields = {
       legende,
       crop_format: format,
-      crop_x: crop.x,
-      crop_y: crop.y,
-      crop_w: crop.w,
-      crop_h: crop.h,
     }
 
     if (isEditing) {
@@ -236,15 +257,16 @@ export default function CreatePost() {
         return
       }
 
-      // Écrit le filtre et le texte de CHAQUE média existant sur sa propre ligne
-      // post_medias, indépendamment des autres — c'est le cœur du correctif demandé :
-      // avant, un seul filtre/texte s'appliquait à tout le carrousel. En parallèle,
-      // comme pour l'upload, pour ne pas enchaîner N allers-retours séquentiels.
+      // Écrit le filtre, le texte ET le crop zoom/pan de CHAQUE média existant
+      // sur sa propre ligne post_medias, indépendamment des autres. En
+      // parallèle, comme pour l'upload, pour ne pas enchaîner N allers-retours
+      // séquentiels.
       const existingIds = existingMediaIds
       const mediaUpdateErrors = (await Promise.all(
         existingIds.map((mediaId, i) => {
           if (!mediaId) return Promise.resolve(null)
           const t = textesParMedia[i]
+          const c = cropsParMedia[i] ?? { zoom: 1, offsetX: 0, offsetY: 0 }
           return supabase
             .from('post_medias')
             .update({
@@ -254,6 +276,12 @@ export default function CreatePost() {
               texte_y: t?.y ?? null,
               texte_couleur: t?.couleur || null,
               texte_police: t?.police || null,
+              crop_format: format,
+              zoom: c.zoom,
+              offset_x: c.offsetX,
+              offset_y: c.offsetY,
+              natural_width: c.naturalWidth ?? null,
+              natural_height: c.naturalHeight ?? null,
             })
             .eq('id', mediaId)
             .then(({ error: mediaError }) => mediaError)
@@ -326,6 +354,15 @@ export default function CreatePost() {
       ])
       bumpProgress()
 
+      // Dimensions naturelles du fichier RÉELLEMENT uploadé (après compression,
+      // qui peut avoir changé la résolution) : ce sont elles qui doivent être
+      // stockées, pour que le zoom minimum recalculé au rendu (feed) corresponde
+      // exactement à ce que l'utilisateur a vu pendant l'édition. À défaut, on
+      // retombe sur les dimensions lues à la sélection (cropsParMedia[i]).
+      const compressedDims = await getMediaDimensions(file).catch(() => null)
+      const naturalWidth = compressedDims?.width ?? cropsParMedia[i]?.naturalWidth ?? null
+      const naturalHeight = compressedDims?.height ?? cropsParMedia[i]?.naturalHeight ?? null
+
       const fileName = `${influencerProfile.id}/${post.id}/${i}-${file.name}`
 
       const uploadTasks = [
@@ -346,6 +383,7 @@ export default function CreatePost() {
         ? supabase.storage.from('posts').getPublicUrl(thumbName).data.publicUrl
         : null
 
+      const c = cropsParMedia[i] ?? { zoom: 1, offsetX: 0, offsetY: 0 }
       const { data: mediaRow } = await supabase
         .from('post_medias')
         .insert({
@@ -360,6 +398,12 @@ export default function CreatePost() {
           texte_y: textesParMedia[i]?.y ?? null,
           texte_couleur: textesParMedia[i]?.couleur || null,
           texte_police: textesParMedia[i]?.police || null,
+          crop_format: format,
+          zoom: c.zoom,
+          offset_x: c.offsetX,
+          offset_y: c.offsetY,
+          natural_width: naturalWidth,
+          natural_height: naturalHeight,
         })
         .select('id')
         .single()
@@ -406,7 +450,8 @@ export default function CreatePost() {
   const cropAreaRef = useRef(null)
   const videoRef = useRef(null)
   const editCarrouselRef = useRef(null)
-  const dragState = useRef(null)
+  // état du geste en cours : pan (1 doigt/souris) ou pinch (2 doigts)
+  const gestureState = useRef(null)
 
   const handleEditCarrouselScroll = () => {
     const el = editCarrouselRef.current
@@ -417,57 +462,77 @@ export default function CreatePost() {
   const pendingEvent = useRef(null)
   const rafId = useRef(null)
 
-  const startDrag = (handle) => (e) => {
+  const minZoomActif = getMinZoom(draftCropActive.naturalWidth, draftCropActive.naturalHeight, format)
+
+  const distanceBetween = (t1, t2) => Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY)
+
+  const startGesture = (e) => {
     e.stopPropagation()
-    const point = e.touches ? e.touches[0] : e
-    dragState.current = { handle, startX: point.clientX, startY: point.clientY, start: { ...draftCrop } }
-  }
-
-  const computeNextCrop = (point) => {
-    const rect = cropAreaRef.current.getBoundingClientRect()
-    const dx = ((point.clientX - dragState.current.startX) / rect.width) * 100
-    const dy = ((point.clientY - dragState.current.startY) / rect.height) * 100
-    const { handle, start } = dragState.current
-
-    let { x, y, w, h } = start
-    if (handle === 'move') {
-      x = Math.max(0, Math.min(100 - w, start.x + dx))
-      y = Math.max(0, Math.min(100 - h, start.y + dy))
+    const touches = e.touches
+    if (touches && touches.length === 2) {
+      gestureState.current = {
+        type: 'pinch',
+        startDist: distanceBetween(touches[0], touches[1]),
+        startZoom: draftCropActive.zoom,
+        start: { ...draftCropActive },
+      }
     } else {
-      if (handle.includes('l')) {
-        const newX = Math.max(0, Math.min(start.x + start.w - 10, start.x + dx))
-        w = start.w - (newX - start.x)
-        x = newX
-      }
-      if (handle.includes('r')) {
-        w = Math.max(10, Math.min(100 - start.x, start.w + dx))
-      }
-      if (handle.includes('t')) {
-        const newY = Math.max(0, Math.min(start.y + start.h - 10, start.y + dy))
-        h = start.h - (newY - start.y)
-        y = newY
-      }
-      if (handle.includes('b')) {
-        h = Math.max(10, Math.min(100 - start.y, start.h + dy))
+      const point = touches ? touches[0] : e
+      gestureState.current = {
+        type: 'pan',
+        startX: point.clientX,
+        startY: point.clientY,
+        start: { ...draftCropActive },
       }
     }
-    return { x, y, w, h }
   }
 
-  const flushDrag = useCallback(() => {
+  const computeNextCrop = (e) => {
+    const rect = cropAreaRef.current.getBoundingClientRect()
+    const gesture = gestureState.current
+    const minZoom = getMinZoom(gesture.start.naturalWidth, gesture.start.naturalHeight, format)
+
+    if (gesture.type === 'pinch' && e.touches?.length === 2) {
+      const dist = distanceBetween(e.touches[0], e.touches[1])
+      const scaleFactor = dist / gesture.startDist
+      const nextZoom = clampZoom(gesture.startZoom * scaleFactor, minZoom)
+      return {
+        ...gesture.start,
+        zoom: nextZoom,
+        offsetX: clampOffset(gesture.start.offsetX, nextZoom, minZoom),
+        offsetY: clampOffset(gesture.start.offsetY, nextZoom, minZoom),
+      }
+    }
+
+    const point = e.touches ? e.touches[0] : e
+    const dx = ((point.clientX - gesture.startX) / rect.width) * 100
+    const dy = ((point.clientY - gesture.startY) / rect.height) * 100
+    return {
+      ...gesture.start,
+      offsetX: clampOffset(gesture.start.offsetX + dx, gesture.start.zoom, minZoom),
+      offsetY: clampOffset(gesture.start.offsetY + dy, gesture.start.zoom, minZoom),
+    }
+  }
+
+  const flushGesture = useCallback(() => {
     rafId.current = null
-    if (!dragState.current || !cropAreaRef.current || !pendingEvent.current) return
-    setDraftCrop(computeNextCrop(pendingEvent.current))
-  }, [])
+    if (!gestureState.current || !cropAreaRef.current || !pendingEvent.current) return
+    setDraftCropActive(computeNextCrop(pendingEvent.current))
+  }, [format])
 
-  const onDragMove = useCallback((e) => {
-    if (!dragState.current || !cropAreaRef.current) return
-    pendingEvent.current = e.touches ? e.touches[0] : e
-    if (rafId.current == null) rafId.current = requestAnimationFrame(flushDrag)
-  }, [flushDrag])
+  const onGestureMove = useCallback((e) => {
+    if (!gestureState.current || !cropAreaRef.current) return
+    // Passage pan -> pinch en cours de geste (2e doigt posé) : on redémarre
+    // proprement le geste au lieu de mélanger deux logiques différentes.
+    if (e.touches?.length === 2 && gestureState.current.type === 'pan') {
+      startGesture(e)
+    }
+    pendingEvent.current = e
+    if (rafId.current == null) rafId.current = requestAnimationFrame(flushGesture)
+  }, [flushGesture])
 
-  const endDrag = useCallback(() => {
-    dragState.current = null
+  const endGesture = useCallback(() => {
+    gestureState.current = null
     pendingEvent.current = null
     if (rafId.current != null) {
       cancelAnimationFrame(rafId.current)
@@ -477,41 +542,50 @@ export default function CreatePost() {
 
   useEffect(() => {
     if (step !== 'crop') return
-    window.addEventListener('pointermove', onDragMove, { passive: true })
-    window.addEventListener('pointerup', endDrag)
+    window.addEventListener('pointermove', onGestureMove, { passive: true })
+    window.addEventListener('pointerup', endGesture)
+    window.addEventListener('touchmove', onGestureMove, { passive: true })
+    window.addEventListener('touchend', endGesture)
     return () => {
-      window.removeEventListener('pointermove', onDragMove)
-      window.removeEventListener('pointerup', endDrag)
+      window.removeEventListener('pointermove', onGestureMove)
+      window.removeEventListener('pointerup', endGesture)
+      window.removeEventListener('touchmove', onGestureMove)
+      window.removeEventListener('touchend', endGesture)
       if (rafId.current != null) cancelAnimationFrame(rafId.current)
     }
-  }, [step, onDragMove, endDrag])
+  }, [step, onGestureMove, endGesture])
 
   const openCrop = () => {
-    setDraftCrop(crop)
+    setDraftCropActive(cropActif)
     setStep('crop')
   }
   const cancelCrop = () => setStep('edit')
   const confirmCrop = () => {
-    setCrop(draftCrop)
+    setCropMedia(activeMediaIndex, draftCropActive)
     setStep('edit')
   }
 
-  // choix d'un ratio : recadre le cadre, centré, à cette proportion — reste
-  // ensuite ajustable à la main comme un crop normal
+  // choix d'un ratio : le cadre change de forme, donc le zoom minimum change
+  // aussi pour CHAQUE média du carrousel (pas seulement l'actif) -- on
+  // recalcule et on relève le zoom de chacun si besoin pour ne jamais laisser
+  // d'espace vide après un changement de ratio.
   const applyRatio = (ratioValue) => {
     setFormat(ratioValue)
-    const targets = { carre: 1, vertical: 9 / 16, horizontal: 4 / 3 }
-    const target = targets[ratioValue]
-    if (!target || !cropAreaRef.current) return
-    const rect = cropAreaRef.current.getBoundingClientRect()
-    const containerRatio = rect.width / rect.height
-    let w = 100, h = 100
-    if (target > containerRatio) {
-      h = (containerRatio / target) * 100
-    } else {
-      w = (target / containerRatio) * 100
-    }
-    setDraftCrop({ x: (100 - w) / 2, y: (100 - h) / 2, w, h })
+    setCropsParMedia((prev) => prev.map((c) => {
+      const minZoom = getMinZoom(c.naturalWidth, c.naturalHeight, ratioValue)
+      const zoom = Math.max(c.zoom, minZoom)
+      return {
+        ...c,
+        zoom,
+        offsetX: clampOffset(c.offsetX, zoom, minZoom),
+        offsetY: clampOffset(c.offsetY, zoom, minZoom),
+      }
+    }))
+    setDraftCropActive((prev) => {
+      const minZoom = getMinZoom(prev.naturalWidth, prev.naturalHeight, ratioValue)
+      const zoom = Math.max(prev.zoom, minZoom)
+      return { ...prev, zoom, offsetX: clampOffset(prev.offsetX, zoom, minZoom), offsetY: clampOffset(prev.offsetY, zoom, minZoom) }
+    })
   }
 
   // ---- écran texte ----
@@ -582,106 +656,86 @@ export default function CreatePost() {
   }
 
   // ============================================================
-  // ÉCRAN CROP — cadre manuel + choix de ratio
+  // ÉCRAN CROP — cadre FIXE, image en zoom/pan (façon Instagram)
   // ============================================================
-  const cropStyle = {
-    clipPath: `inset(${crop.y}% ${100 - crop.x - crop.w}% ${100 - crop.y - crop.h}% ${crop.x}%)`,
-  }
+  // Style de rendu de l'image en cours d'édition : identique à
+  // getCropTransformStyle, appliqué directement à draftCropActive (état en
+  // cours de manipulation, pas encore confirmé). Le média affiché en édition
+  // est celui du carrousel actuellement sélectionné (activeMediaIndex) : un
+  // carrousel se recadre média par média, chacun garde son propre zoom/pan.
+  const draftTransformStyle = getCropTransformStyle({
+    naturalWidth: draftCropActive.naturalWidth,
+    naturalHeight: draftCropActive.naturalHeight,
+    cropFormat: format,
+    zoom: draftCropActive.zoom,
+    offsetX: draftCropActive.offsetX,
+    offsetY: draftCropActive.offsetY,
+  })
 
   if (step === 'crop') {
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-black select-none">
-        <div className="flex-1 relative flex items-center justify-center overflow-hidden">
-          <div ref={cropAreaRef} className="relative w-full h-full">
-            <img
-              src={mainPreview}
-              alt=""
-              className="w-full h-full object-contain opacity-30"
-              draggable={false}
-              style={{ transform: `rotate(${rotation}deg)` }}
-            />
-            <div
-              className="absolute inset-0"
-              style={{
-                clipPath: `inset(${draftCrop.y}% ${100 - draftCrop.x - draftCrop.w}% ${100 - draftCrop.y - draftCrop.h}% ${draftCrop.x}%)`,
-              }}
-            >
-              <img
-                src={mainPreview}
-                alt=""
-                className="w-full h-full object-contain"
+        <div className="flex-1 relative flex items-center justify-center overflow-hidden px-4">
+          <div
+            ref={cropAreaRef}
+            className={`relative w-full ${EDIT_ASPECT_CLASSES[format] || 'aspect-square'} overflow-hidden touch-none`}
+            onPointerDown={startGesture}
+            onTouchStart={startGesture}
+          >
+            {activeMediaIsVideo ? (
+              <video
+                key={activeMedia}
+                src={activeMedia}
+                className="absolute inset-0 select-none pointer-events-none"
+                style={{ ...draftTransformStyle, transform: `${draftTransformStyle.transform} rotate(${rotation}deg)` }}
+                muted
+                playsInline
                 draggable={false}
-                style={{ transform: `rotate(${rotation}deg)` }}
               />
-            </div>
+            ) : (
+              <img
+                src={activeMedia}
+                alt=""
+                className="absolute inset-0 select-none pointer-events-none"
+                draggable={false}
+                style={{ ...draftTransformStyle, transform: `${draftTransformStyle.transform} rotate(${rotation}deg)` }}
+              />
+            )}
 
-            <div
-              className="absolute border-2 border-white"
-              style={{
-                left: `${draftCrop.x}%`,
-                top: `${draftCrop.y}%`,
-                width: `${draftCrop.w}%`,
-                height: `${draftCrop.h}%`,
-                zIndex: 1,
-              }}
-              onPointerDown={startDrag('move')}
-            >
-              <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none">
-                {Array.from({ length: 9 }).map((_, i) => (
-                  <div key={i} className="border border-white/40" />
-                ))}
-              </div>
-
-              {['t', 'b', 'l', 'r'].map((h) => {
-                const isVertical = h === 't' || h === 'b'
-                return (
-                  <div
-                    key={h}
-                    onPointerDown={startDrag(h)}
-                    className="absolute touch-none"
-                    style={{
-                      zIndex: 2,
-                      left: isVertical ? 16 : h === 'l' ? -22 : undefined,
-                      right: isVertical ? 16 : h === 'r' ? -22 : undefined,
-                      top: !isVertical ? 16 : h === 't' ? -22 : undefined,
-                      bottom: !isVertical ? 16 : h === 'b' ? -22 : undefined,
-                      width: isVertical ? undefined : 44,
-                      height: isVertical ? 44 : undefined,
-                      cursor: isVertical ? 'ns-resize' : 'ew-resize',
-                    }}
-                  />
-                )
-              })}
-
-              {['tl', 'tr', 'bl', 'br'].map((h) => (
-                <div
-                  key={h}
-                  onPointerDown={startDrag(h)}
-                  className="absolute w-11 h-11 -m-[22px] touch-none"
-                  style={{
-                    zIndex: 3,
-                    left: h.includes('l') ? 0 : undefined,
-                    right: h.includes('r') ? 0 : undefined,
-                    top: h.includes('t') ? 0 : undefined,
-                    bottom: h.includes('b') ? 0 : undefined,
-                    cursor: h === 'tl' || h === 'br' ? 'nwse-resize' : 'nesw-resize',
-                  }}
-                >
-                  <div className="w-6 h-6 border-white m-[10px]" style={{
-                    borderTopWidth: h.includes('t') ? 3 : 0,
-                    borderBottomWidth: h.includes('b') ? 3 : 0,
-                    borderLeftWidth: h.includes('l') ? 3 : 0,
-                    borderRightWidth: h.includes('r') ? 3 : 0,
-                  }} />
-                </div>
+            {/* grille de composition (repères visuels uniquement, le cadre lui-même
+                est la zone entière -- il ne bouge jamais, contrairement à l'ancien
+                système à rectangle déplaçable) */}
+            <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} className="border border-white/25" />
               ))}
             </div>
           </div>
         </div>
 
-        {/* choix de ratio, en plus du cadre manuel — carré retiré uniquement pour une
-            vidéo SEULE (pas en carrousel) : un carrousel garde toujours les 3 ratios,
-            même s'il contient une ou plusieurs vidéos. */}
+        {/* navigation entre médias du carrousel : chaque média garde son propre
+            zoom/pan, on doit donc confirmer le geste en cours avant de changer
+            d'index (le crop en cours d'édition est déjà appliqué en continu à
+            cropsParMedia via confirmCrop, ici on bascule juste l'aperçu) */}
+        {isCarrousel && (
+          <div className="flex items-center justify-center gap-2 pb-2">
+            {displayMedias.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  setCropMedia(activeMediaIndex, draftCropActive)
+                  setActiveMediaIndex(i)
+                  setDraftCropActive(cropsParMedia[i] ?? { zoom: 1, offsetX: 0, offsetY: 0 })
+                }}
+                className={`w-2 h-2 rounded-full ${i === activeMediaIndex ? 'bg-white' : 'bg-white/30'}`}
+                aria-label={`Média ${i + 1}`}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* choix de ratio — carré retiré uniquement pour une vidéo SEULE (pas en
+            carrousel) : un carrousel garde toujours les 3 ratios. */}
         <div className="flex gap-2 px-4 pb-2">
           {RATIOS.filter((r) => !(mainIsVideo && !isCarrousel && r.value === 'carre')).map((r) => (
             <button
@@ -694,6 +748,30 @@ export default function CreatePost() {
               {r.label}
             </button>
           ))}
+        </div>
+
+        {/* zoom : slider explicite en plus du pinch, pour accessibilité et pour
+            les appareils sans écran tactile multi-touch (souris) */}
+        <div className="flex items-center gap-3 px-6 pb-2">
+          <span className="text-white/50 text-caption">–</span>
+          <input
+            type="range"
+            min={minZoomActif}
+            max={3}
+            step={0.01}
+            value={draftCropActive.zoom}
+            onChange={(e) => {
+              const nextZoom = clampZoom(Number(e.target.value), minZoomActif)
+              setDraftCropActive((prev) => ({
+                ...prev,
+                zoom: nextZoom,
+                offsetX: clampOffset(prev.offsetX, nextZoom, minZoomActif),
+                offsetY: clampOffset(prev.offsetY, nextZoom, minZoomActif),
+              }))
+            }}
+            className="flex-1 accent-white"
+          />
+          <span className="text-white/50 text-caption">+</span>
         </div>
 
         <div className="flex items-center justify-center pb-2">
@@ -749,15 +827,17 @@ export default function CreatePost() {
 
         <div className="flex-1 relative flex items-center justify-center overflow-hidden bg-black">
           <div
-            className={`relative w-full ${EDIT_ASPECT_CLASSES[format] || 'aspect-square'} flex items-center justify-center overflow-hidden`}
-            style={cropStyle}
+            className={`relative w-full ${EDIT_ASPECT_CLASSES[format] || 'aspect-square'} overflow-hidden`}
           >
             <img
               src={activeMedia}
               alt=""
-              className="w-full h-full object-contain select-none"
+              className="absolute inset-0 select-none"
               draggable={false}
-              style={{ filter: filterCss, transform: `rotate(${rotation}deg)` }}
+              style={(() => {
+                const s = getCropTransformStyle({ ...cropActif, cropFormat: format })
+                return { ...s, filter: filterCss, transform: `${s.transform} rotate(${rotation}deg)` }
+              })()}
             />
             <div className="absolute inset-0 flex items-center justify-center px-8 pointer-events-none">
               <textarea
@@ -824,8 +904,7 @@ export default function CreatePost() {
 
       <div className="flex-1 relative flex items-center justify-center overflow-hidden bg-black">
         <div
-          className={`relative w-full ${EDIT_ASPECT_CLASSES[format] || 'aspect-square'} ${isCarrousel ? '' : 'overflow-hidden'}`}
-          style={isCarrousel ? undefined : cropStyle}
+          className={`relative w-full ${EDIT_ASPECT_CLASSES[format] || 'aspect-square'} overflow-hidden`}
         >
           {mainIsVideo && !isCarrousel ? (
             isEditing && existingHls?.status === 'ready' && existingHls?.playlistUrl ? (
@@ -834,8 +913,8 @@ export default function CreatePost() {
                 hlsPlaylistUrl={existingHls.playlistUrl}
                 fallbackMp4Url={mainPreview}
                 poster={existingHls.thumbnailUrl}
-                className="w-full h-full object-contain"
-                style={{ filter: filterCss }}
+                className="absolute inset-0"
+                style={{ ...getCropTransformStyle({ ...cropActif, cropFormat: format }), filter: filterCss }}
                 loop
                 muted={false}
                 controls
@@ -843,7 +922,15 @@ export default function CreatePost() {
                 preload="metadata"
               />
             ) : (
-              <video key={mainPreview} src={mainPreview} className="w-full h-full object-contain" controls autoPlay playsInline style={{ filter: filterCss }} />
+              <video
+                key={mainPreview}
+                src={mainPreview}
+                className="absolute inset-0"
+                style={{ ...getCropTransformStyle({ ...cropActif, cropFormat: format }), filter: filterCss }}
+                controls
+                autoPlay
+                playsInline
+              />
             )
           ) : isCarrousel ? (
             <>
@@ -852,30 +939,31 @@ export default function CreatePost() {
                 onScroll={handleEditCarrouselScroll}
                 className="flex w-full h-full overflow-x-auto snap-x snap-mandatory"
               >
-                {displayMedias.map((p, i) =>
-                  displayMediaTypes[i] === 'video' ? (
-                    <div key={i} className="w-full h-full shrink-0 snap-center">
+                {displayMedias.map((p, i) => {
+                  const cropStyleMedia = getCropTransformStyle({ ...(cropsParMedia[i] ?? {}), cropFormat: format })
+                  return displayMediaTypes[i] === 'video' ? (
+                    <div key={i} className="relative w-full h-full shrink-0 snap-center overflow-hidden">
                       <video
                         src={p}
-                        className="w-full h-full object-contain"
-                        style={{ filter: getFilterCss(filtresParMedia[i]) }}
+                        className="absolute inset-0"
+                        style={{ ...cropStyleMedia, filter: getFilterCss(filtresParMedia[i]) }}
                         controls
                         playsInline
                         preload="metadata"
                       />
                     </div>
                   ) : (
-                    <div key={i} className="w-full h-full shrink-0 snap-center">
+                    <div key={i} className="relative w-full h-full shrink-0 snap-center overflow-hidden">
                       <img
                         src={p}
                         alt=""
-                        className="w-full h-full object-contain select-none"
+                        className="absolute inset-0 select-none"
                         draggable={false}
-                        style={{ filter: getFilterCss(filtresParMedia[i]) }}
+                        style={{ ...cropStyleMedia, filter: getFilterCss(filtresParMedia[i]) }}
                       />
                     </div>
                   )
-                )}
+                })}
               </div>
 
               {/* indicateur i/N, identique à l'affichage du feed (PostCard.jsx) */}
@@ -915,9 +1003,12 @@ export default function CreatePost() {
             <img
               src={mainPreview}
               alt=""
-              className="w-full h-full object-contain select-none"
+              className="absolute inset-0 select-none"
               draggable={false}
-              style={{ filter: filterCss, transform: `rotate(${rotation}deg)` }}
+              style={(() => {
+                const s = getCropTransformStyle({ ...cropActif, cropFormat: format })
+                return { ...s, filter: filterCss, transform: `${s.transform} rotate(${rotation}deg)` }
+              })()}
             />
           )}
 
