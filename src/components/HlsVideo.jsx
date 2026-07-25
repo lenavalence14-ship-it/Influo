@@ -18,6 +18,8 @@ export default function HlsVideo({
   poster,
   loop,
   muted,
+  controls,
+  autoPlay,
   preload,
   onLoadedData,
   className,
@@ -116,6 +118,8 @@ export default function HlsVideo({
       style={style}
       loop={loop}
       muted={muted}
+      controls={controls}
+      autoPlay={autoPlay}
       playsInline
       preload={preload}
       onLoadedData={onLoadedData}

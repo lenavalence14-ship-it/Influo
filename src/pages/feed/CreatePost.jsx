@@ -8,6 +8,7 @@ import { triggerHlsTranscode } from '../../lib/hlsTranscode'
 import FilterPicker, { getFilterCss } from './editor/FilterPicker'
 import DraggableElement from './editor/DraggableElement'
 import { FONTS, getFontStyle } from './PhotoNoteEditor'
+import HlsVideo from '../../components/HlsVideo'
 
 const RATIOS = [
   { value: 'carre', label: 'Carré', aspect: 'aspect-square' },
@@ -37,6 +38,7 @@ export default function CreatePost() {
   const [previews, setPreviews] = useState([])
   const [existingMediaUrls, setExistingMediaUrls] = useState([])
   const [existingMediaTypes, setExistingMediaTypes] = useState([])
+  const [existingHls, setExistingHls] = useState(null) // { status, playlistUrl, thumbnailUrl } pour le média principal
   const [legende, setLegende] = useState('')
   const [format, setFormat] = useState('carre')
   const [loading, setLoading] = useState(false)
@@ -59,7 +61,7 @@ export default function CreatePost() {
     const loadPost = async () => {
       const { data } = await supabase
         .from('posts')
-        .select('*, post_medias(media_url, media_type, position)')
+        .select('*, post_medias(media_url, media_type, position, hls_status, hls_playlist_url, thumbnail_url)')
         .eq('id', postId)
         .maybeSingle()
 
@@ -80,6 +82,13 @@ export default function CreatePost() {
         const sorted = [...(data.post_medias || [])].sort((a, b) => a.position - b.position)
         setExistingMediaUrls(sorted.map((m) => m.media_url))
         setExistingMediaTypes(sorted.map((m) => m.media_type || 'image'))
+        if (sorted[0]?.media_type === 'video') {
+          setExistingHls({
+            status: sorted[0].hls_status,
+            playlistUrl: sorted[0].hls_playlist_url,
+            thumbnailUrl: sorted[0].thumbnail_url,
+          })
+        }
       }
       setLoadingExisting(false)
     }
@@ -226,6 +235,7 @@ export default function CreatePost() {
   // les règles des Hooks React : ils doivent être appelés dans le même
   // ordre à chaque rendu, donc aucun `return` avant eux)
   const cropAreaRef = useRef(null)
+  const videoRef = useRef(null)
   const dragState = useRef(null)
   const pendingEvent = useRef(null)
   const rafId = useRef(null)
@@ -633,7 +643,23 @@ export default function CreatePost() {
       <div className="flex-1 relative overflow-hidden" style={cropStyle}>
         <div className="relative w-full h-full bg-black">
           {mainIsVideo ? (
-            <video key={mainPreview} src={mainPreview} className="w-full h-full object-contain" controls autoPlay playsInline style={{ filter: filterCss }} />
+            isEditing && existingHls?.status === 'ready' && existingHls?.playlistUrl ? (
+              <HlsVideo
+                videoRef={videoRef}
+                hlsPlaylistUrl={existingHls.playlistUrl}
+                fallbackMp4Url={mainPreview}
+                poster={existingHls.thumbnailUrl}
+                className="w-full h-full object-contain"
+                style={{ filter: filterCss }}
+                loop
+                muted={false}
+                controls
+                autoPlay
+                preload="metadata"
+              />
+            ) : (
+              <video key={mainPreview} src={mainPreview} className="w-full h-full object-contain" controls autoPlay playsInline style={{ filter: filterCss }} />
+            )
           ) : isCarrousel ? (
             <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory">
               {displayMedias.map((p, i) => (
