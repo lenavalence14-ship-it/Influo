@@ -12,8 +12,31 @@ import { useActiveStories } from '../../hooks/useActiveStories'
 import { timeAgo } from '../../lib/time'
 import { getFilterCss } from './editor/FilterPicker'
 import { CROP_ASPECT_CLASSES, getCropTransformStyle } from '../../lib/mediaCrop'
+import { getFontStyle } from './PhotoNoteEditor'
 
 const cropClasses = CROP_ASPECT_CLASSES
+
+// Rendu du texte overlay stocké sur un média (texte_overlay/x/y/couleur/police),
+// en lecture seule (pas de drag ici, contrairement à l'éditeur) -- même
+// positionnement (% ancré au centre) et même style que DraggableElement dans
+// CreatePost.jsx/PhotoNoteEditor.jsx, pour un rendu identique à ce que
+// l'utilisateur a validé à la publication.
+function TextOverlay({ media }) {
+  if (!media?.texte_overlay) return null
+  return (
+    <div
+      className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+      style={{ left: `${media.texte_x ?? 50}%`, top: `${media.texte_y ?? 50}%` }}
+    >
+      <p
+        className="text-center px-3 max-w-[80vw] whitespace-pre-wrap"
+        style={{ color: media.texte_couleur || '#ffffff', fontSize: 28, textShadow: '0 1px 6px rgba(0,0,0,0.5)', ...getFontStyle(media.texte_police) }}
+      >
+        {media.texte_overlay}
+      </p>
+    </div>
+  )
+}
 
 // Style de rendu d'UN média précis (photo ou vidéo), à partir de son crop
 // zoom/pan stocké en base (post_medias.zoom/offset_x/offset_y/natural_width/
@@ -221,6 +244,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
                     />
                   )}
                 </button>
+                <TextOverlay media={allMedias[0]} />
                 <button
                   onClick={(e) => { e.stopPropagation(); onToggleMute() }}
                   aria-label={muted ? 'Activer le son' : 'Couper le son'}
@@ -260,6 +284,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
                           style={{ ...getMediaCropStyle(m, post.crop_format), filter: getFilterCss(m.filtre ?? post.filtre) }}
                         />
                       )}
+                      <TextOverlay media={m} />
                     </div>
                   ))}
                 </div>
@@ -307,6 +332,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
                   className="absolute inset-0 select-none"
                   style={{ ...getMediaCropStyle(allMedias[0], post.crop_format), filter: getFilterCss(post.filtre) }}
                 />
+                <TextOverlay media={allMedias[0]} />
               </div>
             )}
           </div>

@@ -9,6 +9,7 @@ import CommentsSheet from './CommentsSheet'
 import { getFilterCss } from './editor/FilterPicker'
 import HlsVideo from '../../components/HlsVideo'
 import { getCropTransformStyle } from '../../lib/mediaCrop'
+import { getFontStyle } from './PhotoNoteEditor'
 
 function getMediaCropStyle(media, cropFormat) {
   return getCropTransformStyle({
@@ -19,6 +20,26 @@ function getMediaCropStyle(media, cropFormat) {
     offsetX: media?.offset_x,
     offsetY: media?.offset_y,
   })
+}
+
+// Même rendu qu'en feed (PostCard.jsx) : texte overlay en lecture seule,
+// positionné en % ancré au centre, identique à ce que l'utilisateur a validé
+// dans l'éditeur.
+function TextOverlay({ media }) {
+  if (!media?.texte_overlay) return null
+  return (
+    <div
+      className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10"
+      style={{ left: `${media.texte_x ?? 50}%`, top: `${media.texte_y ?? 50}%` }}
+    >
+      <p
+        className="text-center px-3 max-w-[80vw] whitespace-pre-wrap"
+        style={{ color: media.texte_couleur || '#ffffff', fontSize: 28, textShadow: '0 1px 6px rgba(0,0,0,0.5)', ...getFontStyle(media.texte_police) }}
+      >
+        {media.texte_overlay}
+      </p>
+    </div>
+  )
 }
 
 const REELS_PAGE_SIZE = 20
@@ -393,6 +414,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
                 style={{ ...cropStyle, filter: getFilterCss(reel.filtre) }}
               />
             )}
+            <TextOverlay media={media} />
           </div>
         </div>
       ) : (
@@ -424,6 +446,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
               style={{ ...cropStyle, filter: getFilterCss(reel.filtre) }}
             />
           )}
+          <TextOverlay media={media} />
         </>
       )}
 
