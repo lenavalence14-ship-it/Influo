@@ -37,6 +37,8 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false 
   const [mediaMounted, setMediaMounted] = useState(priority)
   const videoRef = useRef(null)
   const mediaContainerRef = useRef(null)
+  const carrouselRef = useRef(null)
+  const [carrouselIndex, setCarrouselIndex] = useState(0)
 
   const influencer = post.profils_influenceur
   const isOwner = influencer?.user_id === user?.id
@@ -114,6 +116,15 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false 
     playObserver.observe(video)
     return () => playObserver.disconnect()
   }, [isVideo, mediaMounted])
+
+  const sortedMedias = allMedias.slice().sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+
+  const handleCarrouselScroll = () => {
+    const el = carrouselRef.current
+    if (!el) return
+    const index = Math.round(el.scrollLeft / el.clientWidth)
+    setCarrouselIndex(Math.max(0, Math.min(sortedMedias.length - 1, index)))
+  }
 
   if (deleted) return null
 
@@ -203,11 +214,13 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false 
                 </button>
               </>
             ) : isCarrousel ? (
-              <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory">
-                {allMedias
-                  .slice()
-                  .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-                  .map((m, i) => (
+              <>
+                <div
+                  ref={carrouselRef}
+                  onScroll={handleCarrouselScroll}
+                  className="flex w-full h-full overflow-x-auto snap-x snap-mandatory"
+                >
+                  {sortedMedias.map((m, i) => (
                     <img
                       key={i}
                       src={m.media_url}
@@ -218,7 +231,41 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false 
                       style={{ filter: getFilterCss(post.filtre) }}
                     />
                   ))}
-              </div>
+                </div>
+
+                {/* compteur photo visitée / total, façon Instagram */}
+                <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/50 text-white text-[12px] leading-[16px] font-medium">
+                  {carrouselIndex + 1}/{sortedMedias.length}
+                </div>
+
+                {/* points de progression, fenêtre glissante si beaucoup d'items */}
+                <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1">
+                  {(() => {
+                    const total = sortedMedias.length
+                    const maxDots = 8
+                    let start = 0
+                    if (total > maxDots) {
+                      start = Math.min(Math.max(0, carrouselIndex - Math.floor(maxDots / 2)), total - maxDots)
+                    }
+                    const visibleCount = Math.min(total, maxDots)
+                    return Array.from({ length: visibleCount }).map((_, offset) => {
+                      const i = start + offset
+                      const active = i === carrouselIndex
+                      return (
+                        <span
+                          key={i}
+                          className="rounded-full transition-all duration-200"
+                          style={{
+                            width: active ? 12 : 5,
+                            height: 5,
+                            backgroundColor: active ? 'var(--accent)' : 'rgba(255,255,255,0.5)',
+                          }}
+                        />
+                      )
+                    })
+                  })()}
+                </div>
+              </>
             ) : (
               <img
                 src={mediaUrl}
