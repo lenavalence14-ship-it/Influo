@@ -15,10 +15,8 @@ import { getFilterCss } from './editor/FilterPicker'
 const cropClasses = {
   carre: 'aspect-square',
   vertical: 'aspect-[4/5]',
-  paysage: 'aspect-[4/3]',
-  // valeurs héritées d'un ancien système de format, gardées pour l'affichage
-  // des posts déjà publiés avec ces valeurs en base
   horizontal: 'aspect-[4/3]',
+  // ancienne valeur héritée, gardée pour l'affichage des posts déjà publiés
   vertical_45: 'aspect-[4/5]',
 }
 

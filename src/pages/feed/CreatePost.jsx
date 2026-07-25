@@ -12,13 +12,14 @@ import { FONTS, getFontStyle } from './PhotoNoteEditor'
 const RATIOS = [
   { value: 'carre', label: 'Carré', aspect: 'aspect-square' },
   { value: 'vertical', label: 'Vertical', aspect: 'aspect-[4/5]' },
-  { value: 'paysage', label: 'Paysage', aspect: 'aspect-[4/3]' },
+  { value: 'horizontal', label: 'Paysage', aspect: 'aspect-[4/3]' },
 ]
 
 // anciens posts publiés avec un ancien système de format : on les fait
 // retomber sur le ratio encore existant le plus proche, uniquement pour
 // l'affichage dans CET éditeur (n'affecte pas l'affichage publié ailleurs).
-const LEGACY_FORMAT_MAP = { horizontal: 'paysage', vertical_45: 'vertical' }
+// note : les valeurs de RATIOS (carre/vertical/horizontal) correspondent
+// directement à l'enum crop_format existant en base — aucun mapping nécessaire
 
 const TEXT_COLORS = ['#ffffff', '#000000', '#f43f5e', '#3b82f6', '#22c55e', '#eab308']
 
@@ -65,7 +66,7 @@ export default function CreatePost() {
       if (data) {
         setLegende(data.legende || '')
         const savedFormat = data.crop_format
-        setFormat(LEGACY_FORMAT_MAP[savedFormat] || savedFormat || 'carre')
+        setFormat(savedFormat === 'vertical_45' ? 'vertical' : savedFormat || 'carre')
         setFiltre(data.filtre || null)
         if (data.texte_overlay) {
           setTextEl({
@@ -117,6 +118,7 @@ export default function CreatePost() {
       texte_x: textEl?.x ?? null,
       texte_y: textEl?.y ?? null,
       texte_couleur: textEl?.couleur || null,
+      texte_police: textEl?.police || null,
     }
 
     if (isEditing) {
@@ -311,7 +313,7 @@ export default function CreatePost() {
   // ensuite ajustable à la main comme un crop normal
   const applyRatio = (ratioValue) => {
     setFormat(ratioValue)
-    const targets = { carre: 1, vertical: 4 / 5, paysage: 4 / 3 }
+    const targets = { carre: 1, vertical: 4 / 5, horizontal: 4 / 3 }
     const target = targets[ratioValue]
     if (!target || !cropAreaRef.current) return
     const rect = cropAreaRef.current.getBoundingClientRect()
