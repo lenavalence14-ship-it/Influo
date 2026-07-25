@@ -8,6 +8,18 @@ import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import CommentsSheet from './CommentsSheet'
 import { getFilterCss } from './editor/FilterPicker'
 import HlsVideo from '../../components/HlsVideo'
+import { getCropTransformStyle } from '../../lib/mediaCrop'
+
+function getMediaCropStyle(media, cropFormat) {
+  return getCropTransformStyle({
+    naturalWidth: media?.natural_width,
+    naturalHeight: media?.natural_height,
+    cropFormat,
+    zoom: media?.zoom,
+    offsetX: media?.offset_x,
+    offsetY: media?.offset_y,
+  })
+}
 
 const REELS_PAGE_SIZE = 20
 
@@ -27,7 +39,7 @@ async function fetchReels(userId) {
     .from('posts')
     .select(`
       id, legende, created_at, filtre, client_id, crop_format,
-      post_medias(media_url, media_type, thumbnail_url, position, hls_status, hls_playlist_url),
+      post_medias(media_url, media_type, thumbnail_url, position, hls_status, hls_playlist_url, zoom, offset_x, offset_y, natural_width, natural_height),
       profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
       client:client_id(id, nom_complet, photo_url)
     `)
@@ -284,11 +296,16 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
   const media = reel.post_medias?.[0]
   const mediaUrl = media?.media_url
   const thumbnailUrl = media?.thumbnail_url
-  // Portrait (par défaut, y compris posts anciens sans crop_format renseigné) : plein
-  // écran comme TikTok/Reels. Paysage : centré au milieu de l'écran, sans zoom — sinon
-  // object-cover en plein écran forcerait un rognage/zoom disproportionné d'une vidéo
-  // large, ce que l'utilisateur ne veut pas.
+  // Le cadrage (zoom/pan) choisi dans l'éditeur pour le feed s'applique
+  // TOUJOURS en Reels, qu'importe le format -- sinon un élément volontairement
+  // coupé au cadrage (ex: watermark d'une autre app) réapparaîtrait en Reels,
+  // ce qui viderait le cadrage de son utilité. Seul le POSITIONNEMENT à
+  // l'écran change selon le format : le cadre déjà recadré est soit étalé en
+  // plein écran (vertical), soit centré avec bandes noires (paysage) -- mais
+  // dans les deux cas c'est le MÊME rectangle cadré qu'on affiche, jamais la
+  // vidéo brute non recadrée.
   const isLandscape = reel.crop_format === 'horizontal'
+  const cropStyle = getMediaCropStyle(media, reel.crop_format)
   // HLS utilisé uniquement si le transcodage est bien allé au bout (voir
   // hls_status côté service de transcodage). Sinon, repli silencieux sur le
   // MP4 classique déjà uploadé à la publication — l'utilisateur ne voit jamais
@@ -347,33 +364,67 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
       style={{ height: '100dvh' }}
     >
       {/* miniature réelle affichée tant que la vidéo n'est pas montée : jamais d'icône
-          vidéo grise, jamais d'écran noir vide pendant le chargement. */}
-      {!shouldMount && (
-        <img
-          src={thumbnailUrl || undefined}
-          alt=""
-          className={`absolute inset-0 w-full h-full bg-black ${isLandscape ? 'object-contain' : 'object-cover'}`}
-          style={{ filter: getFilterCss(reel.filtre) }}
-        />
-      )}
-      {shouldMount && (
-        <HlsVideo
-          videoRef={(el) => setVideoRef(el)}
-          hlsPlaylistUrl={hlsPlaylistUrl}
-          fallbackMp4Url={mediaUrl}
-          poster={thumbnailUrl || undefined}
-          className={`absolute inset-0 w-full h-full ${isLandscape ? 'object-contain' : 'object-cover'}`}
-          loop
-          muted={muted}
-          // 3 niveaux de préchargement réseau, du plus prioritaire au moins prioritaire :
-          // - active/suivante (shouldPreload) : 'auto', téléchargement complet immédiat
-          // - suivante+1 (shouldPrefetchMeta) : 'metadata' seul, juste assez pour un
-          //   démarrage rapide si l'utilisateur swipe vite sans saturer la data mobile
-          // - le reste (celle qu'on vient de quitter) : 'metadata' aussi, pas de re-fetch
-          preload={shouldPreload ? 'auto' : shouldPrefetchMeta ? 'metadata' : 'metadata'}
-          onLoadedData={() => setVideoReady(true)}
-          style={{ filter: getFilterCss(reel.filtre) }}
-        />
+          vidéo grise, jamais d'écran noir vide pendant le chargement. Paysage : le
+          cadre cadré (16:9) est centré dans l'écran, bandes noires au-dessus/dessous.
+          Vertical : le cadre cadré remplit tout l'écran. Dans les deux cas, c'est le
+          MÊME cadrage (zoom/pan) que celui choisi dans l'éditeur pour le feed. */}
+      {isLandscape ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-black">
+          <div className="relative w-full aspect-video overflow-hidden">
+            {!shouldMount && (
+              <img
+                src={thumbnailUrl || undefined}
+                alt=""
+                className="absolute inset-0"
+                style={{ ...cropStyle, filter: getFilterCss(reel.filtre) }}
+              />
+            )}
+            {shouldMount && (
+              <HlsVideo
+                videoRef={(el) => setVideoRef(el)}
+                hlsPlaylistUrl={hlsPlaylistUrl}
+                fallbackMp4Url={mediaUrl}
+                poster={thumbnailUrl || undefined}
+                className="absolute inset-0"
+                loop
+                muted={muted}
+                preload={shouldPreload ? 'auto' : shouldPrefetchMeta ? 'metadata' : 'metadata'}
+                onLoadedData={() => setVideoReady(true)}
+                style={{ ...cropStyle, filter: getFilterCss(reel.filtre) }}
+              />
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {!shouldMount && (
+            <img
+              src={thumbnailUrl || undefined}
+              alt=""
+              className="absolute inset-0 w-full h-full bg-black"
+              style={{ ...cropStyle, filter: getFilterCss(reel.filtre) }}
+            />
+          )}
+          {shouldMount && (
+            <HlsVideo
+              videoRef={(el) => setVideoRef(el)}
+              hlsPlaylistUrl={hlsPlaylistUrl}
+              fallbackMp4Url={mediaUrl}
+              poster={thumbnailUrl || undefined}
+              className="absolute inset-0 w-full h-full"
+              loop
+              muted={muted}
+              // 3 niveaux de préchargement réseau, du plus prioritaire au moins prioritaire :
+              // - active/suivante (shouldPreload) : 'auto', téléchargement complet immédiat
+              // - suivante+1 (shouldPrefetchMeta) : 'metadata' seul, juste assez pour un
+              //   démarrage rapide si l'utilisateur swipe vite sans saturer la data mobile
+              // - le reste (celle qu'on vient de quitter) : 'metadata' aussi, pas de re-fetch
+              preload={shouldPreload ? 'auto' : shouldPrefetchMeta ? 'metadata' : 'metadata'}
+              onLoadedData={() => setVideoReady(true)}
+              style={{ ...cropStyle, filter: getFilterCss(reel.filtre) }}
+            />
+          )}
+        </>
       )}
 
       {/* Si aucune miniature n'existe en base (vidéos publiées avant la génération

@@ -559,6 +559,18 @@ export default function CreatePost() {
     setDraftCropActive(cropActif)
     setStep('crop')
   }
+  // si les dimensions naturelles du média actif arrivent après l'ouverture de
+  // l'écran crop (lecture async au moment de la sélection du fichier), on les
+  // reporte dans le brouillon en cours dès qu'elles sont connues -- sinon le
+  // zoom minimum resterait calculé sur des dimensions nulles tant que
+  // l'utilisateur ne rouvre pas l'écran.
+  useEffect(() => {
+    if (step !== 'crop') return
+    const latest = cropsParMedia[activeMediaIndex]
+    if (latest?.naturalWidth && !draftCropActive.naturalWidth) {
+      setDraftCropActive((prev) => ({ ...prev, naturalWidth: latest.naturalWidth, naturalHeight: latest.naturalHeight }))
+    }
+  }, [step, activeMediaIndex, cropsParMedia, draftCropActive.naturalWidth])
   const cancelCrop = () => setStep('edit')
   const confirmCrop = () => {
     setCropMedia(activeMediaIndex, draftCropActive)
@@ -689,7 +701,10 @@ export default function CreatePost() {
                 className="absolute inset-0 select-none pointer-events-none"
                 style={{ ...draftTransformStyle, transform: `${draftTransformStyle.transform} rotate(${rotation}deg)` }}
                 muted
+                autoPlay
+                loop
                 playsInline
+                preload="auto"
                 draggable={false}
               />
             ) : (
