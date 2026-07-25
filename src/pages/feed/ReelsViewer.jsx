@@ -26,7 +26,7 @@ async function fetchReels(userId) {
   const { data } = await supabase
     .from('posts')
     .select(`
-      id, legende, created_at, filtre, client_id,
+      id, legende, created_at, filtre, client_id, crop_format,
       post_medias(media_url, media_type, thumbnail_url, position, hls_status, hls_playlist_url),
       profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
       client:client_id(id, nom_complet, photo_url)
@@ -284,6 +284,11 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
   const media = reel.post_medias?.[0]
   const mediaUrl = media?.media_url
   const thumbnailUrl = media?.thumbnail_url
+  // Portrait (par défaut, y compris posts anciens sans crop_format renseigné) : plein
+  // écran comme TikTok/Reels. Paysage : centré au milieu de l'écran, sans zoom — sinon
+  // object-cover en plein écran forcerait un rognage/zoom disproportionné d'une vidéo
+  // large, ce que l'utilisateur ne veut pas.
+  const isLandscape = reel.crop_format === 'horizontal'
   // HLS utilisé uniquement si le transcodage est bien allé au bout (voir
   // hls_status côté service de transcodage). Sinon, repli silencieux sur le
   // MP4 classique déjà uploadé à la publication — l'utilisateur ne voit jamais
@@ -338,7 +343,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
   return (
     <div
       data-index={index}
-      className="relative w-full snap-start snap-always"
+      className="relative w-full bg-black snap-start snap-always"
       style={{ height: '100dvh' }}
     >
       {/* miniature réelle affichée tant que la vidéo n'est pas montée : jamais d'icône
@@ -347,7 +352,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
         <img
           src={thumbnailUrl || undefined}
           alt=""
-          className="absolute inset-0 w-full h-full object-cover bg-black"
+          className={`absolute inset-0 w-full h-full bg-black ${isLandscape ? 'object-contain' : 'object-cover'}`}
           style={{ filter: getFilterCss(reel.filtre) }}
         />
       )}
@@ -357,7 +362,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           hlsPlaylistUrl={hlsPlaylistUrl}
           fallbackMp4Url={mediaUrl}
           poster={thumbnailUrl || undefined}
-          className="absolute inset-0 w-full h-full object-cover"
+          className={`absolute inset-0 w-full h-full ${isLandscape ? 'object-contain' : 'object-cover'}`}
           loop
           muted={muted}
           // 3 niveaux de préchargement réseau, du plus prioritaire au moins prioritaire :

@@ -14,9 +14,10 @@ import { getFilterCss } from './editor/FilterPicker'
 
 const cropClasses = {
   carre: 'aspect-square',
-  vertical: 'aspect-[4/5]',
+  vertical: 'aspect-[9/16]',
   horizontal: 'aspect-[4/3]',
-  // ancienne valeur héritée, gardée pour l'affichage des posts déjà publiés
+  // ancienne valeur héritée (anciens posts publiés en 4:5 avant le passage à 9:16) :
+  // on garde ce ratio pour eux spécifiquement, pas pour 'vertical' qui est désormais 9:16
   vertical_45: 'aspect-[4/5]',
 }
 

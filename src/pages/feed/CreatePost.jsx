@@ -13,9 +13,23 @@ import { usePostUpload } from '../../contexts/PostUploadContext'
 
 const RATIOS = [
   { value: 'carre', label: 'Carré', aspect: 'aspect-square' },
-  { value: 'vertical', label: 'Vertical', aspect: 'aspect-[4/5]' },
+  { value: 'vertical', label: 'Vertical', aspect: 'aspect-[9/16]' },
   { value: 'horizontal', label: 'Paysage', aspect: 'aspect-[4/3]' },
 ]
+
+// Classes aspect-ratio par format, utilisées pour que le cadre d'édition adopte
+// directement le ratio cible (comme le fait déjà le feed via cropClasses dans
+// PostCard.jsx), au lieu de partir d'un cadre plein-écran (flex-1, proche du
+// carré) puis d'y superposer un clip-path : cette dernière approche produisait
+// un rendu flou/déformé dès que le ratio choisi n'était pas carré, car l'image
+// est en object-contain DANS LE GRAND CADRE, pas dans le rectangle réellement
+// découpé — donc la portion visible n'a jamais le ratio net attendu.
+const EDIT_ASPECT_CLASSES = {
+  carre: 'aspect-square',
+  vertical: 'aspect-[9/16]',
+  horizontal: 'aspect-[4/3]',
+  vertical_45: 'aspect-[4/5]',
+}
 
 // anciens posts publiés avec un ancien système de format : on les fait
 // retomber sur le ratio encore existant le plus proche, uniquement pour
@@ -39,38 +53,69 @@ export default function CreatePost() {
   const [files, setFiles] = useState([])
   const [previews, setPreviews] = useState([])
   const [existingMediaUrls, setExistingMediaUrls] = useState([])
+  const [existingMediaIds, setExistingMediaIds] = useState([])
   const [existingMediaTypes, setExistingMediaTypes] = useState([])
   const [existingHls, setExistingHls] = useState(null) // { status, playlistUrl, thumbnailUrl } pour le média principal
   const [legende, setLegende] = useState('')
   const [format, setFormat] = useState('carre')
   const [loading, setLoading] = useState(false)
 
+  // Recadrage (crop_x/y/w/h), format (crop_format) et rotation restent des réglages
+  // GLOBAUX au post entier : le carrousel s'affiche dans un seul cadre à l'aspect-ratio
+  // uniforme, donc ces réglages ne peuvent pas être différents d'un média à l'autre.
   const [rotation, setRotation] = useState(0)
-  const [filtre, setFiltre] = useState(null)
-
-  // recadrage manuel : rectangle en % relatif au conteneur image
   const [crop, setCrop] = useState({ x: 0, y: 0, w: 100, h: 100 })
   const [draftCrop, setDraftCrop] = useState(crop)
 
-  // texte superposé (un seul, déplaçable, comme dans l'éditeur de note)
-  const [textEl, setTextEl] = useState(null) // { contenu, x, y, couleur, police }
+  // Filtre et texte superposé, en revanche, sont désormais INDÉPENDANTS par média :
+  // un tableau, un élément par item du carrousel (index aligné sur displayMedias/
+  // sortedMedias). Pour un post simple (pas de carrousel), seul l'index 0 est utilisé.
+  // C'est le cœur du correctif demandé : avant, un seul filtre/texte s'appliquait à
+  // TOUS les médias du carrousel, sans possibilité de les éditer séparément.
+  const [filtresParMedia, setFiltresParMedia] = useState([])
+  const [textesParMedia, setTextesParMedia] = useState([]) // { contenu, x, y, couleur, police } | null, par index
+
+  // Média actuellement affiché/édité dans l'écran principal (swipe du carrousel
+  // en mode édition, cf. écran principal plus bas).
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0)
+
   const [textDraft, setTextDraft] = useState('')
   const [textColor, setTextColor] = useState('#ffffff')
   const [textFont, setTextFont] = useState('Inter')
+
+  // Accesseurs pratiques pour le média actif : le filtre/texte affiché et modifié
+  // à l'écran est toujours celui de activeMediaIndex.
+  const filtre = filtresParMedia[activeMediaIndex] ?? null
+  const textEl = textesParMedia[activeMediaIndex] ?? null
+  const setFiltre = (value) => {
+    setFiltresParMedia((prev) => {
+      const next = [...prev]
+      next[activeMediaIndex] = value
+      return next
+    })
+  }
+  const setTextEl = (updater) => {
+    setTextesParMedia((prev) => {
+      const next = [...prev]
+      const current = next[activeMediaIndex] ?? null
+      next[activeMediaIndex] = typeof updater === 'function' ? updater(current) : updater
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!isEditing) return
     const loadPost = async () => {
       const { data } = await supabase
         .from('posts')
-        .select('*, post_medias(media_url, media_type, position, hls_status, hls_playlist_url, thumbnail_url)')
+        .select('*, post_medias(id, media_url, media_type, position, hls_status, hls_playlist_url, thumbnail_url, filtre, crop_format, crop_x, crop_y, crop_w, crop_h, texte_overlay, texte_x, texte_y, texte_couleur, texte_police)')
         .eq('id', postId)
         .maybeSingle()
 
       if (data) {
         setLegende(data.legende || '')
         const savedFormat = data.crop_format
-        setFormat(savedFormat === 'vertical_45' ? 'vertical' : savedFormat || 'carre')
+        setFormat(savedFormat || 'carre')
         if (
           data.crop_x != null && data.crop_y != null &&
           data.crop_w != null && data.crop_h != null
@@ -79,19 +124,38 @@ export default function CreatePost() {
           setCrop(savedCrop)
           setDraftCrop(savedCrop)
         }
-        setFiltre(data.filtre || null)
-        if (data.texte_overlay) {
-          setTextEl({
-            contenu: data.texte_overlay,
-            couleur: data.texte_couleur || '#ffffff',
-            police: data.texte_police || 'Inter',
-            x: data.texte_x ?? 50,
-            y: data.texte_y ?? 50,
-          })
-        }
         const sorted = [...(data.post_medias || [])].sort((a, b) => a.position - b.position)
         setExistingMediaUrls(sorted.map((m) => m.media_url))
+        setExistingMediaIds(sorted.map((m) => m.id))
         setExistingMediaTypes(sorted.map((m) => m.media_type || 'image'))
+        // Filtre par média : chaque item du carrousel garde le sien (post_medias.filtre).
+        // Fallback sur l'ancien filtre unique du post (data.filtre) pour un média qui
+        // n'aurait pas encore de filtre propre enregistré (posts publiés avant ce
+        // correctif) : mieux que de perdre silencieusement le filtre déjà visible.
+        setFiltresParMedia(sorted.map((m) => m.filtre ?? data.filtre ?? null))
+        setTextesParMedia(sorted.map((m, i) => {
+          if (m.texte_overlay) {
+            return {
+              contenu: m.texte_overlay,
+              couleur: m.texte_couleur || '#ffffff',
+              police: m.texte_police || 'Inter',
+              x: m.texte_x ?? 50,
+              y: m.texte_y ?? 50,
+            }
+          }
+          // Repli sur l'ancien champ unique du post, uniquement pour le 1er média
+          // (posts publiés avant l'ajout des colonnes texte par média).
+          if (i === 0 && data.texte_overlay) {
+            return {
+              contenu: data.texte_overlay,
+              couleur: data.texte_couleur || '#ffffff',
+              police: data.texte_police || 'Inter',
+              x: data.texte_x ?? 50,
+              y: data.texte_y ?? 50,
+            }
+          }
+          return null
+        }))
         if (sorted[0]?.media_type === 'video') {
           setExistingHls({
             status: sorted[0].hls_status,
@@ -110,6 +174,9 @@ export default function CreatePost() {
     if (selected.length === 0) return
     setFiles(selected)
     setPreviews(selected.map((f) => URL.createObjectURL(f)))
+    setFiltresParMedia(selected.map(() => null))
+    setTextesParMedia(selected.map(() => null))
+    setActiveMediaIndex(0)
     setStep('edit')
   }
 
@@ -126,6 +193,11 @@ export default function CreatePost() {
     ? existingMediaTypes
     : files.map((f) => (isVideoFile(f) ? 'video' : 'image'))
   const mainPreview = displayMedias[0]
+  // Média actuellement swipé/édité dans le carrousel (filtre, texte). Le crop global,
+  // lui, continue de se baser sur mainPreview (1er média) : c'est un réglage commun à
+  // tout le carrousel, prévisualisé sur la 1ère image par simplicité, comme avant.
+  const activeMedia = displayMedias[activeMediaIndex] ?? mainPreview
+  const activeMediaIsVideo = displayMediaTypes[activeMediaIndex] === 'video'
   // Un carrousel peut désormais contenir une vidéo (pas seulement en position
   // 0) : la condition ne dépend donc plus de mainIsVideo, seulement du nombre
   // de fichiers. mainIsVideo ne sert plus qu'à choisir l'écran plein cadre
@@ -142,6 +214,11 @@ export default function CreatePost() {
     setLoading(true)
     setPublishError(null)
 
+    // Champs réellement globaux au post : la légende, et le cadre de recadrage
+    // (crop_format + rectangle), qui s'applique uniformément à tout le carrousel
+    // puisque l'affichage se fait dans un seul cadre à ratio fixe. Le filtre et le
+    // texte overlay, eux, sont désormais indépendants par média (voir plus bas,
+    // écrits directement sur chaque ligne post_medias).
     const commonFields = {
       legende,
       crop_format: format,
@@ -149,19 +226,43 @@ export default function CreatePost() {
       crop_y: crop.y,
       crop_w: crop.w,
       crop_h: crop.h,
-      filtre,
-      texte_overlay: textEl?.contenu || null,
-      texte_x: textEl?.x ?? null,
-      texte_y: textEl?.y ?? null,
-      texte_couleur: textEl?.couleur || null,
-      texte_police: textEl?.police || null,
     }
 
     if (isEditing) {
       const { error: updateError } = await supabase.from('posts').update(commonFields).eq('id', postId)
-      setLoading(false)
       if (updateError) {
+        setLoading(false)
         setPublishError(updateError.message)
+        return
+      }
+
+      // Écrit le filtre et le texte de CHAQUE média existant sur sa propre ligne
+      // post_medias, indépendamment des autres — c'est le cœur du correctif demandé :
+      // avant, un seul filtre/texte s'appliquait à tout le carrousel. En parallèle,
+      // comme pour l'upload, pour ne pas enchaîner N allers-retours séquentiels.
+      const existingIds = existingMediaIds
+      const mediaUpdateErrors = (await Promise.all(
+        existingIds.map((mediaId, i) => {
+          if (!mediaId) return Promise.resolve(null)
+          const t = textesParMedia[i]
+          return supabase
+            .from('post_medias')
+            .update({
+              filtre: filtresParMedia[i] ?? null,
+              texte_overlay: t?.contenu || null,
+              texte_x: t?.x ?? null,
+              texte_y: t?.y ?? null,
+              texte_couleur: t?.couleur || null,
+              texte_police: t?.police || null,
+            })
+            .eq('id', mediaId)
+            .then(({ error: mediaError }) => mediaError)
+        })
+      )).filter(Boolean)
+
+      setLoading(false)
+      if (mediaUpdateErrors.length > 0) {
+        setPublishError(mediaUpdateErrors[0].message)
         return
       }
       navigate(-1)
@@ -253,6 +354,12 @@ export default function CreatePost() {
           media_type: isVideo ? 'video' : 'image',
           thumbnail_url: thumbnailUrl,
           position: i,
+          filtre: filtresParMedia[i] ?? null,
+          texte_overlay: textesParMedia[i]?.contenu || null,
+          texte_x: textesParMedia[i]?.x ?? null,
+          texte_y: textesParMedia[i]?.y ?? null,
+          texte_couleur: textesParMedia[i]?.couleur || null,
+          texte_police: textesParMedia[i]?.police || null,
         })
         .select('id')
         .single()
@@ -298,7 +405,15 @@ export default function CreatePost() {
   // ordre à chaque rendu, donc aucun `return` avant eux)
   const cropAreaRef = useRef(null)
   const videoRef = useRef(null)
+  const editCarrouselRef = useRef(null)
   const dragState = useRef(null)
+
+  const handleEditCarrouselScroll = () => {
+    const el = editCarrouselRef.current
+    if (!el) return
+    const index = Math.round(el.scrollLeft / el.clientWidth)
+    setActiveMediaIndex(Math.max(0, Math.min(displayMedias.length - 1, index)))
+  }
   const pendingEvent = useRef(null)
   const rafId = useRef(null)
 
@@ -385,7 +500,7 @@ export default function CreatePost() {
   // ensuite ajustable à la main comme un crop normal
   const applyRatio = (ratioValue) => {
     setFormat(ratioValue)
-    const targets = { carre: 1, vertical: 4 / 5, horizontal: 4 / 3 }
+    const targets = { carre: 1, vertical: 9 / 16, horizontal: 4 / 3 }
     const target = targets[ratioValue]
     if (!target || !cropAreaRef.current) return
     const rect = cropAreaRef.current.getBoundingClientRect()
@@ -564,9 +679,11 @@ export default function CreatePost() {
           </div>
         </div>
 
-        {/* choix de ratio, en plus du cadre manuel */}
+        {/* choix de ratio, en plus du cadre manuel — carré retiré uniquement pour une
+            vidéo SEULE (pas en carrousel) : un carrousel garde toujours les 3 ratios,
+            même s'il contient une ou plusieurs vidéos. */}
         <div className="flex gap-2 px-4 pb-2">
-          {RATIOS.map((r) => (
+          {RATIOS.filter((r) => !(mainIsVideo && !isCarrousel && r.value === 'carre')).map((r) => (
             <button
               key={r.value}
               onClick={() => applyRatio(r.value)}
@@ -630,10 +747,13 @@ export default function CreatePost() {
           </div>
         </div>
 
-        <div className="flex-1 relative overflow-hidden" style={cropStyle}>
-          <div className="relative w-full h-full flex items-center justify-center bg-black">
+        <div className="flex-1 relative flex items-center justify-center overflow-hidden bg-black">
+          <div
+            className={`relative w-full ${EDIT_ASPECT_CLASSES[format] || 'aspect-square'} flex items-center justify-center overflow-hidden`}
+            style={cropStyle}
+          >
             <img
-              src={mainPreview}
+              src={activeMedia}
               alt=""
               className="w-full h-full object-contain select-none"
               draggable={false}
@@ -702,8 +822,11 @@ export default function CreatePost() {
         </div>
       </div>
 
-      <div className={`flex-1 relative ${isCarrousel ? '' : 'overflow-hidden'}`} style={isCarrousel ? undefined : cropStyle}>
-        <div className="relative w-full h-full bg-black">
+      <div className="flex-1 relative flex items-center justify-center overflow-hidden bg-black">
+        <div
+          className={`relative w-full ${EDIT_ASPECT_CLASSES[format] || 'aspect-square'} ${isCarrousel ? '' : 'overflow-hidden'}`}
+          style={isCarrousel ? undefined : cropStyle}
+        >
           {mainIsVideo && !isCarrousel ? (
             isEditing && existingHls?.status === 'ready' && existingHls?.playlistUrl ? (
               <HlsVideo
@@ -723,26 +846,71 @@ export default function CreatePost() {
               <video key={mainPreview} src={mainPreview} className="w-full h-full object-contain" controls autoPlay playsInline style={{ filter: filterCss }} />
             )
           ) : isCarrousel ? (
-            <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory">
-              {displayMedias.map((p, i) =>
-                displayMediaTypes[i] === 'video' ? (
-                  <div key={i} className="w-full h-full shrink-0 snap-center">
-                    <video
-                      src={p}
-                      className="w-full h-full object-contain"
-                      style={{ filter: filterCss }}
-                      controls
-                      playsInline
-                      preload="metadata"
-                    />
-                  </div>
-                ) : (
-                  <div key={i} className="w-full h-full shrink-0 snap-center">
-                    <img src={p} alt="" className="w-full h-full object-contain select-none" draggable={false} style={{ filter: filterCss }} />
-                  </div>
-                )
-              )}
-            </div>
+            <>
+              <div
+                ref={editCarrouselRef}
+                onScroll={handleEditCarrouselScroll}
+                className="flex w-full h-full overflow-x-auto snap-x snap-mandatory"
+              >
+                {displayMedias.map((p, i) =>
+                  displayMediaTypes[i] === 'video' ? (
+                    <div key={i} className="w-full h-full shrink-0 snap-center">
+                      <video
+                        src={p}
+                        className="w-full h-full object-contain"
+                        style={{ filter: getFilterCss(filtresParMedia[i]) }}
+                        controls
+                        playsInline
+                        preload="metadata"
+                      />
+                    </div>
+                  ) : (
+                    <div key={i} className="w-full h-full shrink-0 snap-center">
+                      <img
+                        src={p}
+                        alt=""
+                        className="w-full h-full object-contain select-none"
+                        draggable={false}
+                        style={{ filter: getFilterCss(filtresParMedia[i]) }}
+                      />
+                    </div>
+                  )
+                )}
+              </div>
+
+              {/* indicateur i/N, identique à l'affichage du feed (PostCard.jsx) */}
+              <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/50 text-white text-[12px] leading-[16px] font-medium">
+                {activeMediaIndex + 1}/{displayMedias.length}
+              </div>
+
+              {/* points de progression, identiques à l'affichage du feed */}
+              <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1">
+                {(() => {
+                  const total = displayMedias.length
+                  const maxDots = 8
+                  let start = 0
+                  if (total > maxDots) {
+                    start = Math.min(Math.max(0, activeMediaIndex - Math.floor(maxDots / 2)), total - maxDots)
+                  }
+                  const visibleCount = Math.min(total, maxDots)
+                  return Array.from({ length: visibleCount }).map((_, offset) => {
+                    const i = start + offset
+                    const active = i === activeMediaIndex
+                    return (
+                      <span
+                        key={i}
+                        className="rounded-full transition-all duration-200"
+                        style={{
+                          width: active ? 12 : 5,
+                          height: 5,
+                          backgroundColor: active ? 'var(--accent)' : 'rgba(255,255,255,0.5)',
+                        }}
+                      />
+                    )
+                  })
+                })()}
+              </div>
+            </>
           ) : (
             <img
               src={mainPreview}
@@ -769,7 +937,7 @@ export default function CreatePost() {
       {showFilters && (
         <div className="shrink-0 bg-black/95 pt-2" style={{ animation: 'slideUpPanel 0.2s ease-out' }}>
           <p className="text-center text-white/60 text-caption pb-1">Filtres</p>
-          <FilterPicker imageUrl={mainPreview} isVideo={mainIsVideo} value={filtre} onChange={setFiltre} />
+          <FilterPicker imageUrl={activeMedia} isVideo={activeMediaIsVideo} value={filtre} onChange={setFiltre} />
         </div>
       )}
 
