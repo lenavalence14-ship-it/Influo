@@ -9,6 +9,7 @@ import FilterPicker, { getFilterCss } from './editor/FilterPicker'
 import DraggableElement from './editor/DraggableElement'
 import { FONTS, getFontStyle } from './PhotoNoteEditor'
 import HlsVideo from '../../components/HlsVideo'
+import { usePostUpload } from '../../contexts/PostUploadContext'
 
 const RATIOS = [
   { value: 'carre', label: 'Carré', aspect: 'aspect-square' },
@@ -27,7 +28,8 @@ const TEXT_COLORS = ['#ffffff', '#000000', '#f43f5e', '#3b82f6', '#22c55e', '#ea
 export default function CreatePost() {
   const { postId } = useParams()
   const isEditing = Boolean(postId)
-  const { influencerProfile } = useAuth()
+  const { influencerProfile, user } = useAuth()
+  const { startUpload, updateProgress, finishUpload } = usePostUpload()
   const navigate = useNavigate()
 
   const [loadingExisting, setLoadingExisting] = useState(isEditing)
@@ -158,6 +160,21 @@ export default function CreatePost() {
       return
     }
 
+    // À partir d'ici, l'utilisateur n'attend plus : retour immédiat à l'accueil,
+    // l'upload (compression + envoi des fichiers) continue en arrière-plan. La
+    // progression est pilotée via PostUploadContext et affichée en cercle autour
+    // du bouton "+" du feed (voir Feed.jsx).
+    setLoading(false)
+    navigate('/')
+    startUpload(influencerProfile.id)
+
+    const totalSteps = files.length * 2 // compression + upload, par fichier
+    let doneSteps = 0
+    const bumpProgress = () => {
+      doneSteps += 1
+      updateProgress(influencerProfile.id, Math.round((doneSteps / totalSteps) * 100))
+    }
+
     // Chaque fichier du post (photo unique, carrousel, vidéo) est traité en parallèle :
     // compression + génération de miniature + upload, au lieu d'une boucle séquentielle
     // qui attend chaque étape de chaque fichier avant de passer au suivant. Pour un
@@ -175,6 +192,7 @@ export default function CreatePost() {
         isVideo ? compressVideo(rawFile) : compressImage(rawFile),
         isVideo ? generateVideoThumbnail(rawFile) : Promise.resolve(null),
       ])
+      bumpProgress()
 
       const fileName = `${influencerProfile.id}/${post.id}/${i}-${file.name}`
 
@@ -189,6 +207,7 @@ export default function CreatePost() {
       }
 
       await Promise.all(uploadTasks)
+      bumpProgress()
 
       const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
       const thumbnailUrl = thumbName
@@ -222,8 +241,20 @@ export default function CreatePost() {
       }
     }))
 
-    setLoading(false)
-    navigate('/')
+    finishUpload(influencerProfile.id)
+
+    // Notification interne : visible dans la cloche de l'app même si l'utilisateur
+    // a quitté l'écran de publication depuis longtemps. Le déclenchement d'une vraie
+    // notification push système (téléphone verrouillé, app fermée) suivra le même
+    // principe côté serveur (fonction send-push), pas encore branché ici.
+    if (user?.id) {
+      await supabase.from('notifications').insert({
+        user_id: user.id,
+        type: 'nouveau_post',
+        contenu: 'Votre publication est en ligne.',
+        lien_ref_id: post.id,
+      })
+    }
   }
 
   // (le spinner de chargement est rendu plus bas, après tous les Hooks)
@@ -640,7 +671,7 @@ export default function CreatePost() {
         </div>
       </div>
 
-      <div className="flex-1 relative overflow-hidden" style={cropStyle}>
+      <div className={`flex-1 relative ${isCarrousel ? '' : 'overflow-hidden'}`} style={isCarrousel ? undefined : cropStyle}>
         <div className="relative w-full h-full bg-black">
           {mainIsVideo ? (
             isEditing && existingHls?.status === 'ready' && existingHls?.playlistUrl ? (

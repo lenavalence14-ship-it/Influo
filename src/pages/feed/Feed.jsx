@@ -9,6 +9,7 @@ import Card from '../../components/ui/Card'
 import { Sun, Moon, MessageCircle, Plus, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useUnreadCounts } from '../../hooks/useUnreadCounts'
+import { usePostUploadProgress } from '../../contexts/PostUploadContext'
 import { usePullToRefresh } from '../../hooks/usePullToRefresh'
 import Logo from '../../components/ui/Logo'
 
@@ -55,10 +56,11 @@ async function fetchFeedPage({ userId, pageParam = 0 }) {
 }
 
 export default function Feed() {
-  const { user, profile } = useAuth()
+  const { user, profile, influencerProfile } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const { hasUnreadMessages } = useUnreadCounts()
+  const uploadProgress = usePostUploadProgress(influencerProfile?.id)
   const queryClient = useQueryClient()
   // partagé entre toutes les vidéos du feed : activer le son sur l'une
   // l'active pour toutes, sans pour autant les jouer toutes en même temps
@@ -115,9 +117,34 @@ export default function Feed() {
           <button
             onClick={() => navigate('/publier')}
             aria-label="Publier"
-            className="w-9 h-9 flex items-center justify-center"
+            className="relative w-9 h-9 flex items-center justify-center"
           >
+            {uploadProgress !== null && (
+              <svg className="absolute inset-0 w-9 h-9 -rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--border)" strokeWidth="2" />
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="15.5"
+                  fill="none"
+                  stroke="var(--accent)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 15.5}
+                  strokeDashoffset={2 * Math.PI * 15.5 * (1 - uploadProgress / 100)}
+                  style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                />
+              </svg>
+            )}
             <Plus size={24} />
+            {uploadProgress !== null && (
+              <span
+                className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-semibold px-1 rounded-full whitespace-nowrap"
+                style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--accent)' }}
+              >
+                {uploadProgress}%
+              </span>
+            )}
           </button>
         ) : (
           <div className="w-9 h-9" />

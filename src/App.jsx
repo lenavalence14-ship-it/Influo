@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { NoteUploadProvider } from './contexts/NoteUploadContext'
+import { PostUploadProvider } from './contexts/PostUploadContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
 import BackButtonHandler from './components/BackButtonHandler'
@@ -221,10 +222,12 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <NoteUploadProvider>
-          <BrowserRouter>
-            <BackButtonHandler />
-            <AppRoutes />
-          </BrowserRouter>
+          <PostUploadProvider>
+            <BrowserRouter>
+              <BackButtonHandler />
+              <AppRoutes />
+            </BrowserRouter>
+          </PostUploadProvider>
         </NoteUploadProvider>
       </AuthProvider>
     </ThemeProvider>
