@@ -392,11 +392,14 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
       {isLandscape ? (
         <div className="absolute inset-0 flex items-center justify-center bg-black">
           <div className="relative w-full aspect-video overflow-hidden">
-            {!shouldMount && (
+            {/* la miniature reste affichée tant que la vidéo n'a pas de frame prête
+                (videoReady), qu'elle existe en base ou non (fond noir sinon) --
+                jamais de flash gris natif du <video> pendant ce court instant */}
+            {!videoReady && (
               <img
                 src={thumbnailUrl || undefined}
                 alt=""
-                className="absolute inset-0"
+                className="absolute inset-0 bg-black"
                 style={{ ...cropStyle, filter: getFilterCss(reel.filtre) }}
               />
             )}
@@ -411,7 +414,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
                 muted={muted}
                 preload={shouldPreload ? 'auto' : shouldPrefetchMeta ? 'metadata' : 'metadata'}
                 onLoadedData={() => setVideoReady(true)}
-                style={{ ...cropStyle, filter: getFilterCss(reel.filtre) }}
+                style={{ ...cropStyle, filter: getFilterCss(reel.filtre), opacity: videoReady ? 1 : 0 }}
               />
             )}
             <TextOverlay media={media} />
@@ -419,7 +422,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
         </div>
       ) : (
         <>
-          {!shouldMount && (
+          {!videoReady && (
             <img
               src={thumbnailUrl || undefined}
               alt=""
@@ -443,7 +446,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
               // - le reste (celle qu'on vient de quitter) : 'metadata' aussi, pas de re-fetch
               preload={shouldPreload ? 'auto' : shouldPrefetchMeta ? 'metadata' : 'metadata'}
               onLoadedData={() => setVideoReady(true)}
-              style={{ ...cropStyle, filter: getFilterCss(reel.filtre) }}
+              style={{ ...cropStyle, filter: getFilterCss(reel.filtre), opacity: videoReady ? 1 : 0 }}
             />
           )}
           <TextOverlay media={media} />
