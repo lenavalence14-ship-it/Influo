@@ -20,7 +20,7 @@ const cropClasses = {
   vertical_45: 'aspect-[4/5]',
 }
 
-function PostCard({ post, onDeleted, autoOpenComments = false, priority = false }) {
+function PostCard({ post, onDeleted, autoOpenComments = false, priority = false, muted: mutedProp, onToggleMute: onToggleMuteProp }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const activeStoryIds = useActiveStories()
@@ -30,7 +30,12 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false 
   const [showComments, setShowComments] = useState(autoOpenComments)
   const [showMenu, setShowMenu] = useState(false)
   const [deleted, setDeleted] = useState(false)
-  const [muted, setMuted] = useState(true)
+  // le son est partagé entre toutes les vidéos du feed quand le parent (Feed.jsx)
+  // passe muted/onToggleMute ; sinon (ex: PostDetail, une seule carte affichée)
+  // on retombe sur un état local propre à cette carte
+  const [localMuted, setLocalMuted] = useState(true)
+  const muted = mutedProp ?? localMuted
+  const onToggleMute = onToggleMuteProp ?? (() => setLocalMuted((m) => !m))
   // le média (vidéo) n'est monté dans le DOM que quand la carte approche de l'écran.
   // Pour les toutes premières cartes du feed (priority), on le monte immédiatement
   // pour éviter un flash vide au premier affichage.
@@ -206,7 +211,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false 
                   )}
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); setMuted((m) => !m) }}
+                  onClick={(e) => { e.stopPropagation(); onToggleMute() }}
                   aria-label={muted ? 'Activer le son' : 'Couper le son'}
                   className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white"
                 >

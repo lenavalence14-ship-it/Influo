@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -60,6 +60,10 @@ export default function Feed() {
   const navigate = useNavigate()
   const { hasUnreadMessages } = useUnreadCounts()
   const queryClient = useQueryClient()
+  // partagé entre toutes les vidéos du feed : activer le son sur l'une
+  // l'active pour toutes, sans pour autant les jouer toutes en même temps
+  // (seule la vidéo réellement visible à l'écran joue, voir PostCard)
+  const [feedMuted, setFeedMuted] = useState(true)
 
   const {
     data,
@@ -185,6 +189,8 @@ export default function Feed() {
               post={post}
               onDeleted={handleDeleted}
               priority={i < 2}
+              muted={feedMuted}
+              onToggleMute={() => setFeedMuted((m) => !m)}
             />
           ))}
           {hasNextPage && (

@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react'
-import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft, Plus, Volume2, VolumeX } from 'lucide-react'
+import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft, Plus, Volume2, VolumeX, Play, Pause } from 'lucide-react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
@@ -61,7 +61,17 @@ export default function ReelsViewer() {
   const videoRefs = useRef([])
   const hasScrolledToStart = useRef(false)
   const [activeIndex, setActiveIndex] = useState(0)
-  const [muted, setMuted] = useState(true)
+  const [muted, setMuted] = useState(false)
+  const [pausedSlides, setPausedSlides] = useState(() => new Set())
+
+  const toggleSlidePaused = (index) => {
+    setPausedSlides((prev) => {
+      const next = new Set(prev)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
+      return next
+    })
+  }
 
   const { data: reels = [], isLoading: loading } = useQuery({
     queryKey: ['reels', user?.id],
@@ -115,18 +125,34 @@ export default function ReelsViewer() {
   // depuis l'IntersectionObserver ; il centralise la décision sur activeIndex,
   // ce qui est nécessaire maintenant que seules activeIndex-1..activeIndex+1
   // sont montées dans le DOM (voir shouldMount plus bas).
+  // au changement de slide active : reset au début et retire toute pause manuelle
+  // héritée d'une session de lecture précédente sur cette même vidéo
+  useEffect(() => {
+    const video = videoRefs.current[activeIndex]
+    if (video) video.currentTime = 0
+    setPausedSlides((prev) => {
+      if (!prev.has(activeIndex)) return prev
+      const next = new Set(prev)
+      next.delete(activeIndex)
+      return next
+    })
+  }, [activeIndex])
+
   useEffect(() => {
     videoRefs.current.forEach((video, idx) => {
       if (!video) return
       if (idx === activeIndex) {
-        video.currentTime = 0
-        video.muted = muted
-        video.play().catch(() => {})
+        if (!pausedSlides.has(idx)) {
+          video.muted = muted
+          video.play().catch(() => {})
+        } else {
+          video.pause()
+        }
       } else {
         video.pause()
       }
     })
-  }, [activeIndex, muted])
+  }, [activeIndex, muted, pausedSlides])
 
   // applique immédiatement mute/unmute à la vidéo en cours de lecture
   useEffect(() => {
@@ -206,13 +232,15 @@ export default function ReelsViewer() {
           setVideoRef={(el) => (videoRefs.current[i] = el)}
           muted={muted}
           onToggleMute={() => setMuted((m) => !m)}
+          isPaused={pausedSlides.has(i)}
+          onTogglePause={() => toggleSlidePaused(i)}
         />
       ))}
     </div>
   )
 }
 
-const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPreload, shouldPrefetchMeta, isActive, setVideoRef, muted, onToggleMute }) {
+const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPreload, shouldPrefetchMeta, isActive, setVideoRef, muted, onToggleMute, isPaused, onTogglePause }) {
   const { user } = useAuth()
   const [liked, setLiked] = useState(reel.liked_by_me)
   const [likeCount, setLikeCount] = useState(reel.like_count || 0)
@@ -222,6 +250,10 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
   // première image de la vidéo (événement natif "loadeddata") : à ce moment-là,
   // le spinner de secours (utilisé quand thumbnailUrl est vide) n'a plus lieu d'être.
   const [videoReady, setVideoReady] = useState(false)
+  const [showBigHeart, setShowBigHeart] = useState(false)
+  const [showPauseIcon, setShowPauseIcon] = useState(false)
+  const lastTapRef = useRef(0)
+  const tapTimeoutRef = useRef(null)
 
   const influencer = reel.profils_influenceur
   const media = reel.post_medias?.[0]
@@ -244,6 +276,38 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
       setLikeCount((c) => c + 1)
       await supabase.from('post_likes').insert({ post_id: reel.id, user_id: user.id })
     }
+  }
+
+  const likeOnly = async () => {
+    if (!user || liked) return
+    setLiked(true)
+    setLikeCount((c) => c + 1)
+    await supabase.from('post_likes').insert({ post_id: reel.id, user_id: user.id })
+  }
+
+  const triggerBigHeart = () => {
+    setShowBigHeart(true)
+    window.clearTimeout(triggerBigHeart._t)
+    triggerBigHeart._t = window.setTimeout(() => setShowBigHeart(false), 700)
+  }
+
+  const handleVideoTap = () => {
+    const now = Date.now()
+    if (now - lastTapRef.current < 300) {
+      // double-tap : like uniquement, ne touche pas à play/pause
+      window.clearTimeout(tapTimeoutRef.current)
+      lastTapRef.current = 0
+      likeOnly()
+      triggerBigHeart()
+      return
+    }
+    lastTapRef.current = now
+    tapTimeoutRef.current = window.setTimeout(() => {
+      // tap simple confirmé (pas suivi d'un second tap) : play/pause
+      onTogglePause()
+      setShowPauseIcon(true)
+      window.setTimeout(() => setShowPauseIcon(false), 700)
+    }, 300)
   }
 
   return (
@@ -289,6 +353,46 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           ce que la vidéo ait sa première image prête. */}
       {shouldMount && !thumbnailUrl && !videoReady && <ReelLoadingOverlay />}
 
+      {/* zone de tap : simple = play/pause, double = like */}
+      <button
+        onClick={handleVideoTap}
+        aria-label="Vidéo"
+        className="absolute inset-0 w-full h-full z-[5]"
+        style={{ background: 'transparent' }}
+      />
+
+      {/* grand cœur, façon Instagram, apparaît puis repart */}
+      {showBigHeart && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <Heart
+            size={96}
+            className="fill-[var(--accent)] text-[var(--accent)]"
+            style={{ animation: 'bigHeartPop 0.7s ease-out' }}
+          />
+        </div>
+      )}
+
+      {/* bouton play/pause central, glassmorphism cramoisi */}
+      {showPauseIcon && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center"
+            style={{
+              background: 'color-mix(in srgb, var(--accent) 35%, transparent)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              border: '1px solid color-mix(in srgb, var(--accent) 50%, transparent)',
+            }}
+          >
+            {isPaused ? (
+              <Play size={28} className="text-white fill-white ml-1" />
+            ) : (
+              <Pause size={28} className="text-white fill-white" />
+            )}
+          </div>
+        </div>
+      )}
+
       {/* dégradés pour lisibilité de l'UI */}
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
       <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
@@ -299,8 +403,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
         style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) + 16px)' }}
       >
         <button onClick={toggleLike} className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
-          <Heart size={27} className={liked ? 'fill-red-500 text-red-500' : ''} strokeWidth={2} />
-          {likeCount > 0 && <span className="text-[11px] font-medium">{likeCount}</span>}
+          <Heart size={27} className={liked ? 'fill-[var(--accent)] text-[var(--accent)]' : ''} strokeWidth={2} />
         </button>
         <button
           onClick={() => setShowComments(true)}
@@ -362,6 +465,15 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
       {showComments && (
         <CommentsSheet postId={reel.id} onClose={() => setShowComments(false)} />
       )}
+
+      <style>{`
+        @keyframes bigHeartPop {
+          0% { transform: scale(0.3); opacity: 0; }
+          25% { transform: scale(1.15); opacity: 1; }
+          40% { transform: scale(1); opacity: 1; }
+          100% { transform: scale(1); opacity: 0; }
+        }
+      `}</style>
     </div>
   )
 })
