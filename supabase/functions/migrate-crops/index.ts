@@ -10,7 +10,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const RATIO_VALUES: Record<string, number> = { carre: 1, horizontal: 4 / 3, vertical: 9 / 16, vertical_45: 4 / 5 }
+const RATIO_VALUES: Record<string, number> = { carre: 1, horizontal: 16 / 9, vertical: 9 / 16, vertical_45: 4 / 5 }
 
 function computeMinZoom(width: number, height: number, cropFormat: string) {
   const frameRatio = RATIO_VALUES[cropFormat] || 1
@@ -18,8 +18,7 @@ function computeMinZoom(width: number, height: number, cropFormat: string) {
   return mediaRatio > frameRatio ? mediaRatio / frameRatio : frameRatio / mediaRatio
 }
 
-// Lit largeur/hauteur d'un JPEG/PNG à partir des seuls octets d'en-tête
-// (pas besoin de télécharger le fichier entier, juste les premiers Ko).
+// Lit largeur/hauteur d'un JPEG/PNG/WEBP à partir des octets du fichier.
 function readImageDimensions(bytes: Uint8Array): { width: number; height: number } | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
@@ -28,59 +27,96 @@ function readImageDimensions(bytes: Uint8Array): { width: number; height: number
     return { width: view.getUint32(16), height: view.getUint32(20) }
   }
 
-  // JPEG : parcourt les marqueurs jusqu'à trouver un SOFn (0xC0-0xCF sauf C4/C8/CC)
+  // WEBP (VP8/VP8L/VP8X) : certains exports mobiles renomment en .jpg par erreur
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+      bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+    const fourCC = String.fromCharCode(bytes[12], bytes[13], bytes[14], bytes[15])
+    if (fourCC === 'VP8 ') {
+      return { width: view.getUint16(26, true) & 0x3fff, height: view.getUint16(28, true) & 0x3fff }
+    }
+    if (fourCC === 'VP8X') {
+      const width = (bytes[24] | (bytes[25] << 8) | (bytes[26] << 16)) + 1
+      const height = (bytes[27] | (bytes[28] << 8) | (bytes[29] << 16)) + 1
+      return { width, height }
+    }
+  }
+
+  // JPEG : parcourt les marqueurs jusqu'à trouver un SOFn. Certains fichiers
+  // (notamment issus de traitements mobiles) ont un premier octet parasite ou
+  // un padding entre marqueurs (0xFF répétés) : on avance marqueur par
+  // marqueur en tolérant plusieurs 0xFF consécutifs avant le code, au lieu de
+  // s'arrêter à la première incohérence.
   if (bytes[0] === 0xff && bytes[1] === 0xd8) {
     let offset = 2
-    while (offset < bytes.length - 8) {
+    while (offset < bytes.length - 4) {
       if (bytes[offset] !== 0xff) { offset++; continue }
-      const marker = bytes[offset + 1]
+      // tolère un padding de 0xFF avant le vrai code marqueur
+      let markerOffset = offset + 1
+      while (markerOffset < bytes.length && bytes[markerOffset] === 0xff) markerOffset++
+      const marker = bytes[markerOffset]
+      // marqueurs sans segment de longueur : on avance d'un octet seulement
       if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9)) {
-        offset += 2
+        offset = markerOffset + 1
         continue
       }
-      const segmentLength = view.getUint16(offset + 2)
-      if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
-        const height = view.getUint16(offset + 5)
-        const width = view.getUint16(offset + 7)
-        return { width, height }
+      if (markerOffset + 2 >= bytes.length) break
+      const segmentLength = view.getUint16(markerOffset + 1)
+      const isSOF = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc
+      if (isSOF) {
+        const height = view.getUint16(markerOffset + 4)
+        const width = view.getUint16(markerOffset + 6)
+        if (width && height) return { width, height }
       }
-      offset += 2 + segmentLength
+      if (segmentLength < 2) break // segment invalide, éviter boucle infinie
+      offset = markerOffset + 1 + segmentLength
     }
   }
 
   return null
 }
 
-// Parse minimal d'un MP4/MOV : cherche l'atome tkhd (dans moov/trak) qui
-// contient la largeur/hauteur d'affichage de la piste (format fixed-point
-// 16.16, d'où le >> 16). Suffisant pour les fichiers produits par le
-// compresseur vidéo de l'app (mp4/webm classiques H.264).
+// Parse un MP4/MOV : cherche l'atome tkhd (dans moov/trak) qui contient la
+// largeur/hauteur d'affichage de la piste. Recherche récursive à travers
+// toute l'arborescence d'atomes (pas seulement au premier niveau), et gère le
+// cas où 'moov' est placé après 'mdat' (fichier non "faststart", fréquent sur
+// exports mobiles) puisqu'on a déjà téléchargé le fichier entier de toute façon.
 function readMp4Dimensions(bytes: Uint8Array): { width: number; height: number } | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  let offset = 0
 
-  function findAtom(start: number, end: number, type: string): { start: number; end: number } | null {
+  function findAtomRecursive(start: number, end: number, path: string[]): { start: number; end: number } | null {
     let o = start
     while (o < end - 8) {
-      const size = view.getUint32(o)
+      let size = Number(view.getUint32(o))
       const atomType = String.fromCharCode(bytes[o + 4], bytes[o + 5], bytes[o + 6], bytes[o + 7])
+      let headerSize = 8
+      if (size === 1) {
+        // taille étendue 64 bits (rare, mais présente sur certains exports)
+        const high = view.getUint32(o + 8)
+        const low = view.getUint32(o + 12)
+        size = high * 2 ** 32 + low
+        headerSize = 16
+      }
       if (size < 8) break
-      if (atomType === type) return { start: o + 8, end: o + size }
+      if (atomType === path[0]) {
+        const contentStart = o + headerSize
+        const contentEnd = o + size
+        if (path.length === 1) return { start: contentStart, end: contentEnd }
+        // conteneurs qui ont des octets de version/flags avant leurs enfants (ex: pas ici pour moov/trak/mdia, mais stbl a besoin d'aller dans stsd etc — non nécessaire pour tkhd)
+        const found = findAtomRecursive(contentStart, contentEnd, path.slice(1))
+        if (found) return found
+      }
       o += size
     }
     return null
   }
 
-  const moov = findAtom(0, bytes.length, 'moov')
-  if (!moov) return null
-  const trak = findAtom(moov.start, moov.end, 'trak')
-  if (!trak) return null
-  const tkhd = findAtom(trak.start, trak.end, 'tkhd')
+  const tkhd = findAtomRecursive(0, bytes.length, ['moov', 'trak', 'tkhd'])
   if (!tkhd) return null
 
   // largeur/hauteur sont les 8 derniers octets de l'atome tkhd, en fixed-point 16.16
-  const width = view.getUint32(tkhd.end - 8) >> 16
-  const height = view.getUint32(tkhd.end - 4) >> 16
+  if (tkhd.end - tkhd.start < 8) return null
+  const width = view.getUint32(tkhd.end - 8) >>> 16
+  const height = view.getUint32(tkhd.end - 4) >>> 16
   if (!width || !height) return null
   return { width, height }
 }

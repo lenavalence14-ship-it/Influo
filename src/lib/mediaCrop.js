@@ -10,7 +10,7 @@
 
 export const RATIO_VALUES = {
   carre: 1,
-  horizontal: 4 / 3,
+  horizontal: 16 / 9,
   vertical: 9 / 16,
   vertical_45: 4 / 5,
 }
@@ -79,7 +79,7 @@ export function getCropTransformStyle({ naturalWidth, naturalHeight, cropFormat,
 
 export const CROP_ASPECT_CLASSES = {
   carre: 'aspect-square',
-  horizontal: 'aspect-[4/3]',
+  horizontal: 'aspect-video',
   vertical: 'aspect-[9/16]',
   vertical_45: 'aspect-[4/5]',
 }

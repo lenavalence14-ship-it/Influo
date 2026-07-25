@@ -15,7 +15,7 @@ import { CROP_ASPECT_CLASSES, getCropTransformStyle, getMinZoom, clampZoom, clam
 const RATIOS = [
   { value: 'carre', label: 'Carré', aspect: 'aspect-square' },
   { value: 'vertical', label: 'Vertical', aspect: 'aspect-[9/16]' },
-  { value: 'horizontal', label: 'Paysage', aspect: 'aspect-[4/3]' },
+  { value: 'horizontal', label: 'Paysage', aspect: 'aspect-video' },
 ]
 
 // Classes aspect-ratio par format, pour que le cadre d'édition adopte
