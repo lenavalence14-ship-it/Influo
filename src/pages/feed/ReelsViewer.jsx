@@ -685,7 +685,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           "son original" avec la photo du créateur -- pas un vrai lecteur audio. */}
       <div
         className="absolute right-3 z-10"
-        style={{ bottom: 'calc(48px + env(safe-area-inset-bottom) + 78px)' }}
+        style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) - 36px)' }}
       >
         <div className="relative w-7 h-7 rounded-md overflow-hidden shrink-0 border border-white/40">
           <img
