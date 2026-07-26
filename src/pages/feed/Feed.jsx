@@ -41,16 +41,24 @@ async function fetchFeedPage({ userId, pageParam = 0 }) {
 
   const postIds = data.map((p) => p.id)
   const [{ data: likes }, { data: comments }] = await Promise.all([
-    supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds),
+    supabase.from('post_likes').select('post_id, user_id, created_at, users(nom_complet)').in('post_id', postIds),
     supabase.from('post_comments').select('post_id').in('post_id', postIds),
   ])
 
-  const posts = data.map((p) => ({
-    ...p,
-    like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
-    liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === userId) || false,
-    comment_count: comments?.filter((c) => c.post_id === p.id).length || 0,
-  }))
+  const posts = data.map((p) => {
+    const postLikes = likes?.filter((l) => l.post_id === p.id) || []
+    // dernier like = created_at le plus récent, pour "Aimé par {nom} et d'autres personnes"
+    const lastLike = postLikes.length
+      ? postLikes.reduce((latest, l) => (new Date(l.created_at) > new Date(latest.created_at) ? l : latest))
+      : null
+    return {
+      ...p,
+      like_count: postLikes.length,
+      liked_by_me: postLikes.some((l) => l.user_id === userId),
+      comment_count: comments?.filter((c) => c.post_id === p.id).length || 0,
+      last_liker_name: lastLike?.users?.nom_complet || null,
+    }
+  })
 
   return { posts, nextPage: data.length === PAGE_SIZE ? pageParam + 1 : null }
 }

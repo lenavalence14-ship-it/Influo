@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react'
-import { Heart, MessageCircle, Send, MoreHorizontal, X, Trash2, Pencil, Volume2, VolumeX } from 'lucide-react'
+import { Heart, MessageCircle, Send, MoreHorizontal, X, Trash2, Pencil, Volume2, VolumeX, Repeat2, Bookmark } from 'lucide-react'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { InstagramIcon, TikTokIcon } from '../../components/ui/SocialIcons'
 import Avatar from '../../components/ui/Avatar'
@@ -52,6 +52,63 @@ function getMediaCropStyle(media, cropFormat) {
     offsetX: media?.offset_x,
     offsetY: media?.offset_y,
   })
+}
+
+// Légende avec troncature façon Instagram : 1 ligne pleine + la moitié de la
+// 2e ligne, suivi de "... voir plus". Le clip à "1.5 ligne" est fait en CSS
+// pur (hauteur fixe = 1.5x la line-height, overflow hidden) plutôt qu'en
+// comptant les caractères, pour rester correct quelle que soit la largeur
+// d'écran ou la longueur du nom d'auteur devant le texte. Au clic sur
+// "voir plus", on repasse en affichage complet (plus de contrainte de hauteur).
+function CaptionWithSeeMore({ legende, authorName, hasLikeLine }) {
+  const [expanded, setExpanded] = useState(false)
+  // null = pas encore mesuré (on ne clippe pas tant qu'on ne sait pas si c'est nécessaire,
+  // pour éviter un flash de texte tronqué sur une légende courte)
+  const [truncatable, setTruncatable] = useState(null)
+  const textRef = useRef(null)
+  const LINE_HEIGHT = 16 // px, cohérent avec leading-[16px] utilisé ici
+  const CLAMP_HEIGHT = LINE_HEIGHT * 1.5 // 1 ligne pleine + moitié de la 2e
+
+  // détecte si le texte réel dépasse 1.5 ligne pour savoir s'il faut proposer
+  // "voir plus" du tout (légendes courtes tenant sur 1 ligne n'en ont pas besoin).
+  // Mesure sur le scrollHeight naturel, sans contrainte de hauteur, donc au
+  // premier render (avant que truncatable soit déterminé) le texte n'est pas
+  // encore clippé -- ce useLayoutEffect s'exécute avant peinture pour éviter
+  // tout flash visible du texte complet.
+  useEffect(() => {
+    const el = textRef.current
+    if (!el) return
+    setTruncatable(el.scrollHeight > CLAMP_HEIGHT + 1)
+  }, [legende])
+
+  const shouldClamp = truncatable && !expanded
+
+  return (
+    <p className={`px-3 text-[13px] leading-[16px] ${hasLikeLine ? 'pt-0.5' : 'pt-1'}`} style={{ color: 'var(--text-primary)' }}>
+      <span className="font-medium mr-1">{authorName}</span>
+      <span
+        ref={textRef}
+        style={{
+          color: 'var(--text-secondary)',
+          display: 'inline-block',
+          overflow: shouldClamp ? 'hidden' : 'visible',
+          maxHeight: shouldClamp ? `${CLAMP_HEIGHT}px` : 'none',
+          verticalAlign: 'bottom',
+        }}
+      >
+        {legende}
+      </span>
+      {shouldClamp && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="ml-1 font-medium align-bottom"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          voir plus
+        </button>
+      )}
+    </p>
+  )
 }
 
 function PostCard({ post, onDeleted, autoOpenComments = false, priority = false, muted: mutedProp, onToggleMute: onToggleMuteProp }) {
@@ -338,50 +395,79 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
           </div>
         )}
 
-        {/* actions */}
-        <div className="flex items-center gap-3.5 px-3 pt-2 flex-wrap">
-          <button onClick={toggleLike} className="active:scale-90 transition-transform duration-200">
-            <Heart size={23} className={liked ? 'fill-[var(--accent)] text-[var(--accent)]' : ''} strokeWidth={1.75} />
-          </button>
-          <button
-            onClick={() => setShowComments((s) => !s)}
-            className="flex items-center gap-1.5 active:scale-90 transition-transform duration-200"
-          >
-            <MessageCircle size={23} strokeWidth={1.75} />
-            {commentCount > 0 && <span className="text-[12px] leading-[15px] font-medium">{commentCount}</span>}
-          </button>
+        {/* actions -- design et ordre repris d'Instagram : like, commentaire,
+            repost, partager groupés à gauche, enregistrer seul à l'extrémité
+            droite. Repost et Enregistrer sont ajoutés à l'identique visuel
+            d'Instagram mais sans comportement (pas de onClick) : la base n'a
+            pas encore ces fonctionnalités. Partager reste tel qu'avant
+            (présent, non fonctionnel). */}
+        <div className="flex items-center justify-between px-3 pt-2">
+          <div className="flex items-center gap-4">
+            <button onClick={toggleLike} className="active:scale-90 transition-transform duration-200">
+              <Heart size={24} className={liked ? 'fill-[var(--accent)] text-[var(--accent)]' : ''} strokeWidth={1.75} />
+            </button>
+            <button
+              onClick={() => setShowComments((s) => !s)}
+              className="flex items-center gap-1.5 active:scale-90 transition-transform duration-200"
+            >
+              <MessageCircle size={24} strokeWidth={1.75} />
+              {commentCount > 0 && <span className="text-[12px] leading-[15px] font-medium">{commentCount}</span>}
+            </button>
+            {/* Repost : pas encore de fonctionnalité côté base, affiché sans onClick */}
+            <button className="active:scale-90 transition-transform duration-200">
+              <Repeat2 size={24} strokeWidth={1.75} />
+            </button>
+            <button className="active:scale-90 transition-transform duration-200">
+              <Send size={22} strokeWidth={1.75} />
+            </button>
+          </div>
+          {/* Enregistrer : pas encore de fonctionnalité côté base, affiché sans onClick */}
           <button className="active:scale-90 transition-transform duration-200">
-            <Send size={21} strokeWidth={1.75} />
+            <Bookmark size={24} strokeWidth={1.75} />
           </button>
-
-          {lienInstagram && (
-            <a
-              href={lienInstagram}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 feed-pill rounded-full pl-2.5 pr-3 py-1 text-[12px] leading-[15px] font-medium active:scale-95 transition-transform duration-200"
-            >
-              Voir sur <InstagramIcon size={12} />
-            </a>
-          )}
-          {lienTiktok && (
-            <a
-              href={lienTiktok}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 feed-pill rounded-full pl-2.5 pr-3 py-1 text-[12px] leading-[15px] font-medium active:scale-95 transition-transform duration-200"
-            >
-              Voir sur <TikTokIcon size={12} />
-            </a>
-          )}
         </div>
 
-        {/* caption */}
-        {post.legende && (
-          <p className="px-3 pt-1 text-[13px] leading-[16px]" style={{ color: 'var(--text-primary)' }}>
-            <span className="font-medium mr-1">{influencer?.users?.nom_complet}</span>
-            <span style={{ color: 'var(--text-secondary)' }}>{post.legende}</span>
+        {(lienInstagram || lienTiktok) && (
+          <div className="flex items-center gap-2 px-3 pt-2 flex-wrap">
+            {lienInstagram && (
+              <a
+                href={lienInstagram}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 feed-pill rounded-full pl-2.5 pr-3 py-1 text-[12px] leading-[15px] font-medium active:scale-95 transition-transform duration-200"
+              >
+                Voir sur <InstagramIcon size={12} />
+              </a>
+            )}
+            {lienTiktok && (
+              <a
+                href={lienTiktok}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 feed-pill rounded-full pl-2.5 pr-3 py-1 text-[12px] leading-[15px] font-medium active:scale-95 transition-transform duration-200"
+              >
+                Voir sur <TikTokIcon size={12} />
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* "Aimé par {dernier liker} et d'autres personnes", façon Instagram.
+            N'existe que s'il y a au moins un like -- sinon aucun espace n'est
+            réservé, on passe directement à la légende. */}
+        {likeCount > 0 && (
+          <p className="px-3 pt-2 text-[13px] leading-[16px]" style={{ color: 'var(--text-primary)' }}>
+            Aimé par <span className="font-medium">{post.last_liker_name || 'quelqu\u2019un'}</span>
+            {likeCount > 1 && <> et d'autres personnes</>}
           </p>
+        )}
+
+        {/* caption avec "voir plus" : tronquée à ~1.5 ligne via line-clamp-2,
+            avec un texte de repli "... voir plus" affiché seulement quand le
+            contenu réel dépasse cette hauteur. Au clic, bascule vers l'affichage
+            complet (expanded). */}
+        {post.legende && (
+          <CaptionWithSeeMore legende={post.legende} authorName={influencer?.users?.nom_complet} hasLikeLine={likeCount > 0} />
         )}
         {post.created_at && (
           <p className="px-3 pb-2 pt-1 text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
