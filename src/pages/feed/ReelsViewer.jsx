@@ -544,7 +544,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           ne pas perturber les espacements de la colonne d'actions reproduite
           à l'identique d'Instagram. */}
       {isPaused && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 pointer-events-none">
           <button
             onClick={(e) => { e.stopPropagation(); onToggleMute() }}
             aria-label={muted ? 'Activer le son' : 'Couper le son'}
@@ -576,14 +576,15 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
       <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
 
-      {/* Barre de progression draggable, tout en bas du slide (au-dessus de
-          la nav bar de l'app). Zone de tap invisible plus haute (h-5) que la
-          barre visible (h-[3px]) pour que le doigt puisse viser facilement
-          sans précision chirurgicale, comme sur Instagram/TikTok. */}
+      {/* Barre de progression draggable, positionnée au-dessus de la BottomNav
+          de l'app (fixed bottom-0, z-40) qui sinon la masquerait complètement
+          puisque cette route /video ne fait pas partie de ROUTES_SANS_BOTTOM_NAV.
+          Zone de tap invisible plus haute (20px) que la barre visible (3px)
+          pour que le doigt puisse viser facilement, comme sur Instagram/TikTok. */}
       <div
         ref={progressBarRef}
-        className="absolute inset-x-0 bottom-0 z-20 flex items-center"
-        style={{ height: '20px', touchAction: 'none' }}
+        className="absolute inset-x-0 z-40 flex items-center"
+        style={{ height: '20px', bottom: 'calc(76px + env(safe-area-inset-bottom))', touchAction: 'none' }}
         onMouseDown={handleProgressPointerDown}
         onMouseMove={handleProgressPointerMove}
         onMouseUp={handleProgressPointerUp}
@@ -609,18 +610,18 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           ici -- il vit uniquement dans l'overlay central (voir plus haut). */}
       <div
         className="absolute right-2 flex flex-col items-center gap-7 z-10 text-white"
-        style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) + 16px)' }}
+        style={{ bottom: 'calc(76px + env(safe-area-inset-bottom) + 16px)' }}
       >
         <button onClick={toggleLike} className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
           <Heart size={30} className={liked ? 'fill-[var(--accent)] text-[var(--accent)]' : ''} strokeWidth={1.8} />
-          <span className="text-caption font-medium">J'aime</span>
+          <span className="text-[11px] leading-tight font-medium">J'aime</span>
         </button>
         <button
           onClick={() => setShowComments(true)}
           className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200"
         >
           <MessageCircle size={30} strokeWidth={1.8} />
-          <span className="text-caption font-semibold">{commentCount}</span>
+          <span className="text-[11px] leading-tight font-semibold">{commentCount}</span>
         </button>
         {/* Repost : sans route pour l'instant. Le compteur sera ajouté quand
             la fonctionnalité existera réellement côté base -- pas de mock. */}
@@ -641,10 +642,12 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
         </button>
       </div>
 
-      {/* bas : profil, nom, légende */}
+      {/* bas : profil, nom, légende -- juste au-dessus de la barre de
+          progression, comme sur Instagram (petit espace équilibré, pas un
+          grand vide). */}
       <div
         className="absolute left-3 right-16 z-10"
-        style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) + 12px)' }}
+        style={{ bottom: 'calc(76px + env(safe-area-inset-bottom) + 14px)' }}
       >
         <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2 mb-1.5">
           <img
@@ -683,7 +686,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           -- pas un vrai lecteur audio. */}
       <div
         className="absolute right-3 z-10"
-        style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) - 36px)' }}
+        style={{ bottom: 'calc(76px + env(safe-area-inset-bottom) - 36px)' }}
       >
         <div className="relative w-7 h-7 rounded-md overflow-hidden shrink-0 border border-white/40">
           <img
