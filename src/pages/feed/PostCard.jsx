@@ -163,33 +163,11 @@ function CaptionWithSeeMore({ legende, authorName, hasLikeLine }) {
 // la suite. Mesure réelle en pixels (comme CaptionWithSeeMore) plutôt qu'un
 // simple line-clamp CSS, pour pouvoir insérer "...voir plus" collé au texte
 // plutôt que sur une ligne séparée.
-// Vignette carrée de la photo de profil de l'auteur, propre à TextPostBody
-// (pas le composant Avatar partagé, qui est toujours rond -- rounded-full --
-// et sert ailleurs dans l'app). Flotte à gauche du texte façon colonne de
-// journal : côté = MAX_LINES * lineHeight, donc sa hauteur correspond
-// pile aux 5 lignes tronquées, et le texte au-delà (après "voir plus")
-// repasse naturellement en pleine largeur sous elle (clearfix sur le parent).
-function TextPostAvatar({ src, seed, size }) {
-  const fallback = `https://api.dicebear.com/9.x/glass/svg?seed=${seed || 'default'}`
-  return (
-    <img
-      src={src || fallback}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      className="float-left rounded-lg object-cover mr-2 mb-1"
-      style={{ width: size, height: size }}
-    />
-  )
-}
-
-function TextPostBody({ texte, authorPhotoUrl, authorSeed }) {
+function TextPostBody({ texte }) {
   const [expanded, setExpanded] = useState(false)
   const [cutIndex, setCutIndex] = useState(null) // index (en mots) où couper, ou null si pas besoin
   const containerRef = useRef(null)
   const measureRef = useRef(null)
-  const wrapperRef = useRef(null)
-  const [avatarSize, setAvatarSize] = useState(null)
   const MAX_LINES = 5
 
   useEffect(() => {
@@ -197,24 +175,10 @@ function TextPostBody({ texte, authorPhotoUrl, authorSeed }) {
     const measure = measureRef.current
     if (!container || !measure || !texte) return
 
-    const lineHeight = parseFloat(getComputedStyle(container).lineHeight) || 20
-    const squareSide = lineHeight * MAX_LINES
-    setAvatarSize(squareSide)
-
-    // Le vrai rendu a un carré flottant à gauche (float:left) sur les
-    // premières lignes. Pour mesurer juste, on met le clone dans un mini
-    // conteneur hors-écran (position:absolute, mais avec une vraie largeur et
-    // un vrai flux normal à l'intérieur) contenant un spacer flottant de
-    // même taille -- measure va donc réellement wrapper autour, exactement
-    // comme le fera le <p> visible.
     const fullWidth = container.getBoundingClientRect().width
-    const measureBox = measure.parentElement // conteneur dédié, voir JSX
-    measureBox.style.width = `${fullWidth}px`
+    const lineHeight = parseFloat(getComputedStyle(container).lineHeight) || 20
 
-    const spacer = measure.previousElementSibling // <div> flottant dédié, voir JSX
-    spacer.style.width = `${squareSide + 8}px` // +8 = marge droite du vrai carré (mr-2)
-    spacer.style.height = `${squareSide}px`
-
+    measure.style.width = `${fullWidth}px`
     measure.textContent = texte
     const fullHeight = measure.getBoundingClientRect().height
 
@@ -251,44 +215,33 @@ function TextPostBody({ texte, authorPhotoUrl, authorSeed }) {
   const displayText = expanded || cutIndex === null ? texte : words.slice(0, cutIndex).join(' ')
 
   return (
-    <div className="px-3 pt-2 pb-1" ref={wrapperRef}>
-      {/* clearfix : force ce wrapper à englober la hauteur du carré flottant,
-          pour que les éléments suivants (media, actions...) ne remontent pas
-          par-dessous lui quand le texte est court */}
-      <div style={{ overflow: 'hidden' }}>
-        {avatarSize && <TextPostAvatar src={authorPhotoUrl} seed={authorSeed} size={avatarSize} />}
-        <p ref={containerRef} className="text-[14px] leading-[20px] whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
-          {displayText}
-          {!expanded && cutIndex !== null && (
-            <>
-              ...
-              <button onClick={() => setExpanded(true)} className="font-medium" style={{ color: 'var(--text-secondary)' }}>
-                voir plus
-              </button>
-            </>
-          )}
-          {expanded && cutIndex !== null && (
-            <>
-              {' '}
-              <button onClick={() => setExpanded(false)} className="font-medium" style={{ color: 'var(--text-secondary)' }}>
-                voir moins
-              </button>
-            </>
-          )}
-        </p>
-      </div>
-      {/* boîte de mesure invisible, jamais affichée : reproduit le float du
-          vrai carré (via le spacer) pour que la largeur dispo par ligne soit
-          calculée correctement pendant les MAX_LINES premières lignes */}
-      <div style={{ position: 'absolute', visibility: 'hidden', top: -9999, left: -9999, pointerEvents: 'none' }}>
-        <div style={{ float: 'left' }} />
-        <p
-          ref={measureRef}
-          aria-hidden="true"
-          className="text-[14px] leading-[20px] whitespace-pre-wrap"
-          style={{ wordBreak: 'break-word', margin: 0 }}
-        />
-      </div>
+    <div className="px-3 pt-2 pb-1">
+      <p ref={containerRef} className="text-[14px] leading-[20px] whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
+        {displayText}
+        {!expanded && cutIndex !== null && (
+          <>
+            ...
+            <button onClick={() => setExpanded(true)} className="font-medium" style={{ color: 'var(--text-secondary)' }}>
+              voir plus
+            </button>
+          </>
+        )}
+        {expanded && cutIndex !== null && (
+          <>
+            {' '}
+            <button onClick={() => setExpanded(false)} className="font-medium" style={{ color: 'var(--text-secondary)' }}>
+              voir moins
+            </button>
+          </>
+        )}
+      </p>
+      {/* clone invisible utilisé uniquement pour mesurer, jamais affiché */}
+      <p
+        ref={measureRef}
+        aria-hidden="true"
+        className="text-[14px] leading-[20px] whitespace-pre-wrap"
+        style={{ position: 'absolute', visibility: 'hidden', wordBreak: 'break-word', top: -9999, left: -9999, pointerEvents: 'none' }}
+      />
     </div>
   )
 }
@@ -486,13 +439,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
 
         {/* post texte : pas de média, le texte s'affiche directement sous
             l'avatar à la place de la zone photo/vidéo */}
-        {isTextPost && (
-          <TextPostBody
-            texte={post.legende}
-            authorPhotoUrl={influencer?.users?.photo_url}
-            authorSeed={influencer?.id}
-          />
-        )}
+        {isTextPost && <TextPostBody texte={post.legende} />}
 
         {/* media */}
         {mediaUrl && (
