@@ -134,6 +134,14 @@ function CaptionWithSeeMore({ legende, authorName, hasLikeLine }) {
             </button>
           </>
         )}
+        {expanded && cutIndex !== null && (
+          <>
+            {' '}
+            <button onClick={() => setExpanded(false)} className="font-medium" style={{ color: 'var(--text-secondary)' }}>
+              voir moins
+            </button>
+          </>
+        )}
       </span>
       {/* clone invisible utilisé uniquement pour mesurer, jamais affiché */}
       <span
