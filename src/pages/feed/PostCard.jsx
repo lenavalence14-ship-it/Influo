@@ -650,10 +650,8 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
             avec un texte de repli "... voir plus" affiché seulement quand le
             contenu réel dépasse cette hauteur. Au clic, bascule vers l'affichage
             complet (expanded). */}
-        {post.legende && (
-          {!isTextPost && post.legende && (
-            <CaptionWithSeeMore legende={post.legende} authorName={influencer?.users?.nom_complet} hasLikeLine={likeCount > 0} />
-          )}
+        {!isTextPost && post.legende && (
+          <CaptionWithSeeMore legende={post.legende} authorName={influencer?.users?.nom_complet} hasLikeLine={likeCount > 0} />
         )}
         {post.created_at && (
           <p className="px-3 pb-2 pt-1 text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
