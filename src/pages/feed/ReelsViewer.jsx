@@ -584,7 +584,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
       <div
         ref={progressBarRef}
         className="absolute inset-x-0 z-40 flex items-center"
-        style={{ height: '20px', bottom: 'calc(76px + env(safe-area-inset-bottom))', touchAction: 'none' }}
+        style={{ height: '20px', bottom: 'calc(48px + env(safe-area-inset-bottom))', touchAction: 'none' }}
         onMouseDown={handleProgressPointerDown}
         onMouseMove={handleProgressPointerMove}
         onMouseUp={handleProgressPointerUp}
@@ -610,7 +610,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           ici -- il vit uniquement dans l'overlay central (voir plus haut). */}
       <div
         className="absolute right-2 flex flex-col items-center gap-7 z-10 text-white"
-        style={{ bottom: 'calc(76px + env(safe-area-inset-bottom) + 16px)' }}
+        style={{ bottom: 'calc(48px + env(safe-area-inset-bottom) + 16px)' }}
       >
         <button onClick={toggleLike} className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
           <Heart size={30} className={liked ? 'fill-[var(--accent)] text-[var(--accent)]' : ''} strokeWidth={1.8} />
@@ -642,14 +642,14 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
         </button>
       </div>
 
-      {/* bas : profil, nom, légende -- juste au-dessus de la barre de
-          progression, comme sur Instagram (petit espace équilibré, pas un
-          grand vide). */}
+      {/* bas : profil, nom, légende -- offset mesuré précisément sur la
+          capture Instagram : ~78px entre le bas de la légende et la barre de
+          progression (pas collé du tout), et ~13px entre le nom et la légende. */}
       <div
         className="absolute left-3 right-16 z-10"
-        style={{ bottom: 'calc(76px + env(safe-area-inset-bottom) + 14px)' }}
+        style={{ bottom: 'calc(48px + env(safe-area-inset-bottom) + 78px)' }}
       >
-        <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2 mb-1.5">
+        <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2 mb-[13px]">
           <img
             src={influencer?.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${influencer?.id}`}
             alt=""
@@ -663,7 +663,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           </span>
         </Link>
         {reel.client && (
-          <Link to={`/entreprise/${reel.client.id}`} className="flex items-center gap-2 mb-1.5 -mt-0.5">
+          <Link to={`/entreprise/${reel.client.id}`} className="flex items-center gap-2 mb-[13px] -mt-0.5">
             <img
               src={reel.client.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${reel.client.nom_complet}`}
               alt=""
@@ -675,18 +675,18 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           </Link>
         )}
         {reel.legende && (
-          <p className="text-white text-small line-clamp-2 mt-1">{reel.legende}</p>
+          <p className="text-white text-small line-clamp-2">{reel.legende}</p>
         )}
       </div>
 
-      {/* Bloc "son original" en bas à droite, sous la colonne d'actions,
-          façon Instagram : photo du créateur avec une icône note de musique
-          en badge. La base n'a pas de notion d'audio distincte du post, donc
-          on affiche systématiquement "son original" avec la photo du créateur
-          -- pas un vrai lecteur audio. */}
+      {/* Bloc "son original" en bas à droite, aligné au même niveau vertical
+          que la légende (mesuré sur la capture Instagram : le carré son est
+          au niveau de la description, pas du nom). La base n'a pas de notion
+          d'audio distincte du post, donc on affiche systématiquement "son
+          original" avec la photo du créateur -- pas un vrai lecteur audio. */}
       <div
         className="absolute right-3 z-10"
-        style={{ bottom: 'calc(76px + env(safe-area-inset-bottom) - 36px)' }}
+        style={{ bottom: 'calc(48px + env(safe-area-inset-bottom) + 78px)' }}
       >
         <div className="relative w-7 h-7 rounded-md overflow-hidden shrink-0 border border-white/40">
           <img
