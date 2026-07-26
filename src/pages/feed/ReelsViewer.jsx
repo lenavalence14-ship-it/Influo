@@ -610,7 +610,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           ici -- il vit uniquement dans l'overlay central (voir plus haut). */}
       <div
         className="absolute right-2 flex flex-col items-center gap-7 z-10 text-white"
-        style={{ bottom: 'calc(48px + env(safe-area-inset-bottom) + 16px)' }}
+        style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) + 16px)' }}
       >
         <button onClick={toggleLike} className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
           <Heart size={30} className={liked ? 'fill-[var(--accent)] text-[var(--accent)]' : ''} strokeWidth={1.8} />
