@@ -36,7 +36,8 @@ export default function CreatePost() {
 
   const [loadingExisting, setLoadingExisting] = useState(isEditing)
 
-  const [step, setStep] = useState(isEditing ? 'edit' : 'select') // 'select' | 'edit' | 'crop' | 'texte'
+  const [step, setStep] = useState(isEditing ? 'edit' : 'select') // 'select' | 'edit' | 'crop' | 'texte' | 'texte_post'
+  const [textePostDraft, setTextePostDraft] = useState('') // contenu d'un post 100% texte (pas de média), distinct de textEl (overlay sur photo/vidéo)
   const [showFilters, setShowFilters] = useState(false)
   const [files, setFiles] = useState([])
   const [previews, setPreviews] = useState([])
@@ -237,6 +238,28 @@ export default function CreatePost() {
   const [publishError, setPublishError] = useState(null)
 
   const handlePublish = async () => {
+    // Post 100% texte : pas de fichier, pas de post_medias, insert direct.
+    // Ne passe jamais par la logique de compression/upload ci-dessous, qui ne
+    // concerne que les posts avec média.
+    if (step === 'texte_post') {
+      if (!textePostDraft.trim()) return
+      setLoading(true)
+      setPublishError(null)
+      const { error: texteError } = await supabase.from('posts').insert({
+        influenceur_id: influencerProfile.id,
+        type: 'texte',
+        legende: textePostDraft.trim(),
+      })
+      setLoading(false)
+      if (texteError) {
+        setPublishError(texteError.message)
+        return
+      }
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+      navigate('/')
+      return
+    }
+
     if (!isEditing && files.length === 0) return
     setLoading(true)
     setPublishError(null)
@@ -672,6 +695,52 @@ export default function CreatePost() {
             className="hidden"
           />
         </label>
+
+        <button
+          onClick={() => setStep('texte_post')}
+          className="mx-6 mb-8 py-3 rounded-xl border border-white/15 bg-white/[0.04] text-body text-white/80"
+        >
+          Publier du texte
+        </button>
+      </div>
+    )
+  }
+
+  // ============================================================
+  // ÉCRAN TEXTE PUR — publication 100% texte, pas de média, pas de
+  // légende séparée : ce textarea EST le contenu du post.
+  // ============================================================
+  if (step === 'texte_post') {
+    return (
+      <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col">
+        <header className="flex items-center justify-between px-4 pt-3 pb-2 h-14 shrink-0">
+          <button onClick={() => setStep('select')} aria-label="Retour" className="w-9 h-9 flex items-center justify-center">
+            <X size={22} />
+          </button>
+          <span className="text-body-medium">Publication texte</span>
+          <button
+            onClick={handlePublish}
+            disabled={loading || !textePostDraft.trim()}
+            className="text-body-medium px-2 py-2 disabled:opacity-40"
+            style={{ color: 'var(--accent)' }}
+          >
+            {loading ? 'Publication…' : 'Publier'}
+          </button>
+        </header>
+
+        <div className="flex-1 px-4 pt-4">
+          <textarea
+            autoFocus
+            value={textePostDraft}
+            onChange={(e) => setTextePostDraft(e.target.value)}
+            placeholder="Exprime-toi…"
+            className="w-full h-full bg-transparent text-[16px] leading-[22px] text-white placeholder-white/30 resize-none outline-none"
+          />
+        </div>
+
+        {publishError && (
+          <div className="px-4 pb-4 text-caption text-red-400">{publishError}</div>
+        )}
       </div>
     )
   }

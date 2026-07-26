@@ -154,6 +154,98 @@ function CaptionWithSeeMore({ legende, authorName, hasLikeLine }) {
   )
 }
 
+// Contenu d'un post de type "texte" (pas de média, pas de légende séparée --
+// post.legende sert de champ de texte principal). Troncature à 5 lignes
+// pleines : contrairement à CaptionWithSeeMore (coupure en plein milieu d'un
+// mot, à 1.5 ligne, pensée pour une légende courte sous une photo), ici le
+// texte EST le post donc on coupe au dernier mot ENTIER qui tient dans les 5
+// lignes -- jamais un mot tranché en deux -- et "...voir plus" est ajouté à
+// la suite. Mesure réelle en pixels (comme CaptionWithSeeMore) plutôt qu'un
+// simple line-clamp CSS, pour pouvoir insérer "...voir plus" collé au texte
+// plutôt que sur une ligne séparée.
+function TextPostBody({ texte }) {
+  const [expanded, setExpanded] = useState(false)
+  const [cutIndex, setCutIndex] = useState(null) // index (en mots) où couper, ou null si pas besoin
+  const containerRef = useRef(null)
+  const measureRef = useRef(null)
+  const MAX_LINES = 5
+
+  useEffect(() => {
+    const container = containerRef.current
+    const measure = measureRef.current
+    if (!container || !measure || !texte) return
+
+    const fullWidth = container.getBoundingClientRect().width
+    const lineHeight = parseFloat(getComputedStyle(container).lineHeight) || 20
+
+    measure.style.width = `${fullWidth}px`
+    measure.textContent = texte
+    const fullHeight = measure.getBoundingClientRect().height
+
+    // tient déjà en 5 lignes ou moins : pas de troncature
+    if (fullHeight <= lineHeight * MAX_LINES + 1) {
+      setCutIndex(null)
+      return
+    }
+
+    const targetHeight = lineHeight * MAX_LINES
+    const words = texte.split(/\s+/)
+
+    // recherche binaire du nombre de MOTS (pas de caractères) qui, une fois
+    // rendus avec "...voir plus" à la suite, tiennent dans targetHeight --
+    // garantit que la coupure tombe toujours entre deux mots complets.
+    let lo = 0
+    let hi = words.length
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi + 1) / 2)
+      measure.textContent = words.slice(0, mid).join(' ') + '...voir plus'
+      const h = measure.getBoundingClientRect().height
+      if (h <= targetHeight) {
+        lo = mid
+      } else {
+        hi = mid - 1
+      }
+    }
+    setCutIndex(lo < words.length ? lo : null)
+  }, [texte])
+
+  if (!texte) return null
+
+  const words = texte.split(/\s+/)
+  const displayText = expanded || cutIndex === null ? texte : words.slice(0, cutIndex).join(' ')
+
+  return (
+    <div className="px-3 pt-2 pb-1">
+      <p ref={containerRef} className="text-[14px] leading-[20px] whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
+        {displayText}
+        {!expanded && cutIndex !== null && (
+          <>
+            ...
+            <button onClick={() => setExpanded(true)} className="font-medium" style={{ color: 'var(--text-secondary)' }}>
+              voir plus
+            </button>
+          </>
+        )}
+        {expanded && cutIndex !== null && (
+          <>
+            {' '}
+            <button onClick={() => setExpanded(false)} className="font-medium" style={{ color: 'var(--text-secondary)' }}>
+              voir moins
+            </button>
+          </>
+        )}
+      </p>
+      {/* clone invisible utilisé uniquement pour mesurer, jamais affiché */}
+      <p
+        ref={measureRef}
+        aria-hidden="true"
+        className="text-[14px] leading-[20px] whitespace-pre-wrap"
+        style={{ position: 'absolute', visibility: 'hidden', wordBreak: 'break-word', top: -9999, left: -9999, pointerEvents: 'none' }}
+      />
+    </div>
+  )
+}
+
 function PostCard({ post, onDeleted, autoOpenComments = false, priority = false, muted: mutedProp, onToggleMute: onToggleMuteProp }) {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
@@ -250,6 +342,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
   }
 
   const allMedias = post.post_medias || []
+  const isTextPost = post.type === 'texte'
   const isCarrousel = allMedias.length > 1
   const mediaUrl = allMedias[0]?.media_url
   const thumbnailUrl = allMedias[0]?.thumbnail_url
@@ -343,6 +436,10 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
             </button>
           )}
         </div>
+
+        {/* post texte : pas de média, le texte s'affiche directement sous
+            l'avatar à la place de la zone photo/vidéo */}
+        {isTextPost && <TextPostBody texte={post.legende} />}
 
         {/* media */}
         {mediaUrl && (
@@ -554,7 +651,9 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
             contenu réel dépasse cette hauteur. Au clic, bascule vers l'affichage
             complet (expanded). */}
         {post.legende && (
-          <CaptionWithSeeMore legende={post.legende} authorName={influencer?.users?.nom_complet} hasLikeLine={likeCount > 0} />
+          {!isTextPost && post.legende && (
+            <CaptionWithSeeMore legende={post.legende} authorName={influencer?.users?.nom_complet} hasLikeLine={likeCount > 0} />
+          )}
         )}
         {post.created_at && (
           <p className="px-3 pb-2 pt-1 text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
