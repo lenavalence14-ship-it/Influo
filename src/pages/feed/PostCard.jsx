@@ -155,11 +155,18 @@ function CaptionWithSeeMore({ legende, authorName, hasLikeLine }) {
 }
 
 function PostCard({ post, onDeleted, autoOpenComments = false, priority = false, muted: mutedProp, onToggleMute: onToggleMuteProp }) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const navigate = useNavigate()
   const activeStoryIds = useActiveStories()
   const [liked, setLiked] = useState(post.liked_by_me)
   const [likeCount, setLikeCount] = useState(post.like_count || 0)
+  // Nom du dernier liker affiché sur "Aimé par X". Initialisé depuis la prop
+  // post (calculée par Feed.jsx au chargement), mais doit être mis à jour
+  // immédiatement quand CET utilisateur like -- sinon, comme post.last_liker_name
+  // ne vient que du fetch initial (React Query), un nouveau like affiche encore
+  // l'ancien liker (ou "quelqu'un" si post.last_liker_name était null, càd si
+  // c'est le tout premier like du post).
+  const [lastLikerName, setLastLikerName] = useState(post.last_liker_name || null)
   const [commentCount, setCommentCount] = useState(post.comment_count || 0)
   const [showComments, setShowComments] = useState(autoOpenComments)
   const [showMenu, setShowMenu] = useState(false)
@@ -193,10 +200,27 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
       setLiked(false)
       setLikeCount((c) => c - 1)
       await supabase.from('post_likes').delete().match({ post_id: post.id, user_id: user.id })
+      // après suppression, il faut connaître le vrai dernier liker restant
+      // (pas "quelqu'un" -- afficher un nom générique alors qu'un vrai nom
+      // existe serait trompeur, surtout visible juste à côté de "et d'autres
+      // personnes"). Un seul aller-retour, ciblé sur ce post uniquement.
+      const { data: remaining } = await supabase
+        .from('post_likes')
+        .select('created_at, users(nom_complet)')
+        .eq('post_id', post.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+      setLastLikerName(remaining?.[0]?.users?.nom_complet || null)
     } else {
       setLiked(true)
       setLikeCount((c) => c + 1)
       await supabase.from('post_likes').insert({ post_id: post.id, user_id: user.id })
+      // Va chercher le nom directement en base plutôt que de dépendre de
+      // profile (contexte Auth), qui peut ne pas être encore chargé/à jour
+      // au moment du clic -- c'est ce qui causait l'affichage de "quelqu'un"
+      // jusqu'à ce qu'un refresh complet recharge tout depuis la base.
+      const { data: me } = await supabase.from('users').select('nom_complet').eq('id', user.id).single()
+      setLastLikerName(me?.nom_complet || null)
     }
   }
 
@@ -500,7 +524,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
             réservé, on passe directement à la légende. */}
         {likeCount > 0 && (
           <p className="px-3 pt-2 text-[13px] leading-[16px]" style={{ color: 'var(--text-primary)' }}>
-            Aimé par <span className="font-medium">{post.last_liker_name || 'quelqu\u2019un'}</span>
+            Aimé par <span className="font-medium">{lastLikerName || 'quelqu\u2019un'}</span>
             {likeCount > 1 && <> et d'autres personnes</>}
           </p>
         )}
