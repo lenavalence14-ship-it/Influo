@@ -99,12 +99,16 @@ export default function CommentsSheet({ postId, onClose, onCommentAdded }) {
     setText('')
     const activeReply = replyTo
     setReplyTo(null)
-    await supabase.from('post_comments').insert({
+    const { error } = await supabase.from('post_comments').insert({
       post_id: postId,
       user_id: user.id,
       contenu,
       parent_comment_id: activeReply?.id || null,
     })
+    if (error) {
+      console.error('Erreur insertion commentaire:', error)
+      return
+    }
     onCommentAdded?.()
     loadComments()
   }
