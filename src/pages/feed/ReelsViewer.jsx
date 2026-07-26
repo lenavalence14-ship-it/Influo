@@ -56,6 +56,19 @@ function ReelLoadingOverlay() {
 }
 
 async function fetchReels(userId) {
+  // Même principe que le Feed : le tri n'est pas created_at brut, un repost fait
+  // remonter la vidéo comme si elle venait d'être publiée, sans jamais toucher
+  // created_at. Calculé côté SQL (get_reels_ids) pour rester cohérent avec la
+  // pagination, comme pour get_feed_post_ids dans Feed.jsx.
+  const { data: ordered, error: orderError } = await supabase.rpc('get_reels_ids', {
+    p_limit: REELS_PAGE_SIZE,
+    p_offset: 0,
+  })
+  if (orderError) console.error('Erreur tri reels:', orderError)
+  if (!ordered || ordered.length === 0) return []
+
+  const orderedIds = ordered.map((o) => o.post_id)
+
   const { data } = await supabase
     .from('posts')
     .select(`
@@ -64,9 +77,7 @@ async function fetchReels(userId) {
       profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
       client:client_id(id, nom_complet, photo_url)
     `)
-    .eq('type', 'video')
-    .order('created_at', { ascending: false })
-    .limit(REELS_PAGE_SIZE)
+    .in('id', orderedIds)
 
   const postIds = (data || []).map((p) => p.id)
   const [{ data: likes }, { data: commentCounts }, { data: reposts }] = await Promise.all([
@@ -81,7 +92,14 @@ async function fetchReels(userId) {
       : Promise.resolve({ data: [] }),
   ])
 
-  return (data || []).map((p) => ({
+  // .in('id', orderedIds) ne garantit pas l'ordre de retour -- on remet les
+  // reels dans l'ordre exact décidé par get_reels_ids.
+  const byId = new Map((data || []).map((p) => [p.id, p]))
+
+  return orderedIds
+    .map((id) => byId.get(id))
+    .filter(Boolean)
+    .map((p) => ({
     ...p,
     like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
     liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === userId) || false,
