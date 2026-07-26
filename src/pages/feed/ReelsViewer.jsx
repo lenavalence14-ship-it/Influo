@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react'
-import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft, Plus, Volume2, VolumeX, Play, Pause } from 'lucide-react'
+import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft, Plus, Volume2, VolumeX, Play, Repeat2, Bookmark, Music2 } from 'lucide-react'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
@@ -309,9 +309,16 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
   // le spinner de secours (utilisé quand thumbnailUrl est vide) n'a plus lieu d'être.
   const [videoReady, setVideoReady] = useState(false)
   const [showBigHeart, setShowBigHeart] = useState(false)
-  const [showPauseIcon, setShowPauseIcon] = useState(false)
   const lastTapRef = useRef(0)
   const tapTimeoutRef = useRef(null)
+  // Ref locale vers l'élément <video>, en plus du setVideoRef transmis au
+  // parent (qui gère play/pause centralisé) : nécessaire pour lire
+  // currentTime/duration et permettre le drag sur la barre de progression
+  // sans dupliquer la logique de lecture déjà gérée par ReelsViewer.
+  const videoElRef = useRef(null)
+  const [progress, setProgress] = useState(0) // 0 à 1
+  const [isDragging, setIsDragging] = useState(false)
+  const progressBarRef = useRef(null)
 
   const influencer = reel.profils_influenceur
   const media = reel.post_medias?.[0]
@@ -371,11 +378,62 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
     }
     lastTapRef.current = now
     tapTimeoutRef.current = window.setTimeout(() => {
-      // tap simple confirmé (pas suivi d'un second tap) : play/pause
+      // tap simple confirmé (pas suivi d'un second tap) : play/pause.
+      // Contrairement à avant, l'overlay ne disparaît plus après un délai fixe :
+      // il reste affiché tant que isPaused est vrai (comportement Instagram),
+      // et se cache automatiquement dès que la lecture reprend (voir le style
+      // de l'overlay plus bas, piloté directement par isPaused).
       onTogglePause()
-      setShowPauseIcon(true)
-      window.setTimeout(() => setShowPauseIcon(false), 700)
     }, 300)
+  }
+
+  // Suit la progression de lecture pour remplir la barre, sauf pendant un
+  // drag actif (sinon la vidéo qui avance re-désynchronise la position du
+  // doigt de l'utilisateur pendant qu'il glisse).
+  useEffect(() => {
+    const video = videoElRef.current
+    if (!video) return
+    const onTimeUpdate = () => {
+      if (isDragging) return
+      if (!video.duration) return
+      setProgress(video.currentTime / video.duration)
+    }
+    video.addEventListener('timeupdate', onTimeUpdate)
+    return () => video.removeEventListener('timeupdate', onTimeUpdate)
+  }, [isDragging])
+
+  // Calcule un ratio 0-1 à partir d'une position X (souris ou tactile) par
+  // rapport à la largeur de la barre.
+  const ratioFromClientX = (clientX) => {
+    const bar = progressBarRef.current
+    if (!bar) return 0
+    const rect = bar.getBoundingClientRect()
+    const ratio = (clientX - rect.left) / rect.width
+    return Math.min(1, Math.max(0, ratio))
+  }
+
+  const seekToRatio = (ratio) => {
+    const video = videoElRef.current
+    if (!video || !video.duration) return
+    video.currentTime = ratio * video.duration
+    setProgress(ratio)
+  }
+
+  const handleProgressPointerDown = (e) => {
+    e.stopPropagation() // ne pas déclencher le tap play/pause de la vidéo
+    setIsDragging(true)
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    seekToRatio(ratioFromClientX(clientX))
+  }
+
+  const handleProgressPointerMove = (e) => {
+    if (!isDragging) return
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    seekToRatio(ratioFromClientX(clientX))
+  }
+
+  const handleProgressPointerUp = () => {
+    setIsDragging(false)
   }
 
   return (
@@ -405,7 +463,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
             )}
             {shouldMount && (
               <HlsVideo
-                videoRef={(el) => setVideoRef(el)}
+                videoRef={(el) => { setVideoRef(el); videoElRef.current = el }}
                 hlsPlaylistUrl={hlsPlaylistUrl}
                 fallbackMp4Url={mediaUrl}
                 poster={thumbnailUrl || undefined}
@@ -432,7 +490,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           )}
           {shouldMount && (
             <HlsVideo
-              videoRef={(el) => setVideoRef(el)}
+              videoRef={(el) => { setVideoRef(el); videoElRef.current = el }}
               hlsPlaylistUrl={hlsPlaylistUrl}
               fallbackMp4Url={mediaUrl}
               poster={thumbnailUrl || undefined}
@@ -479,11 +537,18 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
         </div>
       )}
 
-      {/* bouton play/pause central, glassmorphism cramoisi */}
-      {showPauseIcon && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-          <div
-            className="w-16 h-16 rounded-full flex items-center justify-center"
+      {/* Overlay central play/pause + mute, façon Instagram : apparaît au tap et
+          reste affiché statiquement tant que la vidéo est en pause (pas de
+          disparition après un délai fixe). Le mute n'existe plus dans la colonne
+          de droite -- il est uniquement ici, empilé sous le bouton play, pour
+          ne pas perturber les espacements de la colonne d'actions reproduite
+          à l'identique d'Instagram. */}
+      {isPaused && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleMute() }}
+            aria-label={muted ? 'Activer le son' : 'Couper le son'}
+            className="w-11 h-11 rounded-full flex items-center justify-center pointer-events-auto"
             style={{
               background: 'color-mix(in srgb, var(--accent) 35%, transparent)',
               backdropFilter: 'blur(8px)',
@@ -491,11 +556,18 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
               border: '1px solid color-mix(in srgb, var(--accent) 50%, transparent)',
             }}
           >
-            {isPaused ? (
-              <Play size={28} className="text-white fill-white ml-1" />
-            ) : (
-              <Pause size={28} className="text-white fill-white" />
-            )}
+            {muted ? <VolumeX size={20} className="text-white" /> : <Volume2 size={20} className="text-white" />}
+          </button>
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center pointer-events-none"
+            style={{
+              background: 'color-mix(in srgb, var(--accent) 35%, transparent)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              border: '1px solid color-mix(in srgb, var(--accent) 50%, transparent)',
+            }}
+          >
+            <Play size={28} className="text-white fill-white ml-1" />
           </div>
         </div>
       )}
@@ -504,33 +576,68 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
       <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
 
-      {/* colonne d'actions à droite */}
+      {/* Barre de progression draggable, tout en bas du slide (au-dessus de
+          la nav bar de l'app). Zone de tap invisible plus haute (h-5) que la
+          barre visible (h-[3px]) pour que le doigt puisse viser facilement
+          sans précision chirurgicale, comme sur Instagram/TikTok. */}
       <div
-        className="absolute right-3 flex flex-col items-center gap-5 z-10 text-white"
+        ref={progressBarRef}
+        className="absolute inset-x-0 bottom-0 z-20 flex items-center"
+        style={{ height: '20px', touchAction: 'none' }}
+        onMouseDown={handleProgressPointerDown}
+        onMouseMove={handleProgressPointerMove}
+        onMouseUp={handleProgressPointerUp}
+        onMouseLeave={handleProgressPointerUp}
+        onTouchStart={handleProgressPointerDown}
+        onTouchMove={handleProgressPointerMove}
+        onTouchEnd={handleProgressPointerUp}
+      >
+        <div className="w-full h-[3px] bg-white/25 relative">
+          <div
+            className="absolute inset-y-0 left-0 bg-white"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* colonne d'actions à droite -- reproduction Instagram : icônes en
+          contour, espacement vertical large et régulier (gap-7 ≈ 65-70px
+          centre à centre selon la hauteur des labels), libellé texte "J'aime"
+          sous le cœur (PAS un chiffre), chiffre sous commentaire, repost et
+          enregistrer sans route pour l'instant (aucun onClick), 3 points
+          légèrement détaché du reste comme sur Instagram. Le mute n'est plus
+          ici -- il vit uniquement dans l'overlay central (voir plus haut). */}
+      <div
+        className="absolute right-2 flex flex-col items-center gap-7 z-10 text-white"
         style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) + 16px)' }}
       >
         <button onClick={toggleLike} className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
-          <Heart size={27} className={liked ? 'fill-[var(--accent)] text-[var(--accent)]' : ''} strokeWidth={2} />
+          <Heart size={30} className={liked ? 'fill-[var(--accent)] text-[var(--accent)]' : ''} strokeWidth={1.8} />
+          <span className="text-caption font-medium">J'aime</span>
         </button>
         <button
           onClick={() => setShowComments(true)}
           className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200"
         >
-          <MessageCircle size={26} strokeWidth={2} />
-          {commentCount > 0 && <span className="text-[11px] font-medium">{commentCount}</span>}
+          <MessageCircle size={30} strokeWidth={1.8} />
+          <span className="text-caption font-semibold">{commentCount}</span>
         </button>
+        {/* Repost : sans route pour l'instant. Le compteur sera ajouté quand
+            la fonctionnalité existera réellement côté base -- pas de mock. */}
         <button className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
-          <Send size={24} strokeWidth={2} />
+          <Repeat2 size={30} strokeWidth={1.8} />
         </button>
+        {/* Partager : sans route */}
         <button className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
-          <MoreVertical size={24} strokeWidth={2} />
+          <Send size={27} strokeWidth={1.8} />
         </button>
-        <button
-          onClick={onToggleMute}
-          aria-label={muted ? 'Activer le son' : 'Couper le son'}
-          className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200"
-        >
-          {muted ? <VolumeX size={24} strokeWidth={2} /> : <Volume2 size={24} strokeWidth={2} />}
+        {/* Enregistrer : sans route */}
+        <button className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
+          <Bookmark size={28} strokeWidth={1.8} />
+        </button>
+        {/* 3 points : sans route, légèrement détaché du groupe précédent */}
+        <button className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200 mt-1">
+          <MoreVertical size={26} strokeWidth={1.8} />
         </button>
       </div>
 
@@ -539,34 +646,55 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
         className="absolute left-3 right-16 z-10"
         style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) + 12px)' }}
       >
-        <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2.5 mb-2">
+        <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2 mb-1.5">
           <img
             src={influencer?.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${influencer?.id}`}
             alt=""
             loading="lazy"
             decoding="async"
-            className="w-9 h-9 rounded-full object-cover shrink-0"
+            className="w-8 h-8 rounded-full object-cover shrink-0"
           />
-          <span className="text-white text-body-medium flex items-center gap-1.5 truncate">
+          <span className="text-white text-small-medium flex items-center gap-1.5 truncate">
             {influencer?.users?.nom_complet}
-            {influencer?.verifie && <VerifiedBadge size={14} />}
+            {influencer?.verifie && <VerifiedBadge size={13} />}
           </span>
         </Link>
         {reel.client && (
-          <Link to={`/entreprise/${reel.client.id}`} className="flex items-center gap-2 mb-2 -mt-1">
+          <Link to={`/entreprise/${reel.client.id}`} className="flex items-center gap-2 mb-1.5 -mt-0.5">
             <img
               src={reel.client.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${reel.client.nom_complet}`}
               alt=""
               loading="lazy"
               decoding="async"
-              className="w-6 h-6 rounded-full object-cover shrink-0"
+              className="w-5 h-5 rounded-full object-cover shrink-0"
             />
-            <span className="text-white/80 text-small truncate">{reel.client.nom_complet}</span>
+            <span className="text-white/80 text-caption truncate">{reel.client.nom_complet}</span>
           </Link>
         )}
         {reel.legende && (
-          <p className="text-white text-body line-clamp-2">{reel.legende}</p>
+          <p className="text-white text-small line-clamp-2 mt-1">{reel.legende}</p>
         )}
+      </div>
+
+      {/* Bloc "son original" en bas à droite, sous la colonne d'actions,
+          façon Instagram : photo du créateur avec une icône note de musique
+          en badge. La base n'a pas de notion d'audio distincte du post, donc
+          on affiche systématiquement "son original" avec la photo du créateur
+          -- pas un vrai lecteur audio. */}
+      <div
+        className="absolute right-3 z-10"
+        style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) - 36px)' }}
+      >
+        <div className="relative w-7 h-7 rounded-md overflow-hidden shrink-0 border border-white/40">
+          <img
+            src={influencer?.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${influencer?.id}`}
+            alt=""
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <Music2 size={12} className="text-white" />
+          </div>
+        </div>
       </div>
 
       {showComments && (
