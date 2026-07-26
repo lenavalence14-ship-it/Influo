@@ -66,6 +66,20 @@ export default function HlsVideo({
     }
 
     if (Hls.isSupported()) {
+      // autoStartLoad=false + startLoad() manuel plus bas : l'attribut HTML
+      // `preload` (auto/metadata) passé en props n'a AUCUN effet sur hls.js
+      // -- contrairement à un <video src="fichier.mp4"> classique, hls.js
+      // prend le contrôle total du chargement via loadSource/attachMedia,
+      // et démarrait jusqu'ici le téléchargement des segments immédiatement
+      // pour CHAQUE vidéo montée, sans distinction entre "vidéo active" et
+      // "juste préchargée en avance" (voir shouldPreload/shouldPrefetchMeta
+      // dans ReelsViewer.jsx, qui ne changeaient donc rien en pratique).
+      // Avec autoStartLoad=false, hls.js charge le manifest (.m3u8) et se
+      // prépare, mais n'entame le téléchargement des segments vidéo que
+      // lorsqu'on appelle explicitement startLoad() -- ce qui permet enfin
+      // à preload='metadata' de vouloir dire "prêt à démarrer vite, mais pas
+      // en train de consommer de la bande passante maintenant".
+      const useNativePreload = preload !== 'metadata'
       const hls = new Hls({
         // Limite le buffer en avance pour économiser la data mobile : pas besoin
         // de précharger 30s de vidéo en 720p si l'utilisateur peut swiper dans 2s.
@@ -84,6 +98,10 @@ export default function HlsVideo({
         // correcte — nettement moins pessimiste que 500kbps, qui forçait quasi
         // toujours le premier choix vers 360p.
         abrEwmaDefaultEstimate: 1_500_000,
+        // false pour 'metadata' (préchargement léger, i+2) : charge le manifest
+        // sans lancer le téléchargement des segments. true pour 'auto' (vidéo
+        // active/suivante immédiate) : comportement inchangé, chargement complet.
+        autoStartLoad: useNativePreload,
       })
       hls.loadSource(hlsPlaylistUrl)
       hls.attachMedia(video)
@@ -109,6 +127,20 @@ export default function HlsVideo({
       }
     }
   }, [hlsPlaylistUrl, fallbackMp4Url])
+
+  // Effet séparé (pas de recréation de l'instance hls.js) : quand ce reel
+  // passe de "préchargé en metadata seul" à "actif/suivant immédiat", il faut
+  // déclencher le vrai téléchargement des segments qui a été retenu par
+  // autoStartLoad=false plus haut. Sans ça, une vidéo montée en 'metadata'
+  // (ex: i+2 qui devient i après un swipe) resterait bloquée indéfiniment
+  // avec juste son manifest chargé, sans jamais lire la moindre image.
+  useEffect(() => {
+    const hls = hlsInstanceRef.current
+    if (!hls) return
+    if (preload === 'auto') {
+      hls.startLoad()
+    }
+  }, [preload])
 
   return (
     <video
