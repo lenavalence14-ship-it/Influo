@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { Heart, MessageCircle, ShoppingBag, Wallet, ArrowLeft, UserPlus } from 'lucide-react'
+import { Heart, MessageCircle, ShoppingBag, Wallet, ArrowLeft, UserPlus, Repeat2 } from 'lucide-react'
 import Avatar from '../../components/ui/Avatar'
 import Button from '../../components/ui/Button'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
@@ -16,6 +16,7 @@ const POST_TYPES = [
   'like', 'comment', 'comment_collab',
   'nouveau_post', 'nouveau_reel', 'nouvelle_collab', 'nouveau_reel_collab',
   'reply', 'reply_content', 'comment_like',
+  'post_repost', 'repost_activity_like', 'repost_activity_comment', 'repost_activity_repost',
 ]
 
 const TYPE_ICON = {
@@ -30,6 +31,10 @@ const TYPE_ICON = {
   retrait: Wallet,
   retrait_pro: Wallet,
   follow: UserPlus,
+  post_repost: Repeat2,
+  repost_activity_like: Heart,
+  repost_activity_comment: MessageCircle,
+  repost_activity_repost: Repeat2,
 }
 
 // Libellé de secours si `contenu` (déjà formulé côté trigger SQL) est absent pour
@@ -44,6 +49,10 @@ const TYPE_SUFFIX = {
   commande: 'a passé une nouvelle commande',
   commande_pro: 'a passé une nouvelle commande',
   follow: 'a commencé à vous suivre',
+  post_repost: 'a repartagé votre publication',
+  repost_activity_like: 'a aimé la publication que vous avez repartagée',
+  repost_activity_comment: 'a commenté la publication que vous avez repartagée',
+  repost_activity_repost: 'a repartagé la publication que vous avez repartagée',
 }
 
 const TABS = [

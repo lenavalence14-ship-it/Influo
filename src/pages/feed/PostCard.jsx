@@ -168,6 +168,8 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
   // c'est le tout premier like du post).
   const [lastLikerName, setLastLikerName] = useState(post.last_liker_name || null)
   const [commentCount, setCommentCount] = useState(post.comment_count || 0)
+  const [reposted, setReposted] = useState(post.reposted_by_me || false)
+  const [repostCount, setRepostCount] = useState(post.repost_count || 0)
   const [showComments, setShowComments] = useState(autoOpenComments)
   const [showMenu, setShowMenu] = useState(false)
   const [deleted, setDeleted] = useState(false)
@@ -221,6 +223,21 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
       // jusqu'à ce qu'un refresh complet recharge tout depuis la base.
       const { data: me } = await supabase.from('users').select('nom_complet').eq('id', user.id).single()
       setLastLikerName(me?.nom_complet || null)
+    }
+  }
+
+  const toggleRepost = async () => {
+    if (reposted) {
+      setReposted(false)
+      setRepostCount((c) => c - 1)
+      await supabase.from('post_reposts').delete().match({ post_id: post.id, user_id: user.id })
+    } else {
+      setReposted(true)
+      setRepostCount((c) => c + 1)
+      await supabase.from('post_reposts').insert({ post_id: post.id, user_id: user.id })
+      // Le repost fait remonter le post dans le feed (via sort_date calculé côté
+      // serveur), mais SEULEMENT au prochain refresh -- pas de retri en temps réel
+      // ici, même logique que l'apparition d'un nouveau post après CreatePost.jsx.
     }
   }
 
@@ -480,9 +497,12 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
               <MessageCircle size={24} strokeWidth={1.75} />
               {commentCount > 0 && <span className="text-[12px] leading-[15px] font-medium">{commentCount}</span>}
             </button>
-            {/* Repost : pas encore de fonctionnalité côté base, affiché sans onClick */}
-            <button className="active:scale-90 transition-transform duration-200">
-              <Repeat2 size={24} strokeWidth={1.75} />
+            <button
+              onClick={toggleRepost}
+              className="flex items-center gap-1.5 active:scale-90 transition-transform duration-200"
+            >
+              <Repeat2 size={24} className={reposted ? 'text-[var(--accent)]' : ''} strokeWidth={1.75} />
+              {repostCount > 0 && <span className="text-[12px] leading-[15px] font-medium">{repostCount}</span>}
             </button>
             <button className="active:scale-90 transition-transform duration-200">
               <Send size={22} strokeWidth={1.75} />

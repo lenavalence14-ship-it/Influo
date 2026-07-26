@@ -21,7 +21,22 @@ const PAGE_SIZE = 10
 // médias montés en même temps dans le DOM.
 async function fetchFeedPage({ userId, pageParam = 0 }) {
   const from = pageParam * PAGE_SIZE
-  const to = from + PAGE_SIZE - 1
+
+  // L'ordre du feed n'est PAS created_at brut : un repost fait remonter le post
+  // comme s'il venait d'être publié, sans jamais toucher à sa vraie date affichée.
+  // get_feed_post_ids calcule ça côté SQL (greatest(created_at, dernier repost))
+  // et pagine dessus directement -- indispensable pour que range() reste cohérent
+  // d'une page à l'autre (impossible de retrier fiablement après-coup en JS une
+  // fois que Supabase a déjà découpé les pages sur le mauvais critère de tri).
+  const { data: ordered, error: orderError } = await supabase.rpc('get_feed_post_ids', {
+    p_limit: PAGE_SIZE,
+    p_offset: from,
+  })
+
+  if (orderError) console.error('Erreur tri feed:', orderError)
+  if (!ordered || ordered.length === 0) return { posts: [], nextPage: null }
+
+  const orderedIds = ordered.map((o) => o.post_id)
 
   const { data, error } = await supabase
     .from('posts')
@@ -32,35 +47,44 @@ async function fetchFeedPage({ userId, pageParam = 0 }) {
       client:client_id(id, nom_complet, photo_url),
       commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)
     `)
-    .in('type', ['photo', 'carrousel', 'video'])
-    .order('created_at', { ascending: false })
-    .range(from, to)
+    .in('id', orderedIds)
 
   if (error) console.error('Erreur chargement feed:', error)
   if (!data || data.length === 0) return { posts: [], nextPage: null }
 
   const postIds = data.map((p) => p.id)
-  const [{ data: likes }, { data: comments }] = await Promise.all([
+  const [{ data: likes }, { data: comments }, { data: reposts }] = await Promise.all([
     supabase.from('post_likes').select('post_id, user_id, created_at, users(nom_complet)').in('post_id', postIds),
     supabase.from('post_comments').select('post_id').in('post_id', postIds),
+    supabase.from('post_reposts').select('post_id, user_id').in('post_id', postIds),
   ])
 
-  const posts = data.map((p) => {
-    const postLikes = likes?.filter((l) => l.post_id === p.id) || []
-    // dernier like = created_at le plus récent, pour "Aimé par {nom} et d'autres personnes"
-    const lastLike = postLikes.length
-      ? postLikes.reduce((latest, l) => (new Date(l.created_at) > new Date(latest.created_at) ? l : latest))
-      : null
-    return {
-      ...p,
-      like_count: postLikes.length,
-      liked_by_me: postLikes.some((l) => l.user_id === userId),
-      comment_count: comments?.filter((c) => c.post_id === p.id).length || 0,
-      last_liker_name: lastLike?.users?.nom_complet || null,
-    }
-  })
+  // supabase .in('id', orderedIds) ne garantit pas l'ordre de retour -- on
+  // remet les posts dans l'ordre exact décidé par get_feed_post_ids.
+  const byId = new Map(data.map((p) => [p.id, p]))
 
-  return { posts, nextPage: data.length === PAGE_SIZE ? pageParam + 1 : null }
+  const posts = orderedIds
+    .map((id) => byId.get(id))
+    .filter(Boolean)
+    .map((p) => {
+      const postLikes = likes?.filter((l) => l.post_id === p.id) || []
+      const postReposts = reposts?.filter((r) => r.post_id === p.id) || []
+      // dernier like = created_at le plus récent, pour "Aimé par {nom} et d'autres personnes"
+      const lastLike = postLikes.length
+        ? postLikes.reduce((latest, l) => (new Date(l.created_at) > new Date(latest.created_at) ? l : latest))
+        : null
+      return {
+        ...p,
+        like_count: postLikes.length,
+        liked_by_me: postLikes.some((l) => l.user_id === userId),
+        comment_count: comments?.filter((c) => c.post_id === p.id).length || 0,
+        last_liker_name: lastLike?.users?.nom_complet || null,
+        repost_count: postReposts.length,
+        reposted_by_me: postReposts.some((r) => r.user_id === userId),
+      }
+    })
+
+  return { posts, nextPage: ordered.length === PAGE_SIZE ? pageParam + 1 : null }
 }
 
 export default function Feed() {

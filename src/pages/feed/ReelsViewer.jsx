@@ -69,12 +69,15 @@ async function fetchReels(userId) {
     .limit(REELS_PAGE_SIZE)
 
   const postIds = (data || []).map((p) => p.id)
-  const [{ data: likes }, { data: commentCounts }] = await Promise.all([
+  const [{ data: likes }, { data: commentCounts }, { data: reposts }] = await Promise.all([
     postIds.length
       ? supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds)
       : Promise.resolve({ data: [] }),
     postIds.length
       ? supabase.from('post_comments').select('post_id').in('post_id', postIds)
+      : Promise.resolve({ data: [] }),
+    postIds.length
+      ? supabase.from('post_reposts').select('post_id, user_id').in('post_id', postIds)
       : Promise.resolve({ data: [] }),
   ])
 
@@ -83,6 +86,8 @@ async function fetchReels(userId) {
     like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
     liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === userId) || false,
     comment_count: commentCounts?.filter((c) => c.post_id === p.id).length || 0,
+    repost_count: reposts?.filter((r) => r.post_id === p.id).length || 0,
+    reposted_by_me: reposts?.some((r) => r.post_id === p.id && r.user_id === userId) || false,
   }))
 }
 
@@ -304,6 +309,8 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
   const [likeCount, setLikeCount] = useState(reel.like_count || 0)
   const [showComments, setShowComments] = useState(false)
   const [commentCount, setCommentCount] = useState(reel.comment_count || 0)
+  const [reposted, setReposted] = useState(reel.reposted_by_me || false)
+  const [repostCount, setRepostCount] = useState(reel.repost_count || 0)
   // Devient true dès que le navigateur a chargé assez de données pour peindre la
   // première image de la vidéo (événement natif "loadeddata") : à ce moment-là,
   // le spinner de secours (utilisé quand thumbnailUrl est vide) n'a plus lieu d'être.
@@ -350,6 +357,19 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
       setLiked(true)
       setLikeCount((c) => c + 1)
       await supabase.from('post_likes').insert({ post_id: reel.id, user_id: user.id })
+    }
+  }
+
+  const toggleRepost = async () => {
+    if (!user) return
+    if (reposted) {
+      setReposted(false)
+      setRepostCount((c) => c - 1)
+      await supabase.from('post_reposts').delete().match({ post_id: reel.id, user_id: user.id })
+    } else {
+      setReposted(true)
+      setRepostCount((c) => c + 1)
+      await supabase.from('post_reposts').insert({ post_id: reel.id, user_id: user.id })
     }
   }
 
@@ -623,10 +643,12 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           <MessageCircle size={30} strokeWidth={1.8} />
           <span className="text-caption font-semibold">{commentCount}</span>
         </button>
-        {/* Repost : sans route pour l'instant. Le compteur sera ajouté quand
-            la fonctionnalité existera réellement côté base -- pas de mock. */}
-        <button className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
-          <Repeat2 size={30} strokeWidth={1.8} />
+        <button
+          onClick={toggleRepost}
+          className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200"
+        >
+          <Repeat2 size={30} className={reposted ? 'text-[var(--accent)]' : ''} strokeWidth={1.8} />
+          {repostCount > 0 && <span className="text-caption font-semibold">{repostCount}</span>}
         </button>
         {/* Partager : sans route */}
         <button className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
