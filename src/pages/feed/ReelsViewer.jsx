@@ -642,14 +642,17 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
         </button>
       </div>
 
-      {/* bas : profil, nom, légende -- offsets mesurés en pixels sur la
-          capture Instagram : ~78px entre le bas de la légende et la barre de
-          progression, ~13px entre le nom et la légende. */}
+      {/* Avatar + nom de profil, aligné sur la ligne horizontale qui passe par
+          le milieu du vide entre le bouton ⋮ (dernier bouton de la colonne
+          d'actions, bottom: 96px+safe-area+16px, +mt-1, centre à environ
+          96px+safe-area+33px) et le bloc "son original" (bottom:
+          96px+safe-area-36px, centre à environ 96px+safe-area-22px). Milieu
+          de ces deux centres ≈ 96px+safe-area+5.5px. */}
       <div
         className="absolute left-3 right-16 z-10"
-        style={{ bottom: 'calc(48px + env(safe-area-inset-bottom) + 78px)' }}
+        style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) + 5.5px)' }}
       >
-        <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2 mb-[13px]">
+        <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2">
           <img
             src={influencer?.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${influencer?.id}`}
             alt=""
@@ -663,7 +666,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           </span>
         </Link>
         {reel.client && (
-          <Link to={`/entreprise/${reel.client.id}`} className="flex items-center gap-2 mb-[13px] -mt-0.5">
+          <Link to={`/entreprise/${reel.client.id}`} className="flex items-center gap-2 mt-[13px]">
             <img
               src={reel.client.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${reel.client.nom_complet}`}
               alt=""
@@ -674,20 +677,21 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
             <span className="text-white/80 text-caption truncate">{reel.client.nom_complet}</span>
           </Link>
         )}
-        {reel.legende && (
-          <p className="text-white text-small line-clamp-2">{reel.legende}</p>
-        )}
       </div>
 
-      {/* Bloc "son original" en bas à droite, aligné au même niveau vertical
-          que la légende (mesuré sur la capture Instagram). La base n'a pas de
+      {/* Bloc "son original" + légende, sur la même ligne horizontale.
+          La légende est en plus petit caractère grisé, positionnée à gauche
+          du bloc son original (qui reste à droite). La base n'a pas de
           notion d'audio distincte du post, donc on affiche systématiquement
           "son original" avec la photo du créateur -- pas un vrai lecteur audio. */}
       <div
-        className="absolute right-3 z-10"
+        className="absolute left-3 right-3 z-10 flex items-center gap-2"
         style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) - 36px)' }}
       >
-        <div className="relative w-7 h-7 rounded-md overflow-hidden shrink-0 border border-white/40">
+        {reel.legende && (
+          <p className="text-white/60 text-caption truncate flex-1 min-w-0">{reel.legende}</p>
+        )}
+        <div className="relative w-7 h-7 rounded-md overflow-hidden shrink-0 border border-white/40 ml-auto">
           <img
             src={influencer?.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${influencer?.id}`}
             alt=""
