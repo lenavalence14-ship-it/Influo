@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Image as ImageIcon, X, RotateCcw, Check } from 'lucide-react'
@@ -31,6 +32,7 @@ export default function CreatePost() {
   const { influencerProfile, user } = useAuth()
   const { startUpload, updateProgress, finishUpload } = usePostUpload()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   const [loadingExisting, setLoadingExisting] = useState(isEditing)
 
@@ -293,6 +295,7 @@ export default function CreatePost() {
         setPublishError(mediaUpdateErrors[0].message)
         return
       }
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
       navigate(-1)
       return
     }
@@ -424,6 +427,12 @@ export default function CreatePost() {
     }))
 
     finishUpload(influencerProfile.id)
+    // Le post et tous ses médias sont maintenant en base : invalide le cache
+    // du feed (React Query) pour que le nouveau post apparaisse dès que
+    // l'utilisateur revoit l'écran, sans qu'il ait à tirer pour rafraîchir
+    // manuellement. Avant ce correctif, navigate('/') plus haut ramenait sur
+    // un Feed qui réutilisait son cache existant, antérieur à la publication.
+    queryClient.invalidateQueries({ queryKey: ['feed'] })
 
     // Notification interne : visible dans la cloche de l'app même si l'utilisateur
     // a quitté l'écran de publication depuis longtemps. Le déclenchement d'une vraie
