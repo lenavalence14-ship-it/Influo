@@ -544,7 +544,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           ne pas perturber les espacements de la colonne d'actions reproduite
           à l'identique d'Instagram. */}
       {isPaused && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 pointer-events-none">
           <button
             onClick={(e) => { e.stopPropagation(); onToggleMute() }}
             aria-label={muted ? 'Activer le son' : 'Couper le son'}
@@ -576,14 +576,15 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
       <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
 
-      {/* Barre de progression draggable, tout en bas du slide (au-dessus de
-          la nav bar de l'app). Zone de tap invisible plus haute (h-5) que la
-          barre visible (h-[3px]) pour que le doigt puisse viser facilement
-          sans précision chirurgicale, comme sur Instagram/TikTok. */}
+      {/* Barre de progression draggable, positionnée au-dessus de la BottomNav
+          de l'app (fixed bottom-0, z-40, hauteur réelle ~48px de contenu) qui
+          sinon la masquerait complètement puisque cette route /video ne fait
+          pas partie de ROUTES_SANS_BOTTOM_NAV. Zone de tap invisible plus
+          haute (20px) que la barre visible (3px) pour viser facilement au doigt. */}
       <div
         ref={progressBarRef}
-        className="absolute inset-x-0 bottom-0 z-20 flex items-center"
-        style={{ height: '20px', touchAction: 'none' }}
+        className="absolute inset-x-0 z-40 flex items-end"
+        style={{ height: '20px', bottom: 'calc(44px + env(safe-area-inset-bottom))', touchAction: 'none' }}
         onMouseDown={handleProgressPointerDown}
         onMouseMove={handleProgressPointerMove}
         onMouseUp={handleProgressPointerUp}
@@ -609,7 +610,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           ici -- il vit uniquement dans l'overlay central (voir plus haut). */}
       <div
         className="absolute right-2 flex flex-col items-center gap-7 z-10 text-white"
-        style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) + 16px)' }}
+        style={{ bottom: 'calc(48px + env(safe-area-inset-bottom) + 16px)' }}
       >
         <button onClick={toggleLike} className="flex flex-col items-center gap-1 active:scale-90 transition-transform duration-200">
           <Heart size={30} className={liked ? 'fill-[var(--accent)] text-[var(--accent)]' : ''} strokeWidth={1.8} />
@@ -641,12 +642,14 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
         </button>
       </div>
 
-      {/* bas : profil, nom, légende */}
+      {/* bas : profil, nom, légende -- offsets mesurés en pixels sur la
+          capture Instagram : ~78px entre le bas de la légende et la barre de
+          progression, ~13px entre le nom et la légende. */}
       <div
         className="absolute left-3 right-16 z-10"
-        style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) + 12px)' }}
+        style={{ bottom: 'calc(48px + env(safe-area-inset-bottom) + 78px)' }}
       >
-        <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2 mb-1.5">
+        <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2 mb-[13px]">
           <img
             src={influencer?.users?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${influencer?.id}`}
             alt=""
@@ -660,7 +663,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           </span>
         </Link>
         {reel.client && (
-          <Link to={`/entreprise/${reel.client.id}`} className="flex items-center gap-2 mb-1.5 -mt-0.5">
+          <Link to={`/entreprise/${reel.client.id}`} className="flex items-center gap-2 mb-[13px] -mt-0.5">
             <img
               src={reel.client.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${reel.client.nom_complet}`}
               alt=""
@@ -672,18 +675,17 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           </Link>
         )}
         {reel.legende && (
-          <p className="text-white text-small line-clamp-2 mt-1">{reel.legende}</p>
+          <p className="text-white text-small line-clamp-2">{reel.legende}</p>
         )}
       </div>
 
-      {/* Bloc "son original" en bas à droite, sous la colonne d'actions,
-          façon Instagram : photo du créateur avec une icône note de musique
-          en badge. La base n'a pas de notion d'audio distincte du post, donc
-          on affiche systématiquement "son original" avec la photo du créateur
-          -- pas un vrai lecteur audio. */}
+      {/* Bloc "son original" en bas à droite, aligné au même niveau vertical
+          que la légende (mesuré sur la capture Instagram). La base n'a pas de
+          notion d'audio distincte du post, donc on affiche systématiquement
+          "son original" avec la photo du créateur -- pas un vrai lecteur audio. */}
       <div
         className="absolute right-3 z-10"
-        style={{ bottom: 'calc(96px + env(safe-area-inset-bottom) - 36px)' }}
+        style={{ bottom: 'calc(48px + env(safe-area-inset-bottom) + 78px)' }}
       >
         <div className="relative w-7 h-7 rounded-md overflow-hidden shrink-0 border border-white/40">
           <img
