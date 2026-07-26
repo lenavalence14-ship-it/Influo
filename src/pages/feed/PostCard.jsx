@@ -54,59 +54,94 @@ function getMediaCropStyle(media, cropFormat) {
   })
 }
 
-// Légende avec troncature façon Instagram : 1 ligne pleine + la moitié de la
-// 2e ligne, suivi de "... voir plus". Le clip à "1.5 ligne" est fait en CSS
-// pur (hauteur fixe = 1.5x la line-height, overflow hidden) plutôt qu'en
-// comptant les caractères, pour rester correct quelle que soit la largeur
-// d'écran ou la longueur du nom d'auteur devant le texte. Au clic sur
-// "voir plus", on repasse en affichage complet (plus de contrainte de hauteur).
+// Légende avec troncature façon Instagram : le texte est coupé pile là où
+// s'arrêterait la moitié de la 2e ligne visuelle, et "...voir plus" est collé
+// directement à la suite du texte coupé (pas en dessous, pas un bloc séparé).
+// Contrairement à un clip par hauteur de boîte (qui coupe n'importe où dans
+// le rendu final), on cherche ici le nombre de caractères exact à garder par
+// recherche binaire sur la largeur réelle rendue, dans une copie invisible du
+// texte mesurée en pixels -- donc la coupure tombe bien "en plein milieu" de
+// la 2e ligne, comme demandé, et pas seulement à une hauteur donnée.
 function CaptionWithSeeMore({ legende, authorName, hasLikeLine }) {
   const [expanded, setExpanded] = useState(false)
-  // null = pas encore mesuré (on ne clippe pas tant qu'on ne sait pas si c'est nécessaire,
-  // pour éviter un flash de texte tronqué sur une légende courte)
-  const [truncatable, setTruncatable] = useState(null)
-  const textRef = useRef(null)
-  const LINE_HEIGHT = 16 // px, cohérent avec leading-[16px] utilisé ici
-  const CLAMP_HEIGHT = LINE_HEIGHT * 1.5 // 1 ligne pleine + moitié de la 2e
+  const [cutIndex, setCutIndex] = useState(null) // null = pas encore mesuré, ou pas besoin de couper
+  const containerRef = useRef(null) // <p> visible, sert de référence de largeur/police
+  const measureRef = useRef(null) // clone caché, même style, pour mesurer sans affecter le rendu
 
-  // détecte si le texte réel dépasse 1.5 ligne pour savoir s'il faut proposer
-  // "voir plus" du tout (légendes courtes tenant sur 1 ligne n'en ont pas besoin).
-  // Mesure sur le scrollHeight naturel, sans contrainte de hauteur, donc au
-  // premier render (avant que truncatable soit déterminé) le texte n'est pas
-  // encore clippé -- ce useLayoutEffect s'exécute avant peinture pour éviter
-  // tout flash visible du texte complet.
   useEffect(() => {
-    const el = textRef.current
-    if (!el) return
-    setTruncatable(el.scrollHeight > CLAMP_HEIGHT + 1)
+    const container = containerRef.current
+    const measure = measureRef.current
+    if (!container || !measure) return
+
+    // largeur disponible pour le texte = largeur du <p>, moins la largeur du
+    // nom d'auteur + son espace (ils sont sur la même ligne, en display:inline)
+    const authorSpan = container.querySelector('[data-author]')
+    const authorWidth = authorSpan ? authorSpan.getBoundingClientRect().width : 0
+    const fullWidth = container.getBoundingClientRect().width
+    const lineHeight = parseFloat(getComputedStyle(container).lineHeight) || 16
+
+    measure.style.width = `${fullWidth}px`
+    measure.textContent = legende
+
+    // hauteur réelle du texte à pleine largeur, une fois le nom déduit de la
+    // première ligne seulement (measure a la même largeur totale que container,
+    // donc on simule le début de ligne en mettant un espaceur invisible de la
+    // largeur du nom d'auteur, exactement comme le fera le rendu final)
+    const spacerWidth = authorWidth
+    measure.style.textIndent = `${spacerWidth}px`
+    const fullHeight = measure.getBoundingClientRect().height
+
+    // si le texte tient sur 1 ligne complète (en tenant compte du nom devant),
+    // pas besoin de "voir plus"
+    if (fullHeight <= lineHeight + 1) {
+      setCutIndex(null)
+      return
+    }
+
+    // cible : hauteur de 1 ligne pleine + moitié de la 2e ligne
+    const targetHeight = lineHeight * 1.5
+
+    // recherche binaire du nombre de caractères qui, une fois rendus (avec le
+    // même textIndent simulant le nom d'auteur), donnent une hauteur proche
+    // de targetHeight sans la dépasser
+    let lo = 0
+    let hi = legende.length
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi + 1) / 2)
+      measure.textContent = legende.slice(0, mid) + '...voir plus'
+      const h = measure.getBoundingClientRect().height
+      if (h <= targetHeight) {
+        lo = mid
+      } else {
+        hi = mid - 1
+      }
+    }
+    setCutIndex(lo < legende.length ? lo : null)
   }, [legende])
 
-  const shouldClamp = truncatable && !expanded
+  const displayText = expanded || cutIndex === null ? legende : legende.slice(0, cutIndex)
 
   return (
-    <p className={`px-3 text-[13px] leading-[16px] ${hasLikeLine ? 'pt-0.5' : 'pt-1'}`} style={{ color: 'var(--text-primary)' }}>
-      <span className="font-medium mr-1">{authorName}</span>
-      <span
-        ref={textRef}
-        style={{
-          color: 'var(--text-secondary)',
-          display: 'inline-block',
-          overflow: shouldClamp ? 'hidden' : 'visible',
-          maxHeight: shouldClamp ? `${CLAMP_HEIGHT}px` : 'none',
-          verticalAlign: 'bottom',
-        }}
-      >
-        {legende}
+    <p ref={containerRef} className={`px-3 leading-[16px] ${hasLikeLine ? 'pt-0.5' : 'pt-1'}`} style={{ color: 'var(--text-primary)' }}>
+      <span data-author className="font-medium mr-1 text-[13px]">{authorName}</span>
+      <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+        {displayText}
+        {!expanded && cutIndex !== null && (
+          <>
+            ...
+            <button onClick={() => setExpanded(true)} className="font-medium" style={{ color: 'var(--text-secondary)' }}>
+              voir plus
+            </button>
+          </>
+        )}
       </span>
-      {shouldClamp && (
-        <button
-          onClick={() => setExpanded(true)}
-          className="ml-1 font-medium align-bottom"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          voir plus
-        </button>
-      )}
+      {/* clone invisible utilisé uniquement pour mesurer, jamais affiché */}
+      <span
+        ref={measureRef}
+        aria-hidden="true"
+        className="text-[12px]"
+        style={{ position: 'absolute', visibility: 'hidden', whiteSpace: 'pre-wrap', wordBreak: 'break-word', top: -9999, left: -9999, pointerEvents: 'none' }}
+      />
     </p>
   )
 }
