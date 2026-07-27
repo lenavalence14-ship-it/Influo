@@ -28,6 +28,7 @@ const Search = lazy(() => import('./pages/feed/Search'))
 const Notifications = lazy(() => import('./pages/feed/Notifications'))
 const CreatePost = lazy(() => import('./pages/feed/CreatePost'))
 const PublierOffre = lazy(() => import('./pages/feed/PublierOffre'))
+const MemoryStudio = lazy(() => import('./pages/souvenirs/MemoryStudio'))
 const ReelsViewer = lazy(() => import('./pages/feed/ReelsViewer'))
 const PostDetail = lazy(() => import('./pages/feed/PostDetail'))
 
@@ -195,6 +196,7 @@ function AppRoutes() {
           <Route path="/publier" element={<CreatePost />} />
           <Route path="/publier-offre" element={<PublierOffre />} />
           <Route path="/publier-offre/:offerId/modifier" element={<PublierOffre />} />
+          <Route path="/souvenirs" element={<MemoryStudio />} />
           <Route path="/publier/:postId/modifier" element={<CreatePost />} />
           <Route path="/video" element={<ReelsViewer />} />
           <Route path="/video/:postId" element={<ReelsViewer />} />

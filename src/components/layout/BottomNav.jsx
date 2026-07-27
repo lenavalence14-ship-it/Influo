@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Home, Search, Heart } from 'lucide-react'
+import { Home, Search, Heart, Sparkles } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useUnreadCounts } from '../../hooks/useUnreadCounts'
 
@@ -62,11 +62,13 @@ export default function BottomNav() {
   const { profile } = useAuth()
   const { hasUnreadNotifications } = useUnreadCounts()
   const canPublish = profile?.role === 'influenceur'
+  const canUseMemoryStudio = profile?.role === 'utilisateur_simple'
 
   const items = [
     { to: '/', icon: Home, label: 'Accueil' },
     { to: '/recherche', icon: Search, label: 'Recherche' },
     ...(canPublish ? [{ to: '/video', icon: PlayIcon, label: 'Vidéo' }] : []),
+    ...(canUseMemoryStudio ? [{ to: '/souvenirs', icon: Sparkles, label: 'Souvenirs' }] : []),
     {
       to: '/notifications',
       icon: Heart,
