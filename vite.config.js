@@ -43,7 +43,6 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
-        navigateFallbackDenylist: [/^\/admin/],
         // Cache runtime pour les médias servis par Supabase Storage (photos de profil,
         // images de posts, vidéos, miniatures). Sans ça, chaque retour sur le feed ou
         // le profil re-télécharge intégralement les mêmes fichiers depuis le réseau,
