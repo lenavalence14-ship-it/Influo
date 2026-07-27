@@ -29,6 +29,12 @@ const Notifications = lazy(() => import('./pages/feed/Notifications'))
 const CreatePost = lazy(() => import('./pages/feed/CreatePost'))
 const PublierOffre = lazy(() => import('./pages/feed/PublierOffre'))
 const MemoryStudio = lazy(() => import('./pages/souvenirs/MemoryStudio'))
+const SouvenirEditorialPourQui = lazy(() => import('./pages/souvenirs/SouvenirEditorialPourQui'))
+const SouvenirEditorialPersonne = lazy(() => import('./pages/souvenirs/SouvenirEditorialPersonne'))
+const MagazineEditorialPourQui = lazy(() => import('./pages/souvenirs/MagazineEditorialPourQui'))
+const MagazineEditorialPersonne = lazy(() => import('./pages/souvenirs/MagazineEditorialPersonne'))
+const BonneFete = lazy(() => import('./pages/souvenirs/BonneFete'))
+const DefiSouvenirs = lazy(() => import('./pages/souvenirs/DefiSouvenirs'))
 const ReelsViewer = lazy(() => import('./pages/feed/ReelsViewer'))
 const PostDetail = lazy(() => import('./pages/feed/PostDetail'))
 
@@ -197,6 +203,12 @@ function AppRoutes() {
           <Route path="/publier-offre" element={<PublierOffre />} />
           <Route path="/publier-offre/:offerId/modifier" element={<PublierOffre />} />
           <Route path="/souvenirs" element={<MemoryStudio />} />
+          <Route path="/souvenirs/souvenir-editorial" element={<SouvenirEditorialPourQui />} />
+          <Route path="/souvenirs/souvenir-editorial/personne" element={<SouvenirEditorialPersonne />} />
+          <Route path="/souvenirs/magazine-editorial" element={<MagazineEditorialPourQui />} />
+          <Route path="/souvenirs/magazine-editorial/personne" element={<MagazineEditorialPersonne />} />
+          <Route path="/souvenirs/bonne-fete" element={<BonneFete />} />
+          <Route path="/souvenirs/defi-souvenirs" element={<DefiSouvenirs />} />
           <Route path="/publier/:postId/modifier" element={<CreatePost />} />
           <Route path="/video" element={<ReelsViewer />} />
           <Route path="/video/:postId" element={<ReelsViewer />} />
