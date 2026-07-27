@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../../lib/supabase'
 
 // Aperçu plein écran d'un template choisi dans la bibliothèque. Pas
 // d'édition ici -- étape volontairement pas construite (viendra plus tard :

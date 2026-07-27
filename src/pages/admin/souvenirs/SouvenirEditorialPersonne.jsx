@@ -1,4 +1,4 @@
-import SelectionScreen from '../../components/SelectionScreen'
+import SelectionScreen from '../../../components/SelectionScreen'
 
 // Étape 2 sous "Créer un souvenir éditorial" > "Une personne" : les 9 profils
 // listés par le client. Aucune route derrière -- mène directement aux

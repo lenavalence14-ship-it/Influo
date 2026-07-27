@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, MoreHorizontal, Bookmark, Heart } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../contexts/AuthContext'
-import BottomSheet from '../../components/ui/BottomSheet'
+import { supabase } from '../../../lib/supabase'
+import { useAuth } from '../../../contexts/AuthContext'
+import BottomSheet from '../../../components/ui/BottomSheet'
 
 // Bibliothèque de templates (grille masonry façon Pinterest) pour une
 // catégorie donnée (slug lu depuis l'URL, ex: 'bonne-fete-nouvelle-annee').

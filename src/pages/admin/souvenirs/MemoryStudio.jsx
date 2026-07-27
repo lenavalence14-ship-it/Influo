@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import EmojiIcon, { EmojiCluster } from '../../components/EmojiIcon'
+import EmojiIcon, { EmojiCluster } from '../../../components/EmojiIcon'
 
 // Écran d'accueil de l'outil "Souvenirs" (type Canva), réservé aux
 // utilisateur_simple. Étape 1 du chantier : uniquement le squelette de

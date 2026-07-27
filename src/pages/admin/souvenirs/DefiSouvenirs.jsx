@@ -1,4 +1,4 @@
-import SelectionScreen from '../../components/SelectionScreen'
+import SelectionScreen from '../../../components/SelectionScreen'
 
 // Sous "Lancer un défi de souvenirs" : 2 durées, chacune sans route (mène
 // directement aux templates, étape pas encore construite).

@@ -1,4 +1,4 @@
-import SelectionScreen from '../../components/SelectionScreen'
+import SelectionScreen from '../../../components/SelectionScreen'
 
 // Étape 1 sous "Un magazine éditorial" : pour qui. Structure identique à
 // SouvenirEditorialPourQui, catégorie distincte comme demandé.

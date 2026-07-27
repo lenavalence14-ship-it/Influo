@@ -1,4 +1,4 @@
-import SelectionScreen from '../../components/SelectionScreen'
+import SelectionScreen from '../../../components/SelectionScreen'
 
 // Étape 1 sous "Créer un souvenir éditorial" : pour qui.
 // "Un groupe de personnes" n'a volontairement pas de route (mène directement

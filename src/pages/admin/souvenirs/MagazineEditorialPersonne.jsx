@@ -1,4 +1,4 @@
-import SelectionScreen from '../../components/SelectionScreen'
+import SelectionScreen from '../../../components/SelectionScreen'
 
 // Étape 2 sous "Un magazine éditorial" > "Une personne". Même liste que le
 // pendant "souvenir éditorial" -- seule différence notée dans le brief :

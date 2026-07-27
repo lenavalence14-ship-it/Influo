@@ -1,4 +1,4 @@
-import SelectionScreen from '../../components/SelectionScreen'
+import SelectionScreen from '../../../components/SelectionScreen'
 
 // Sous "Souhaiter bonne fête" : 7 fêtes, chacune sans route (mène
 // directement aux templates, étape pas encore construite).
