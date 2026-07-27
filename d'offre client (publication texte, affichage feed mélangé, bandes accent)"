@@ -1,0 +1,198 @@
+[1mdiff --git a/src/App.jsx b/src/App.jsx[m
+[1mindex 648c003..751e16e 100644[m
+[1m--- a/src/App.jsx[m
+[1m+++ b/src/App.jsx[m
+[36m@@ -27,6 +27,7 @@[m [mconst Feed = lazy(() => import('./pages/feed/Feed'))[m
+ const Search = lazy(() => import('./pages/feed/Search'))[m
+ const Notifications = lazy(() => import('./pages/feed/Notifications'))[m
+ const CreatePost = lazy(() => import('./pages/feed/CreatePost'))[m
+[32m+[m[32mconst PublierOffre = lazy(() => import('./pages/feed/PublierOffre'))[m
+ const ReelsViewer = lazy(() => import('./pages/feed/ReelsViewer'))[m
+ const PostDetail = lazy(() => import('./pages/feed/PostDetail'))[m
+ [m
+[36m@@ -192,6 +193,7 @@[m [mfunction AppRoutes() {[m
+           <Route path="/recherche" element={<Search />} />[m
+           <Route path="/notifications" element={<Notifications />} />[m
+           <Route path="/publier" element={<CreatePost />} />[m
+[32m+[m[32m          <Route path="/publier-offre" element={<PublierOffre />} />[m
+           <Route path="/publier/:postId/modifier" element={<CreatePost />} />[m
+           <Route path="/video" element={<ReelsViewer />} />[m
+           <Route path="/video/:postId" element={<ReelsViewer />} />[m
+[1mdiff --git a/src/pages/feed/Feed.jsx b/src/pages/feed/Feed.jsx[m
+[1mindex f0ce325..8e5904e 100644[m
+[1m--- a/src/pages/feed/Feed.jsx[m
+[1m+++ b/src/pages/feed/Feed.jsx[m
+[36m@@ -5,6 +5,7 @@[m [mimport { useAuth } from '../../contexts/AuthContext'[m
+ import { useTheme } from '../../contexts/ThemeContext'[m
+ import NoteBar from './NoteBar'[m
+ import PostCard from './PostCard'[m
+[32m+[m[32mimport OfferCard from './OfferCard'[m
+ import Card from '../../components/ui/Card'[m
+ import { Sun, Moon, MessageCircle, Plus, RefreshCw } from 'lucide-react'[m
+ import { useNavigate } from 'react-router-dom'[m
+[36m@@ -22,13 +23,14 @@[m [mconst PAGE_SIZE = 10[m
+ async function fetchFeedPage({ userId, pageParam = 0 }) {[m
+   const from = pageParam * PAGE_SIZE[m
+ [m
+[31m-  // L'ordre du feed n'est PAS created_at brut : un repost fait remonter le post[m
+[31m-  // comme s'il venait d'être publié, sans jamais toucher à sa vraie date affichée.[m
+[31m-  // get_feed_post_ids calcule ça côté SQL (greatest(created_at, dernier repost))[m
+[31m-  // et pagine dessus directement -- indispensable pour que range() reste cohérent[m
+[31m-  // d'une page à l'autre (impossible de retrier fiablement après-coup en JS une[m
+[31m-  // fois que Supabase a déjà découpé les pages sur le mauvais critère de tri).[m
+[31m-  const { data: ordered, error: orderError } = await supabase.rpc('get_feed_post_ids', {[m
+[32m+[m[32m  // Le feed mélange deux sources différentes (posts d'influenceurs et appels[m
+[32m+[m[32m  // d'offre de clients), triées ENSEMBLE sur une même sort_date (repost-aware[m
+[32m+[m[32m  // pour les posts, created_at brut pour les offres -- pas de notion de repost[m
+[32m+[m[32m  // pour elles). get_feed_items calcule ce tri fusionné côté SQL et pagine[m
+[32m+[m[32m  // dessus directement, pour les mêmes raisons que get_feed_post_ids[m
+[32m+[m[32m  // auparavant : impossible de retrier fiablement après-coup en JS une fois[m
+[32m+[m[32m  // que range() a déjà découpé les pages sur le mauvais critère.[m
+[32m+[m[32m  const { data: ordered, error: orderError } = await supabase.rpc('get_feed_items', {[m
+     p_limit: PAGE_SIZE,[m
+     p_offset: from,[m
+   })[m
+[36m@@ -36,37 +38,56 @@[m [masync function fetchFeedPage({ userId, pageParam = 0 }) {[m
+   if (orderError) console.error('Erreur tri feed:', orderError)[m
+   if (!ordered || ordered.length === 0) return { posts: [], nextPage: null }[m
+ [m
+[31m-  const orderedIds = ordered.map((o) => o.post_id)[m
+[32m+[m[32m  const postIds = ordered.filter((o) => o.item_type === 'post').map((o) => o.item_id)[m
+[32m+[m[32m  const offerIds = ordered.filter((o) => o.item_type === 'offre').map((o) => o.item_id)[m
+ [m
+[31m-  const { data, error } = await supabase[m
+[31m-    .from('posts')[m
+[31m-    .select(`[m
+[31m-      id, legende, crop_format, type, created_at, commande_id, filtre,[m
+[31m-      post_medias(media_url, media_type, thumbnail_url, position, filtre, zoom, offset_x, offset_y, natural_width, natural_height),[m
+[31m-      profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),[m
+[31m-      client:client_id(id, nom_complet, photo_url),[m
+[31m-      commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)[m
+[31m-    `)[m
+[31m-    .in('id', orderedIds)[m
+[32m+[m[32m  const [postsResult, offersResult] = await Promise.all([[m
+[32m+[m[32m    postIds.length[m
+[32m+[m[32m      ? supabase[m
+[32m+[m[32m          .from('posts')[m
+[32m+[m[32m          .select(`[m
+[32m+[m[32m            id, legende, crop_format, type, created_at, commande_id, filtre,[m
+[32m+[m[32m            post_medias(media_url, media_type, thumbnail_url, position, filtre, zoom, offset_x, offset_y, natural_width, natural_height),[m
+[32m+[m[32m            profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),[m
+[32m+[m[32m            client:client_id(id, nom_complet, photo_url),[m
+[32m+[m[32m            commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)[m
+[32m+[m[32m          `)[m
+[32m+[m[32m          .in('id', postIds)[m
+[32m+[m[32m      : Promise.resolve({ data: [] }),[m
+[32m+[m[32m    offerIds.length[m
+[32m+[m[32m      ? supabase[m
+[32m+[m[32m          .from('appels_offre')[m
+[32m+[m[32m          .select('id, contenu, created_at, profils_client(id, user_id, users(nom_complet, photo_url))')[m
+[32m+[m[32m          .in('id', offerIds)[m
+[32m+[m[32m      : Promise.resolve({ data: [] }),[m
+[32m+[m[32m  ])[m
+ [m
+[32m+[m[32m  const { data, error } = postsResult[m
+   if (error) console.error('Erreur chargement feed:', error)[m
+[31m-  if (!data || data.length === 0) return { posts: [], nextPage: null }[m
+[32m+[m[32m  if (offersResult.error) console.error('Erreur chargement appels offre:', offersResult.error)[m
+ [m
+[31m-  const postIds = data.map((p) => p.id)[m
+[31m-  const [{ data: likes }, { data: comments }, { data: reposts }] = await Promise.all([[m
+[31m-    supabase.from('post_likes').select('post_id, user_id, created_at, users(nom_complet)').in('post_id', postIds),[m
+[31m-    supabase.from('post_comments').select('post_id').in('post_id', postIds),[m
+[31m-    supabase.from('post_reposts').select('post_id, user_id').in('post_id', postIds),[m
+[31m-  ])[m
+[32m+[m[32m  const [{ data: likes }, { data: comments }, { data: reposts }] = postIds.length[m
+[32m+[m[32m    ? await Promise.all([[m
+[32m+[m[32m        supabase.from('post_likes').select('post_id, user_id, created_at, users(nom_complet)').in('post_id', postIds),[m
+[32m+[m[32m        supabase.from('post_comments').select('post_id').in('post_id', postIds),[m
+[32m+[m[32m        supabase.from('post_reposts').select('post_id, user_id').in('post_id', postIds),[m
+[32m+[m[32m      ])[m
+[32m+[m[32m    : [{ data: [] }, { data: [] }, { data: [] }][m
+ [m
+[31m-  // supabase .in('id', orderedIds) ne garantit pas l'ordre de retour -- on[m
+[31m-  // remet les posts dans l'ordre exact décidé par get_feed_post_ids.[m
+[31m-  const byId = new Map(data.map((p) => [p.id, p]))[m
+[32m+[m[32m  // .in('id', ids) ne garantit pas l'ordre de retour -- on remet chaque item[m
+[32m+[m[32m  // dans l'ordre exact décidé par get_feed_items, tous types confondus.[m
+[32m+[m[32m  const postById = new Map((data || []).map((p) => [p.id, p]))[m
+[32m+[m[32m  const offerById = new Map((offersResult.data || []).map((o) => [o.id, o]))[m
+ [m
+[31m-  const posts = orderedIds[m
+[31m-    .map((id) => byId.get(id))[m
+[31m-    .filter(Boolean)[m
+[31m-    .map((p) => {[m
+[32m+[m[32m  const posts = ordered[m
+[32m+[m[32m    .map((o) => {[m
+[32m+[m[32m      if (o.item_type === 'offre') {[m
+[32m+[m[32m        const offer = offerById.get(o.item_id)[m
+[32m+[m[32m        if (!offer) return null[m
+[32m+[m[32m        return { item_type: 'offre', ...offer }[m
+[32m+[m[32m      }[m
+[32m+[m[32m      const p = postById.get(o.item_id)[m
+[32m+[m[32m      if (!p) return null[m
+       const postLikes = likes?.filter((l) => l.post_id === p.id) || [][m
+       const postReposts = reposts?.filter((r) => r.post_id === p.id) || [][m
+       // dernier like = created_at le plus récent, pour "Aimé par {nom} et d'autres personnes"[m
+[36m@@ -74,6 +95,7 @@[m [masync function fetchFeedPage({ userId, pageParam = 0 }) {[m
+         ? postLikes.reduce((latest, l) => (new Date(l.created_at) > new Date(latest.created_at) ? l : latest))[m
+         : null[m
+       return {[m
+[32m+[m[32m        item_type: 'post',[m
+         ...p,[m
+         like_count: postLikes.length,[m
+         liked_by_me: postLikes.some((l) => l.user_id === userId),[m
+[36m@@ -83,6 +105,7 @@[m [masync function fetchFeedPage({ userId, pageParam = 0 }) {[m
+         reposted_by_me: postReposts.some((r) => r.user_id === userId),[m
+       }[m
+     })[m
+[32m+[m[32m    .filter(Boolean)[m
+ [m
+   return { posts, nextPage: ordered.length === PAGE_SIZE ? pageParam + 1 : null }[m
+ }[m
+[36m@@ -179,6 +202,14 @@[m [mexport default function Feed() {[m
+               </span>[m
+             )}[m
+           </button>[m
+[32m+[m[32m        ) : profile?.role === 'client' ? ([m
+[32m+[m[32m          <button[m
+[32m+[m[32m            onClick={() => navigate('/publier-offre')}[m
+[32m+[m[32m            aria-label="Publier un appel d'offre"[m
+[32m+[m[32m            className="w-9 h-9 flex items-center justify-center"[m
+[32m+[m[32m          >[m
+[32m+[m[32m            <Plus size={24} />[m
+[32m+[m[32m          </button>[m
+         ) : ([m
+           <div className="w-9 h-9" />[m
+         )}[m
+[36m@@ -243,16 +274,20 @@[m [mexport default function Feed() {[m
+         </div>[m
+       ) : ([m
+         <div className="pt-0">[m
+[31m-          {posts.map((post, i) => ([m
+[31m-            <PostCard[m
+[31m-              key={post.id}[m
+[31m-              post={post}[m
+[31m-              onDeleted={handleDeleted}[m
+[31m-              priority={i < 2}[m
+[31m-              muted={feedMuted}[m
+[31m-              onToggleMute={toggleFeedMuted}[m
+[31m-            />[m
+[31m-          ))}[m
+[32m+[m[32m          {posts.map((post, i) =>[m
+[32m+[m[32m            post.item_type === 'offre' ? ([m
+[32m+[m[32m              <OfferCard key={post.id} offer={post} />[m
+[32m+[m[32m            ) : ([m
+[32m+[m[32m              <PostCard[m
+[32m+[m[32m                key={post.id}[m
+[32m+[m[32m                post={post}[m
+[32m+[m[32m                onDeleted={handleDeleted}[m
+[32m+[m[32m                priority={i < 2}[m
+[32m+[m[32m                muted={feedMuted}[m
+[32m+[m[32m                onToggleMute={toggleFeedMuted}[m
+[32m+[m[32m              />[m
+[32m+[m[32m            )[m
+[32m+[m[32m          )}[m
+           {hasNextPage && ([m
+             <div ref={observerRef} className="flex justify-center py-6">[m
+               {isFetchingNextPage && ([m

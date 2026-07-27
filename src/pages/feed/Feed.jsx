@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import NoteBar from './NoteBar'
 import PostCard from './PostCard'
+import OfferCard from './OfferCard'
 import Card from '../../components/ui/Card'
 import { Sun, Moon, MessageCircle, Plus, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -22,13 +23,14 @@ const PAGE_SIZE = 10
 async function fetchFeedPage({ userId, pageParam = 0 }) {
   const from = pageParam * PAGE_SIZE
 
-  // L'ordre du feed n'est PAS created_at brut : un repost fait remonter le post
-  // comme s'il venait d'être publié, sans jamais toucher à sa vraie date affichée.
-  // get_feed_post_ids calcule ça côté SQL (greatest(created_at, dernier repost))
-  // et pagine dessus directement -- indispensable pour que range() reste cohérent
-  // d'une page à l'autre (impossible de retrier fiablement après-coup en JS une
-  // fois que Supabase a déjà découpé les pages sur le mauvais critère de tri).
-  const { data: ordered, error: orderError } = await supabase.rpc('get_feed_post_ids', {
+  // Le feed mélange deux sources différentes (posts d'influenceurs et appels
+  // d'offre de clients), triées ENSEMBLE sur une même sort_date (repost-aware
+  // pour les posts, created_at brut pour les offres -- pas de notion de repost
+  // pour elles). get_feed_items calcule ce tri fusionné côté SQL et pagine
+  // dessus directement, pour les mêmes raisons que get_feed_post_ids
+  // auparavant : impossible de retrier fiablement après-coup en JS une fois
+  // que range() a déjà découpé les pages sur le mauvais critère.
+  const { data: ordered, error: orderError } = await supabase.rpc('get_feed_items', {
     p_limit: PAGE_SIZE,
     p_offset: from,
   })
@@ -36,37 +38,56 @@ async function fetchFeedPage({ userId, pageParam = 0 }) {
   if (orderError) console.error('Erreur tri feed:', orderError)
   if (!ordered || ordered.length === 0) return { posts: [], nextPage: null }
 
-  const orderedIds = ordered.map((o) => o.post_id)
+  const postIds = ordered.filter((o) => o.item_type === 'post').map((o) => o.item_id)
+  const offerIds = ordered.filter((o) => o.item_type === 'offre').map((o) => o.item_id)
 
-  const { data, error } = await supabase
-    .from('posts')
-    .select(`
-      id, legende, crop_format, type, created_at, commande_id, filtre,
-      post_medias(media_url, media_type, thumbnail_url, position, filtre, zoom, offset_x, offset_y, natural_width, natural_height),
-      profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
-      client:client_id(id, nom_complet, photo_url),
-      commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)
-    `)
-    .in('id', orderedIds)
-
-  if (error) console.error('Erreur chargement feed:', error)
-  if (!data || data.length === 0) return { posts: [], nextPage: null }
-
-  const postIds = data.map((p) => p.id)
-  const [{ data: likes }, { data: comments }, { data: reposts }] = await Promise.all([
-    supabase.from('post_likes').select('post_id, user_id, created_at, users(nom_complet)').in('post_id', postIds),
-    supabase.from('post_comments').select('post_id').in('post_id', postIds),
-    supabase.from('post_reposts').select('post_id, user_id').in('post_id', postIds),
+  const [postsResult, offersResult] = await Promise.all([
+    postIds.length
+      ? supabase
+          .from('posts')
+          .select(`
+            id, legende, crop_format, type, created_at, commande_id, filtre,
+            post_medias(media_url, media_type, thumbnail_url, position, filtre, zoom, offset_x, offset_y, natural_width, natural_height),
+            profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
+            client:client_id(id, nom_complet, photo_url),
+            commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)
+          `)
+          .in('id', postIds)
+      : Promise.resolve({ data: [] }),
+    offerIds.length
+      ? supabase
+          .from('appels_offre')
+          .select('id, contenu, created_at, profils_client(id, user_id, users(nom_complet, photo_url))')
+          .in('id', offerIds)
+      : Promise.resolve({ data: [] }),
   ])
 
-  // supabase .in('id', orderedIds) ne garantit pas l'ordre de retour -- on
-  // remet les posts dans l'ordre exact décidé par get_feed_post_ids.
-  const byId = new Map(data.map((p) => [p.id, p]))
+  const { data, error } = postsResult
+  if (error) console.error('Erreur chargement feed:', error)
+  if (offersResult.error) console.error('Erreur chargement appels offre:', offersResult.error)
 
-  const posts = orderedIds
-    .map((id) => byId.get(id))
-    .filter(Boolean)
-    .map((p) => {
+  const [{ data: likes }, { data: comments }, { data: reposts }] = postIds.length
+    ? await Promise.all([
+        supabase.from('post_likes').select('post_id, user_id, created_at, users(nom_complet)').in('post_id', postIds),
+        supabase.from('post_comments').select('post_id').in('post_id', postIds),
+        supabase.from('post_reposts').select('post_id, user_id').in('post_id', postIds),
+      ])
+    : [{ data: [] }, { data: [] }, { data: [] }]
+
+  // .in('id', ids) ne garantit pas l'ordre de retour -- on remet chaque item
+  // dans l'ordre exact décidé par get_feed_items, tous types confondus.
+  const postById = new Map((data || []).map((p) => [p.id, p]))
+  const offerById = new Map((offersResult.data || []).map((o) => [o.id, o]))
+
+  const posts = ordered
+    .map((o) => {
+      if (o.item_type === 'offre') {
+        const offer = offerById.get(o.item_id)
+        if (!offer) return null
+        return { item_type: 'offre', ...offer }
+      }
+      const p = postById.get(o.item_id)
+      if (!p) return null
       const postLikes = likes?.filter((l) => l.post_id === p.id) || []
       const postReposts = reposts?.filter((r) => r.post_id === p.id) || []
       // dernier like = created_at le plus récent, pour "Aimé par {nom} et d'autres personnes"
@@ -74,6 +95,7 @@ async function fetchFeedPage({ userId, pageParam = 0 }) {
         ? postLikes.reduce((latest, l) => (new Date(l.created_at) > new Date(latest.created_at) ? l : latest))
         : null
       return {
+        item_type: 'post',
         ...p,
         like_count: postLikes.length,
         liked_by_me: postLikes.some((l) => l.user_id === userId),
@@ -83,6 +105,7 @@ async function fetchFeedPage({ userId, pageParam = 0 }) {
         reposted_by_me: postReposts.some((r) => r.user_id === userId),
       }
     })
+    .filter(Boolean)
 
   return { posts, nextPage: ordered.length === PAGE_SIZE ? pageParam + 1 : null }
 }
@@ -179,6 +202,14 @@ export default function Feed() {
               </span>
             )}
           </button>
+        ) : profile?.role === 'client' ? (
+          <button
+            onClick={() => navigate('/publier-offre')}
+            aria-label="Publier un appel d'offre"
+            className="w-9 h-9 flex items-center justify-center"
+          >
+            <Plus size={24} />
+          </button>
         ) : (
           <div className="w-9 h-9" />
         )}
@@ -243,16 +274,20 @@ export default function Feed() {
         </div>
       ) : (
         <div className="pt-0">
-          {posts.map((post, i) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              onDeleted={handleDeleted}
-              priority={i < 2}
-              muted={feedMuted}
-              onToggleMute={toggleFeedMuted}
-            />
-          ))}
+          {posts.map((post, i) =>
+            post.item_type === 'offre' ? (
+              <OfferCard key={post.id} offer={post} />
+            ) : (
+              <PostCard
+                key={post.id}
+                post={post}
+                onDeleted={handleDeleted}
+                priority={i < 2}
+                muted={feedMuted}
+                onToggleMute={toggleFeedMuted}
+              />
+            )
+          )}
           {hasNextPage && (
             <div ref={observerRef} className="flex justify-center py-6">
               {isFetchingNextPage && (
