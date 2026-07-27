@@ -69,6 +69,9 @@ const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'))
 const AdminMemoryStudio = lazy(() => import('./pages/admin/souvenirs/MemoryStudio'))
 const AdminTemplateLibrary = lazy(() => import('./pages/admin/souvenirs/TemplateLibrary'))
+const AdminChoisirArrierePlan = lazy(() => import('./pages/admin/souvenirs/ChoisirArrierePlan'))
+const AdminChoisirCouleur = lazy(() => import('./pages/admin/souvenirs/ChoisirCouleur'))
+const AdminEditeurTemplateMobile = lazy(() => import('./pages/admin/souvenirs/EditeurTemplateMobile'))
 
 function RouteFallback() {
   return (
@@ -101,6 +104,9 @@ function AppRoutes() {
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="/admin/souvenirs" element={<AdminRoute><AdminMemoryStudio /></AdminRoute>} />
         <Route path="/admin/souvenirs/templates/:categorie" element={<AdminRoute><AdminTemplateLibrary /></AdminRoute>} />
+        <Route path="/admin/souvenirs/templates/:categorie/arriere-plan" element={<AdminRoute><AdminChoisirArrierePlan /></AdminRoute>} />
+        <Route path="/admin/souvenirs/templates/:categorie/couleurs" element={<AdminRoute><AdminChoisirCouleur /></AdminRoute>} />
+        <Route path="/admin/souvenirs/templates/:categorie/editeur" element={<AdminRoute><AdminEditeurTemplateMobile /></AdminRoute>} />
 
         {/* Chat pro (utilisateur <-> entreprise) : placé avant /messages/:id pour que
             "pro" ne soit jamais capturé comme un id de conversation normale. */}
