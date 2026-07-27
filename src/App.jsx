@@ -67,7 +67,7 @@ const Wallet = lazy(() => import('./pages/wallet/Wallet'))
 
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'))
-const TemplateEditor = lazy(() => import('./pages/admin/TemplateEditor'))
+const AdminMemoryStudio = lazy(() => import('./pages/admin/souvenirs/MemoryStudio'))
 
 function RouteFallback() {
   return (
@@ -98,8 +98,7 @@ function AppRoutes() {
         {/* Admin (séparé, pas de bottom nav) */}
         <Route path="/admin/connexion" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-        <Route path="/admin/templates/nouveau" element={<AdminRoute><TemplateEditor /></AdminRoute>} />
-        <Route path="/admin/templates/:templateId" element={<AdminRoute><TemplateEditor /></AdminRoute>} />
+        <Route path="/admin/souvenirs" element={<AdminRoute><AdminMemoryStudio /></AdminRoute>} />
 
         {/* Chat pro (utilisateur <-> entreprise) : placé avant /messages/:id pour que
             "pro" ne soit jamais capturé comme un id de conversation normale. */}

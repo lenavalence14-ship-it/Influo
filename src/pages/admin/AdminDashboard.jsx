@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { Users, TrendingUp, DollarSign, Percent, BadgeCheck } from 'lucide-react'
+import { Users, TrendingUp, DollarSign, Percent, BadgeCheck, Image } from 'lucide-react'
 
 const TABS = ['Statistiques', 'Utilisateurs', 'Offres', 'Paiements', 'Retraits']
 
 export default function AdminDashboard() {
+  const navigate = useNavigate()
   const [tab, setTab] = useState('Statistiques')
   const [stats, setStats] = useState(null)
   const [users, setUsers] = useState([])
@@ -80,6 +82,14 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] px-5 pt-8 pb-10">
       <h1 className="text-h1 mb-1">Administration</h1>
       <p className="text-caption mb-6">CEO Influo App</p>
+
+      <button
+        onClick={() => navigate('/admin/souvenirs')}
+        className="w-full flex items-center gap-2 justify-center rounded-2xl p-3 mb-4 glass-strong text-body-medium"
+      >
+        <Image size={16} />
+        Souvenirs
+      </button>
 
       <div className="flex gap-2 overflow-x-auto mb-6 pb-1">
         {TABS.map((t) => (
