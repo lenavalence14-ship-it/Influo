@@ -57,7 +57,7 @@ async function fetchFeedPage({ userId, pageParam = 0 }) {
     offerIds.length
       ? supabase
           .from('appels_offre')
-          .select('id, contenu, created_at, profils_client(id, user_id, users(nom_complet, photo_url))')
+          .select('id, contenu, couleur, created_at, profils_client(id, user_id, users(nom_complet, photo_url))')
           .in('id', offerIds)
       : Promise.resolve({ data: [] }),
   ])

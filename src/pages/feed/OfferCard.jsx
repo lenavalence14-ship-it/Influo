@@ -6,6 +6,7 @@ import BottomSheet from '../../components/ui/BottomSheet'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { timeAgo } from '../../lib/time'
+import { getContrastTextColor } from '../../lib/offerColors'
 
 // Carte "appel d'offre" publiée par un client (profils_client), mélangée au
 // feed influenceur mais structurellement distincte d'un post (table
@@ -27,6 +28,13 @@ export default function OfferCard({ offer, onDeleted }) {
 
   const isOwner = clientProfile?.id && client?.id && clientProfile.id === client.id
 
+  // couleur choisie par le client (palette de marque), fallback sur l'accent
+  // par défaut de l'app si non renseignée. Contraste texte calculé
+  // automatiquement pour rester lisible quelle que soit la couleur choisie
+  // (var(--accent) reste toujours en blanc, comportement historique inchangé).
+  const bandColor = offer.couleur || 'var(--accent)'
+  const bandTextColor = offer.couleur ? getContrastTextColor(offer.couleur) : '#ffffff'
+
   const handleDelete = async () => {
     if (!window.confirm("Supprimer définitivement cet appel d'offre ?")) return
     setShowMenu(false)
@@ -41,10 +49,10 @@ export default function OfferCard({ offer, onDeleted }) {
     <article className="mb-3 animate-fade-in feed-native">
       <div className="feed-surface overflow-hidden">
         {/* bande du haut : nom du profil client + libellé "Appel d'offre" */}
-        <div className="flex items-center justify-between px-3 py-2" style={{ backgroundColor: 'var(--accent)' }}>
+        <div className="flex items-center justify-between px-3 py-2" style={{ backgroundColor: bandColor }}>
           <Link to={client?.user_id ? `/entreprise/${client.user_id}` : '#'} className="flex items-center gap-2 min-w-0">
             <Avatar src={client?.users?.photo_url} seed={client?.id} size="sm" />
-            <span className="text-[13px] leading-[16px] font-medium text-white truncate">
+            <span className="text-[13px] leading-[16px] font-medium truncate" style={{ color: bandTextColor }}>
               {client?.users?.nom_complet}
             </span>
           </Link>
@@ -53,12 +61,13 @@ export default function OfferCard({ offer, onDeleted }) {
               <button
                 onClick={() => setShowMenu(true)}
                 aria-label="Options"
-                className="w-7 h-7 flex items-center justify-center text-white"
+                className="w-7 h-7 flex items-center justify-center"
+                style={{ color: bandTextColor }}
               >
                 <MoreHorizontal size={18} />
               </button>
             )}
-            <span className="text-[13px] leading-[16px] font-medium text-white">Appel d'offre</span>
+            <span className="text-[13px] leading-[16px] font-medium" style={{ color: bandTextColor }}>Appel d'offre</span>
           </div>
         </div>
 
@@ -79,10 +88,10 @@ export default function OfferCard({ offer, onDeleted }) {
           type="button"
           disabled
           className="w-full flex items-center justify-between px-3 py-3 cursor-default"
-          style={{ backgroundColor: 'var(--accent)' }}
+          style={{ backgroundColor: bandColor, color: bandTextColor }}
         >
-          <span className="text-[14px] font-medium text-white">Postuler</span>
-          <ChevronRight size={18} className="text-white" />
+          <span className="text-[14px] font-medium">Postuler</span>
+          <ChevronRight size={18} />
         </button>
       </div>
 
