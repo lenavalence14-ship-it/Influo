@@ -1,52 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { Users, TrendingUp, DollarSign, Percent, BadgeCheck, ChevronRight } from 'lucide-react'
+import { Users, TrendingUp, DollarSign, Percent, BadgeCheck } from 'lucide-react'
 
-const TABS = ['Statistiques', 'Utilisateurs', 'Offres', 'Paiements', 'Retraits', 'Templates']
-
-// Les 30 slugs de bibliothèques de templates, extraits tels quels des
-// routes déjà utilisées par le parcours utilisateur (BonneFete.jsx,
-// DefiSouvenirs.jsx, MagazineEditorialPersonne.jsx, MagazineEditorialPourQui.jsx,
-// SouvenirEditorialPersonne.jsx, SouvenirEditorialPourQui.jsx, MemoryStudio.jsx).
-// Aucun slug inventé ici : ce sont exactement ceux vers lesquels un
-// utilisateur simple peut naviguer.
-const TEMPLATE_CATEGORIES = [
-  { slug: 'bonne-fete-nouvelle-annee', label: 'Bonne fête · Nouvelle année' },
-  { slug: 'bonne-fete-noel', label: 'Bonne fête · Noël' },
-  { slug: 'bonne-fete-saint-valentin', label: 'Bonne fête · St Valentin' },
-  { slug: 'bonne-fete-ramadan', label: 'Bonne fête · Ramadan' },
-  { slug: 'bonne-fete-paques', label: 'Bonne fête · Pâques' },
-  { slug: 'bonne-fete-peres', label: 'Bonne fête · Fête des pères' },
-  { slug: 'bonne-fete-meres', label: 'Bonne fête · Fête des mères' },
-  { slug: 'defi-un-mois', label: 'Défi souvenirs · Un mois' },
-  { slug: 'defi-un-an', label: 'Défi souvenirs · Un an' },
-  { slug: 'magazine-editorial-moi', label: 'Magazine éditorial · Moi' },
-  { slug: 'magazine-editorial-ami', label: 'Magazine éditorial · Un ami' },
-  { slug: 'magazine-editorial-meilleur-ami', label: 'Magazine éditorial · Meilleur ami' },
-  { slug: 'magazine-editorial-mentor', label: 'Magazine éditorial · Un mentor' },
-  { slug: 'magazine-editorial-famille', label: 'Magazine éditorial · Famille' },
-  { slug: 'magazine-editorial-collegue', label: 'Magazine éditorial · Collègue' },
-  { slug: 'magazine-editorial-inspire', label: 'Magazine éditorial · Personne qui inspire' },
-  { slug: 'magazine-editorial-petit-ami', label: 'Magazine éditorial · Petit ami' },
-  { slug: 'magazine-editorial-petite-amie', label: 'Magazine éditorial · Petite amie' },
-  { slug: 'magazine-editorial-groupe', label: 'Magazine éditorial · Groupe' },
-  { slug: 'souvenir-editorial-moi', label: 'Souvenir éditorial · Moi' },
-  { slug: 'souvenir-editorial-ami', label: 'Souvenir éditorial · Un ami' },
-  { slug: 'souvenir-editorial-meilleur-ami', label: 'Souvenir éditorial · Meilleur ami' },
-  { slug: 'souvenir-editorial-mentor', label: 'Souvenir éditorial · Un mentor' },
-  { slug: 'souvenir-editorial-famille', label: 'Souvenir éditorial · Famille' },
-  { slug: 'souvenir-editorial-collegue', label: 'Souvenir éditorial · Collègue' },
-  { slug: 'souvenir-editorial-inspire', label: 'Souvenir éditorial · Personne qui inspire' },
-  { slug: 'souvenir-editorial-petit-ami', label: 'Souvenir éditorial · Petit ami' },
-  { slug: 'souvenir-editorial-petite-amie', label: 'Souvenir éditorial · Petite amie' },
-  { slug: 'souvenir-editorial-groupe', label: 'Souvenir éditorial · Groupe' },
-  { slug: 'anniversaire', label: 'Anniversaire' },
-  { slug: 'feliciter', label: 'Féliciter' },
-]
+const TABS = ['Statistiques', 'Utilisateurs', 'Offres', 'Paiements', 'Retraits']
 
 export default function AdminDashboard() {
-  const navigate = useNavigate()
   const [tab, setTab] = useState('Statistiques')
   const [stats, setStats] = useState(null)
   const [users, setUsers] = useState([])
@@ -220,21 +178,6 @@ export default function AdminDashboard() {
                 </select>
               </div>
             </div>
-          ))}
-        </div>
-      )}
-
-      {tab === 'Templates' && (
-        <div className="space-y-2">
-          {TEMPLATE_CATEGORIES.map((cat) => (
-            <button
-              key={cat.slug}
-              onClick={() => navigate(`/souvenirs/templates/${cat.slug}`)}
-              className="w-full glass rounded-2xl p-3 flex justify-between items-center text-body"
-            >
-              <span>{cat.label}</span>
-              <ChevronRight size={16} className="text-[var(--text-secondary)]" />
-            </button>
           ))}
         </div>
       )}

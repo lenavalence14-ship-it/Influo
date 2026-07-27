@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, MoreHorizontal, Bookmark, Heart, Plus } from 'lucide-react'
+import { ArrowLeft, MoreHorizontal, Bookmark, Heart } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import BottomSheet from '../../components/ui/BottomSheet'
@@ -53,8 +53,7 @@ function assignMasonryColumns(items) {
 export default function TemplateLibrary() {
   const { categorie } = useParams()
   const navigate = useNavigate()
-  const { user, profile } = useAuth()
-  const isAdmin = profile?.role === 'admin'
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const [tab, setTab] = useState('tout') // 'tout' | 'favoris'
   const [menuTemplateId, setMenuTemplateId] = useState(null)
@@ -94,14 +93,11 @@ export default function TemplateLibrary() {
   // a un heightRatio plus petit (paysage) pour amorcer le désalignement.
   const masonryItems = useMemo(() => {
     const base = visibleTemplates.map((t) => ({ type: 'template', id: t.id, image_url: t.image_url, heightRatio: 1 }))
-    const withFavoris = tab === 'tout'
-      ? [{ type: 'favoris-card', id: '__favoris__', heightRatio: 0.55 }, ...base]
-      : base
-    if (isAdmin && tab === 'tout') {
-      return [{ type: 'add-template-card', id: '__add_template__', heightRatio: 0.55 }, ...withFavoris]
+    if (tab === 'tout') {
+      return [{ type: 'favoris-card', id: '__favoris__', heightRatio: 0.55 }, ...base]
     }
-    return withFavoris
-  }, [visibleTemplates, tab, isAdmin])
+    return base
+  }, [visibleTemplates, tab])
 
   const columns = assignMasonryColumns(masonryItems)
 
@@ -178,15 +174,6 @@ export default function TemplateLibrary() {
                     <Bookmark size={24} />
                     <span className="text-caption font-medium">Favoris</span>
                   </button>
-                ) : item.type === 'add-template-card' ? (
-                  <button
-                    key={item.id}
-                    className="glass-strong rounded-2xl flex flex-col items-center justify-center gap-2"
-                    style={{ aspectRatio: '5 / 3', color: 'var(--text-primary)' }}
-                  >
-                    <Plus size={24} />
-                    <span className="text-caption font-medium">Ajouter un template</span>
-                  </button>
                 ) : (
                   <div key={item.id} className="relative">
                     <button
@@ -196,7 +183,6 @@ export default function TemplateLibrary() {
                     >
                       <img src={item.image_url} alt="" className="w-full h-full object-cover" />
                     </button>
-                    {!isAdmin && (
                     <button
                       onClick={() => setMenuTemplateId(item.id)}
                       aria-label="Options"
@@ -205,7 +191,6 @@ export default function TemplateLibrary() {
                     >
                       <MoreHorizontal size={16} />
                     </button>
-                    )}
                   </div>
                 )
               )}
