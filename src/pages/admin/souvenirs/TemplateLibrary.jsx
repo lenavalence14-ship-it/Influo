@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, MoreHorizontal, Bookmark, Heart } from 'lucide-react'
+import { ArrowLeft, MoreHorizontal, Bookmark, Heart, Plus } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import BottomSheet from '../../../components/ui/BottomSheet'
@@ -112,9 +112,16 @@ export default function TemplateLibrary() {
         >
           <ArrowLeft size={18} />
         </button>
-        <h1 className="text-display" style={{ color: 'var(--text-primary)', fontSize: '18px' }}>
+        <h1 className="text-display flex-1" style={{ color: 'var(--text-primary)', fontSize: '18px' }}>
           Choisissez un modèle
         </h1>
+        <button
+          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 glass text-caption shrink-0"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          <Plus size={14} />
+          Ajouter un template
+        </button>
       </header>
 
       {/* onglets Tout / Favoris, scopés à cette catégorie uniquement */}
