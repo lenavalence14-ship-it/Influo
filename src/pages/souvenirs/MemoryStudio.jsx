@@ -19,6 +19,14 @@ const MAIN_OPTIONS = [
 export default function MemoryStudio() {
   const navigate = useNavigate()
 
+  const routeFor = (to) => {
+    // Anniversaire et Féliciter n'ont aucun écran intermédiaire : ils mènent
+    // directement à la bibliothèque de templates.
+    if (to === '/souvenirs/anniversaire') return '/souvenirs/templates/anniversaire'
+    if (to === '/souvenirs/feliciter') return '/souvenirs/templates/feliciter'
+    return to
+  }
+
   return (
     <div className="min-h-screen pb-10" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <header className="flex items-center gap-3 px-4 pt-4 pb-2">
@@ -43,7 +51,7 @@ export default function MemoryStudio() {
         {MAIN_OPTIONS.map((opt) => (
           <button
             key={opt.to}
-            onClick={() => navigate(opt.to)}
+            onClick={() => navigate(routeFor(opt.to))}
             className="glass flex items-center gap-4 px-4 py-4 rounded-2xl text-left active:scale-[0.98] transition-transform duration-150"
           >
             <span

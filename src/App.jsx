@@ -35,6 +35,8 @@ const MagazineEditorialPourQui = lazy(() => import('./pages/souvenirs/MagazineEd
 const MagazineEditorialPersonne = lazy(() => import('./pages/souvenirs/MagazineEditorialPersonne'))
 const BonneFete = lazy(() => import('./pages/souvenirs/BonneFete'))
 const DefiSouvenirs = lazy(() => import('./pages/souvenirs/DefiSouvenirs'))
+const TemplateLibrary = lazy(() => import('./pages/souvenirs/TemplateLibrary'))
+const TemplatePreview = lazy(() => import('./pages/souvenirs/TemplatePreview'))
 const ReelsViewer = lazy(() => import('./pages/feed/ReelsViewer'))
 const PostDetail = lazy(() => import('./pages/feed/PostDetail'))
 
@@ -209,6 +211,8 @@ function AppRoutes() {
           <Route path="/souvenirs/magazine-editorial/personne" element={<MagazineEditorialPersonne />} />
           <Route path="/souvenirs/bonne-fete" element={<BonneFete />} />
           <Route path="/souvenirs/defi-souvenirs" element={<DefiSouvenirs />} />
+          <Route path="/souvenirs/templates/:categorie" element={<TemplateLibrary />} />
+          <Route path="/souvenirs/apercu/:templateId" element={<TemplatePreview />} />
           <Route path="/publier/:postId/modifier" element={<CreatePost />} />
           <Route path="/video" element={<ReelsViewer />} />
           <Route path="/video/:postId" element={<ReelsViewer />} />

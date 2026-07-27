@@ -9,8 +9,8 @@ export default function DefiSouvenirs() {
       subtitle="Sur quelle durée ?"
       columns={2}
       options={[
-        { emoji: 'flexedBiceps', label: 'Un mois' },
-        { emoji: 'flexedBiceps', label: 'Un an' },
+        { emoji: 'flexedBiceps', label: 'Un mois', to: '/souvenirs/templates/defi-un-mois' },
+        { emoji: 'flexedBiceps', label: 'Un an', to: '/souvenirs/templates/defi-un-an' },
       ]}
     />
   )

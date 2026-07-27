@@ -11,7 +11,7 @@ export default function SouvenirEditorialPourQui() {
       columns={2}
       options={[
         { emoji: 'man', label: 'Une personne', to: '/souvenirs/souvenir-editorial/personne' },
-        { emojiCluster: ['man', 'woman'], label: 'Un groupe de personnes' },
+        { emojiCluster: ['man', 'woman'], label: 'Un groupe de personnes', to: '/souvenirs/templates/souvenir-editorial-groupe' },
       ]}
     />
   )

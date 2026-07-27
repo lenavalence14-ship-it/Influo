@@ -10,7 +10,7 @@ export default function MagazineEditorialPourQui() {
       columns={2}
       options={[
         { emoji: 'man', label: 'Une personne', to: '/souvenirs/magazine-editorial/personne' },
-        { emojiCluster: ['man', 'woman'], label: 'Un groupe de personnes' },
+        { emojiCluster: ['man', 'woman'], label: 'Un groupe de personnes', to: '/souvenirs/templates/magazine-editorial-groupe' },
       ]}
     />
   )
