@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { Users, TrendingUp, DollarSign, Percent, BadgeCheck } from 'lucide-react'
+import { Users, TrendingUp, DollarSign, Percent, BadgeCheck, Plus, LayoutTemplate } from 'lucide-react'
 
-const TABS = ['Statistiques', 'Utilisateurs', 'Offres', 'Paiements', 'Retraits']
+const TABS = ['Statistiques', 'Utilisateurs', 'Offres', 'Paiements', 'Retraits', 'Templates']
 
 export default function AdminDashboard() {
+  const navigate = useNavigate()
   const [tab, setTab] = useState('Statistiques')
   const [stats, setStats] = useState(null)
   const [users, setUsers] = useState([])
   const [offres, setOffres] = useState([])
   const [paiements, setPaiements] = useState([])
   const [retraits, setRetraits] = useState([])
+  const [templates, setTemplates] = useState([])
 
   useEffect(() => {
     const loadStats = async () => {
@@ -54,6 +57,9 @@ export default function AdminDashboard() {
       } else if (tab === 'Retraits') {
         const { data } = await supabase.from('retraits').select('*, profils_influenceur(users(nom_complet))').order('created_at', { ascending: false })
         setRetraits(data || [])
+      } else if (tab === 'Templates') {
+        const { data } = await supabase.from('templates').select('*').order('categorie').order('ordre')
+        setTemplates(data || [])
       }
     }
     loadTabData()
@@ -176,6 +182,55 @@ export default function AdminDashboard() {
                   <option value="traite" className="bg-[var(--bg-elevated)]">traité</option>
                   <option value="echoue" className="bg-[var(--bg-elevated)]">échoué</option>
                 </select>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'Templates' && (
+        <div>
+          <button
+            onClick={() => navigate('/admin/templates/nouveau')}
+            className="w-full flex items-center justify-center gap-2 rounded-2xl p-4 mb-4 glass-strong text-body-medium"
+          >
+            <Plus size={16} />
+            Ajouter un template
+          </button>
+
+          {templates.length === 0 && (
+            <p className="text-caption text-center py-8" style={{ color: 'var(--text-secondary)' }}>
+              Aucun template pour l'instant.
+            </p>
+          )}
+
+          {Object.entries(
+            templates.reduce((acc, t) => {
+              acc[t.categorie] = acc[t.categorie] || []
+              acc[t.categorie].push(t)
+              return acc
+            }, {})
+          ).map(([categorie, items]) => (
+            <div key={categorie} className="mb-5">
+              <p className="text-caption mb-2 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                <LayoutTemplate size={13} /> {categorie}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {items.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => navigate(`/admin/templates/${t.id}`)}
+                    className="aspect-[4/5] rounded-xl overflow-hidden glass"
+                  >
+                    {t.image_url ? (
+                      <img src={t.image_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <LayoutTemplate size={20} style={{ color: 'var(--text-secondary)' }} />
+                      </div>
+                    )}
+                  </button>
+                ))}
               </div>
             </div>
           ))}
