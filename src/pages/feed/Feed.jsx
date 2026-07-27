@@ -276,7 +276,7 @@ export default function Feed() {
         <div className="pt-0">
           {posts.map((post, i) =>
             post.item_type === 'offre' ? (
-              <OfferCard key={post.id} offer={post} />
+              <OfferCard key={post.id} offer={post} onDeleted={handleDeleted} />
             ) : (
               <PostCard
                 key={post.id}

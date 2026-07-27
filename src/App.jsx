@@ -194,6 +194,7 @@ function AppRoutes() {
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/publier" element={<CreatePost />} />
           <Route path="/publier-offre" element={<PublierOffre />} />
+          <Route path="/publier-offre/:offerId/modifier" element={<PublierOffre />} />
           <Route path="/publier/:postId/modifier" element={<CreatePost />} />
           <Route path="/video" element={<ReelsViewer />} />
           <Route path="/video/:postId" element={<ReelsViewer />} />
