@@ -49,7 +49,7 @@ export default function OfferCard({ offer, onDeleted }) {
     <article className="mb-3 animate-fade-in feed-native">
       <div className="feed-surface overflow-hidden">
         {/* bande du haut : nom du profil client + libellé "Appel d'offre" */}
-        <div className="flex items-center justify-between px-3 py-2" style={{ backgroundColor: bandColor }}>
+        <div className="flex items-center justify-between px-3 py-1.5" style={{ backgroundColor: bandColor }}>
           <Link to={client?.user_id ? `/entreprise/${client.user_id}` : '#'} className="flex items-center gap-2 min-w-0">
             <Avatar src={client?.users?.photo_url} seed={client?.id} size="sm" />
             <span className="text-[13px] leading-[16px] font-medium truncate" style={{ color: bandTextColor }}>
@@ -87,7 +87,7 @@ export default function OfferCard({ offer, onDeleted }) {
         <button
           type="button"
           disabled
-          className="w-full flex items-center justify-between px-3 py-3 cursor-default"
+          className="w-full flex items-center justify-between px-3 py-2 cursor-default"
           style={{ backgroundColor: bandColor, color: bandTextColor }}
         >
           <span className="text-[14px] font-medium">Postuler</span>
