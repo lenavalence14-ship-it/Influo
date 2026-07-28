@@ -267,7 +267,7 @@ export default function EditeurTemplateMobile() {
       const [t1, t2] = e.touches
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
       const facteur = dist / state.startDist
-      const newScale = Math.max(1, Math.min(5, state.origScale * facteur))
+      const newScale = Math.max(0.1, Math.min(5, state.origScale * facteur))
       updateBloc(state.id, { imgScale: newScale })
     } else {
       const point = e.touches ? e.touches[0] : e
@@ -530,7 +530,8 @@ function BlocRendu({ bloc, selected, editionImage, onSelect, onEntrerEditionImag
             style={{
               backgroundColor: bloc.imageType === 'couleur' ? bloc.imageValeur : undefined,
               backgroundImage: bloc.imageType === 'photo' ? `url(${bloc.imageValeur})` : undefined,
-              backgroundSize: '100% 100%',
+              backgroundSize: 'contain',
+              backgroundRepeat: 'no-repeat',
               backgroundPosition: 'center',
               transform: `translate(${bloc.imgOffsetX}%, ${bloc.imgOffsetY}%) scaleX(${(bloc.rotationFlipH ? -1 : 1) * bloc.imgScale}) scaleY(${(bloc.rotationFlipV ? -1 : 1) * bloc.imgScale})`,
             }}
@@ -817,7 +818,7 @@ function PanneauPosition({ bloc, onChange, onRetour }) {
 
   const zoomerImage = (delta) => {
     if (bloc.type !== 'photo') return
-    onChange({ imgScale: Math.max(1, Math.min(5, bloc.imgScale + delta)) })
+    onChange({ imgScale: Math.max(0.1, Math.min(5, bloc.imgScale + delta)) })
   }
 
   return (
