@@ -56,6 +56,56 @@ function fontCss(nomPolice) {
   return mapped ? `'${mapped}', cursive, sans-serif` : 'inherit'
 }
 
+// ---------------------------------------------------------------------
+// Suppression d'arrière-plan par couleur (chroma key simple, sans IA).
+// Rend transparent tout pixel dont la couleur est proche de `cible`
+// (distance euclidienne RGB <= tolerance). Retourne un blob PNG.
+// ---------------------------------------------------------------------
+async function supprimerCouleurImage(fichierOuUrl, cible, tolerance) {
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  await new Promise((resolve, reject) => {
+    img.onload = resolve
+    img.onerror = reject
+    img.src = typeof fichierOuUrl === 'string' ? fichierOuUrl : URL.createObjectURL(fichierOuUrl)
+  })
+
+  const canvas = document.createElement('canvas')
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(img, 0, 0)
+
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const d = imgData.data
+  const [cr, cg, cb] = cible
+  const tol2 = tolerance * tolerance
+
+  for (let i = 0; i < d.length; i += 4) {
+    const dr = d[i] - cr, dg = d[i + 1] - cg, db = d[i + 2] - cb
+    const dist2 = dr * dr + dg * dg + db * db
+    if (dist2 <= tol2) d[i + 3] = 0 // transparent
+  }
+  ctx.putImageData(imgData, 0, 0)
+
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+}
+
+// Lit la couleur d'un pixel de l'image affichée au point (xPct, yPct) en %.
+function lireCouleurPixel(imgEl, xPct, yPct) {
+  const canvas = document.createElement('canvas')
+  canvas.width = imgEl.naturalWidth
+  canvas.height = imgEl.naturalHeight
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(imgEl, 0, 0)
+  const x = Math.round((xPct / 100) * canvas.width)
+  const y = Math.round((yPct / 100) * canvas.height)
+  const [r, g, b] = ctx.getImageData(x, y, 1, 1).data
+  return [r, g, b]
+}
+
+
+
 let idCounter = 1
 const nextId = () => `bloc_${idCounter++}`
 
@@ -76,6 +126,31 @@ function nouveauBlocTexte() {
   }
 }
 
+// ---------------------------------------------------------------------
+// Masques de découpe pour les blocs photo, définis en coordonnées SVG
+// relatives (0 à 1, clipPathUnits="objectBoundingBox") pour s'adapter à
+// n'importe quelle taille de bloc sans recalcul JS.
+// ---------------------------------------------------------------------
+const MASQUES_SVG = {
+  rectangle: null, // pas de clip-path, rectangle natif du bloc
+  cercle: <circle cx="0.5" cy="0.5" r="0.5" />,
+  coeur: (
+    <path d="M 0.5 0.88 C 0.2 0.65, 0.02 0.45, 0.02 0.28 C 0.02 0.12, 0.15 0.02, 0.3 0.02
+             C 0.4 0.02, 0.47 0.08, 0.5 0.16 C 0.53 0.08, 0.6 0.02, 0.7 0.02
+             C 0.85 0.02, 0.98 0.12, 0.98 0.28 C 0.98 0.45, 0.8 0.65, 0.5 0.88 Z" />
+  ),
+  etoile: (
+    <polygon points="0.50,0.02 0.61,0.36 0.98,0.36 0.68,0.57 0.79,0.91 0.50,0.70 0.21,0.91 0.32,0.57 0.02,0.36 0.39,0.36" />
+  ),
+}
+
+const OPTIONS_MASQUE = [
+  { valeur: 'rectangle', label: 'Rectangle' },
+  { valeur: 'cercle', label: 'Cercle' },
+  { valeur: 'coeur', label: 'Cœur' },
+  { valeur: 'etoile', label: 'Étoile' },
+]
+
 function nouveauBlocPhoto(fondType, fondValeur) {
   return {
     id: nextId(),
@@ -94,6 +169,7 @@ function nouveauBlocPhoto(fondType, fondValeur) {
     imgScaleY: 1,
     imgOffsetX: 0,
     imgOffsetY: 0,
+    masque: 'rectangle', // 'rectangle' | 'cercle' | 'coeur' | 'etoile'
   }
 }
 
@@ -148,18 +224,33 @@ export default function EditeurTemplateMobile() {
     setPanneau('photo_source')
   }
 
+  const [fichierEnAttente, setFichierEnAttente] = useState(null) // { file, previewUrl }
+
   const handleFichierChoisi = async (e) => {
     const fichier = e.target.files?.[0]
     if (!fichier) return
+    const previewUrl = URL.createObjectURL(fichier)
+    setFichierEnAttente({ file: fichier, previewUrl })
+    setPanneau('detourage')
+    e.target.value = '' // permet de re-choisir le même fichier plus tard
+  }
+
+  // Appelé depuis PanneauDetourage une fois l'utilisateur satisfait (ou "passer")
+  const finaliserImportImage = async (blob) => {
+    if (!fichierEnAttente) return
     try {
-      const chemin = `${categorie}/bloc_${Date.now()}_${fichier.name}`
-      const { error } = await supabase.storage.from('templates').upload(chemin, fichier, { upsert: true, contentType: fichier.type })
+      const contentType = blob ? 'image/png' : fichierEnAttente.file.type
+      const nomFichier = blob ? `bloc_${Date.now()}.png` : `bloc_${Date.now()}_${fichierEnAttente.file.name}`
+      const chemin = `${categorie}/${nomFichier}`
+      const donnees = blob || fichierEnAttente.file
+      const { error } = await supabase.storage.from('templates').upload(chemin, donnees, { upsert: true, contentType })
       if (error) throw error
       const { data: pub } = supabase.storage.from('templates').getPublicUrl(chemin)
       const bloc = nouveauBlocPhoto('photo', pub.publicUrl)
       setBlocs((bs) => [...bs, bloc])
       setSelectedId(bloc.id)
       setPanneau('photo')
+      setFichierEnAttente(null)
     } catch (err) {
       console.error('Erreur upload image de bloc', err)
       alert("Erreur lors de l'import de l'image.")
@@ -479,6 +570,15 @@ export default function EditeurTemplateMobile() {
           />
         )}
 
+        {panneau === 'detourage' && fichierEnAttente && (
+          <PanneauDetourage
+            fichierEnAttente={fichierEnAttente}
+            onValider={(blob) => finaliserImportImage(blob)}
+            onPasser={() => finaliserImportImage(null)}
+            onRetour={() => { setFichierEnAttente(null); fermerPanneau() }}
+          />
+        )}
+
         {panneau === 'texte' && selected && (
           <PanneauTexte
             bloc={selected}
@@ -575,7 +675,20 @@ function BlocRendu({ bloc, selected, editionImage, onSelect, onEntrerEditionImag
       )}
 
       {bloc.type === 'photo' && (
-        <div className="w-full h-full overflow-hidden relative" style={{ opacity: bloc.opacite }}>
+        <div
+          className="w-full h-full overflow-hidden relative"
+          style={{
+            opacity: bloc.opacite,
+            clipPath: (bloc.masque ?? 'rectangle') !== 'rectangle' ? `url(#masque-${bloc.id})` : undefined,
+          }}
+        >
+          {(bloc.masque ?? 'rectangle') !== 'rectangle' && (
+            <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+              <clipPath id={`masque-${bloc.id}`} clipPathUnits="objectBoundingBox">
+                {MASQUES_SVG[bloc.masque]}
+              </clipPath>
+            </svg>
+          )}
           <div
             className="absolute inset-0"
             style={{
@@ -839,9 +952,42 @@ function PanneauPhoto({ bloc, onChange, onRetour, onSupprimer, onDupliquer, onOu
         <ToolButton icon={Copy} label="Cloner" onClick={onDupliquer} />
         <ToolButton icon={FlipHorizontal} label="Retourner" onClick={() => onChange({ rotationFlipH: !bloc.rotationFlipH })} />
         <ToolButton icon={FlipVertical} label="Retourner" onClick={() => onChange({ rotationFlipV: !bloc.rotationFlipV })} />
+        <FormeButton bloc={bloc} onChange={onChange} />
         <ToolButton icon={X} label="Supprimer" onClick={onSupprimer} />
       </div>
     </BarreAvecRetour>
+  )
+}
+
+function FormeButton({ bloc, onChange }) {
+  const [ouvert, setOuvert] = useState(false)
+  return (
+    <div className="relative">
+      <ToolButton icon={Shapes} label="Forme" onClick={() => setOuvert((v) => !v)} />
+      {ouvert && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 glass rounded-lg p-2 z-20 flex gap-2">
+          {OPTIONS_MASQUE.map((opt) => (
+            <button
+              key={opt.valeur}
+              onClick={() => { onChange({ masque: opt.valeur }); setOuvert(false) }}
+              className="flex flex-col items-center gap-1 p-1 rounded-lg"
+              style={{ backgroundColor: bloc.masque === opt.valeur ? 'var(--accent)' : 'transparent' }}
+            >
+              <svg width="28" height="28" viewBox="0 0 1 1" style={{ color: bloc.masque === opt.valeur ? '#fff' : 'var(--text-primary)' }}>
+                {opt.valeur === 'rectangle' ? (
+                  <rect x="0.05" y="0.05" width="0.9" height="0.9" fill="currentColor" />
+                ) : (
+                  <g fill="currentColor">{MASQUES_SVG[opt.valeur]}</g>
+                )}
+              </svg>
+              <span className="text-caption" style={{ fontSize: '10px', color: bloc.masque === opt.valeur ? '#fff' : 'var(--text-secondary)' }}>
+                {opt.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -871,6 +1017,119 @@ function OpaciteButton({ bloc, onChange }) {
 // cadre fixe (même valeur imgScale que le pincer sur le canvas) -- le
 // bloc/cadre lui-même ne change jamais de taille ici.
 // =======================================================================
+// =======================================================================
+// Panneau : détourage (suppression de couleur d'arrière-plan, sans IA).
+// L'utilisateur touche l'image pour choisir la couleur à rendre
+// transparente, ajuste la tolérance, prévisualise, puis valide ou passe.
+// =======================================================================
+function PanneauDetourage({ fichierEnAttente, onValider, onPasser, onRetour }) {
+  const imgRef = useRef(null)
+  const [couleurCible, setCouleurCible] = useState(null) // [r,g,b]
+  const [tolerance, setTolerance] = useState(30)
+  const [previewUrl, setPreviewUrl] = useState(null)
+  const [traitement, setTraitement] = useState(false)
+
+  const genererApercu = async (cible, tol) => {
+    if (!cible) return
+    setTraitement(true)
+    try {
+      const blob = await supprimerCouleurImage(fichierEnAttente.file, cible, tol)
+      setPreviewUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(blob) })
+    } finally {
+      setTraitement(false)
+    }
+  }
+
+  const gererClicImage = (e) => {
+    const img = imgRef.current
+    if (!img) return
+    const rect = img.getBoundingClientRect()
+    const xPct = ((e.clientX - rect.left) / rect.width) * 100
+    const yPct = ((e.clientY - rect.top) / rect.height) * 100
+    const cible = lireCouleurPixel(img, xPct, yPct)
+    setCouleurCible(cible)
+    genererApercu(cible, tolerance)
+  }
+
+  const changerTolerance = (val) => {
+    setTolerance(val)
+    if (couleurCible) genererApercu(couleurCible, val)
+  }
+
+  const validerAvecDetourage = async () => {
+    if (!couleurCible) { onValider(null); return }
+    const blob = await supprimerCouleurImage(fichierEnAttente.file, couleurCible, tolerance)
+    onValider(blob)
+  }
+
+  return (
+    <BarreAvecRetour titre="Enlever l'arrière-plan" onRetour={onRetour}>
+      <div className="px-4 py-3 flex flex-col items-center gap-3">
+        <p className="text-caption text-center" style={{ color: 'var(--text-secondary)' }}>
+          Touche une couleur sur l'image pour la rendre transparente
+        </p>
+
+        <div className="relative w-full max-w-xs" style={{ aspectRatio: '1' }}>
+          <img
+            ref={imgRef}
+            src={previewUrl || fichierEnAttente.previewUrl}
+            onClick={gererClicImage}
+            className="w-full h-full object-contain cursor-crosshair"
+            style={{
+              backgroundImage: 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%)',
+              backgroundSize: '16px 16px',
+            }}
+            alt="Aperçu à détourer"
+          />
+          {traitement && (
+            <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.5)' }}>
+              <span className="text-caption">Traitement…</span>
+            </div>
+          )}
+        </div>
+
+        {couleurCible && (
+          <div className="w-full max-w-xs flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-caption" style={{ color: 'var(--text-secondary)' }}>Couleur choisie</span>
+              <span
+                className="w-5 h-5 rounded-full border"
+                style={{ backgroundColor: `rgb(${couleurCible[0]},${couleurCible[1]},${couleurCible[2]})` }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-caption w-16" style={{ color: 'var(--text-secondary)' }}>Tolérance</span>
+              <input
+                type="range" min="0" max="150" value={tolerance}
+                onChange={(e) => changerTolerance(Number(e.target.value))}
+                className="flex-1"
+              />
+              <span className="text-caption w-8 text-right">{tolerance}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3 w-full max-w-xs pt-2">
+          <button
+            onClick={onPasser}
+            className="flex-1 glass rounded-lg py-2 text-body-medium"
+          >
+            Passer
+          </button>
+          <button
+            onClick={validerAvecDetourage}
+            disabled={!couleurCible || traitement}
+            className="flex-1 rounded-lg py-2 text-body-medium text-white"
+            style={{ backgroundColor: 'var(--accent)', opacity: !couleurCible || traitement ? 0.5 : 1 }}
+          >
+            Valider
+          </button>
+        </div>
+      </div>
+    </BarreAvecRetour>
+  )
+}
+
 function PanneauPosition({ bloc, onChange, onRetour }) {
   const [etape, setEtape] = useState(10)
   const [onglet, setOnglet] = useState('manuel')
