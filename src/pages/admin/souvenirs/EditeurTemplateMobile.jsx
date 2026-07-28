@@ -86,10 +86,12 @@ function nouveauBlocPhoto(fondType, fondValeur) {
     opacite: 1,
     rotationFlipH: false,
     rotationFlipV: false,
-    // l'image vit dans un cadre fixe (le bloc) : imgScale zoome l'image à
-    // l'intérieur, imgOffsetX/Y la déplace (en % de la largeur/hauteur du
-    // bloc). scale=1 = l'image "cover" tient exactement dans le cadre.
-    imgScale: 1,
+    // l'image vit dans un cadre fixe (le bloc) : imgScaleX/Y zooment l'image
+    // indépendamment sur chaque axe à l'intérieur, imgOffsetX/Y la déplace
+    // (en % de la largeur/hauteur du bloc). scale=1 = l'image tient dans le
+    // cadre sur cet axe (avec background-size: contain comme base).
+    imgScaleX: 1,
+    imgScaleY: 1,
     imgOffsetX: 0,
     imgOffsetY: 0,
   }
@@ -234,7 +236,7 @@ export default function EditeurTemplateMobile() {
       // début pincer : on mémorise la distance entre les 2 doigts et le scale de départ
       const [t1, t2] = e.touches
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
-      imgDragState.current = { id: bloc.id, mode: 'pinch', startDist: dist, origScale: bloc.imgScale }
+      imgDragState.current = { id: bloc.id, mode: 'pinch', startDist: dist, origScaleX: bloc.imgScaleX, origScaleY: bloc.imgScaleY }
     } else {
       const point = e.touches ? e.touches[0] : e
       imgDragState.current = {
@@ -258,7 +260,7 @@ export default function EditeurTemplateMobile() {
       const [t1, t2] = e.touches
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
       const bloc = blocs.find((b) => b.id === state.id)
-      imgDragState.current = { id: state.id, mode: 'pinch', startDist: dist, origScale: bloc.imgScale }
+      imgDragState.current = { id: state.id, mode: 'pinch', startDist: dist, origScaleX: bloc.imgScaleX, origScaleY: bloc.imgScaleY }
       return
     }
 
@@ -267,8 +269,9 @@ export default function EditeurTemplateMobile() {
       const [t1, t2] = e.touches
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
       const facteur = dist / state.startDist
-      const newScale = Math.max(0.1, Math.min(5, state.origScale * facteur))
-      updateBloc(state.id, { imgScale: newScale })
+      const newScaleX = Math.max(0.1, Math.min(5, state.origScaleX * facteur))
+      const newScaleY = Math.max(0.1, Math.min(5, state.origScaleY * facteur))
+      updateBloc(state.id, { imgScaleX: newScaleX, imgScaleY: newScaleY })
     } else {
       const point = e.touches ? e.touches[0] : e
       const dxPct = ((point.clientX - state.startX) / state.blocWpx) * 100
@@ -533,7 +536,7 @@ function BlocRendu({ bloc, selected, editionImage, onSelect, onEntrerEditionImag
               backgroundSize: 'contain',
               backgroundRepeat: 'no-repeat',
               backgroundPosition: 'center',
-              transform: `translate(${bloc.imgOffsetX}%, ${bloc.imgOffsetY}%) scaleX(${(bloc.rotationFlipH ? -1 : 1) * bloc.imgScale}) scaleY(${(bloc.rotationFlipV ? -1 : 1) * bloc.imgScale})`,
+              transform: `translate(${bloc.imgOffsetX}%, ${bloc.imgOffsetY}%) scaleX(${(bloc.rotationFlipH ? -1 : 1) * (bloc.imgScaleX ?? 1)}) scaleY(${(bloc.rotationFlipV ? -1 : 1) * (bloc.imgScaleY ?? 1)})`,
             }}
           />
         </div>
@@ -816,9 +819,14 @@ function PanneauPosition({ bloc, onChange, onRetour }) {
     })
   }
 
-  const zoomerImage = (delta) => {
+  const zoomerImageX = (delta) => {
     if (bloc.type !== 'photo') return
-    onChange({ imgScale: Math.max(0.1, Math.min(5, bloc.imgScale + delta)) })
+    onChange({ imgScaleX: Math.max(0.1, Math.min(5, bloc.imgScaleX + delta)) })
+  }
+
+  const zoomerImageY = (delta) => {
+    if (bloc.type !== 'photo') return
+    onChange({ imgScaleY: Math.max(0.1, Math.min(5, bloc.imgScaleY + delta)) })
   }
 
   return (
@@ -860,11 +868,19 @@ function PanneauPosition({ bloc, onChange, onRetour }) {
         )}
 
         {onglet === 'relatif' && (
-          <div className="flex items-center justify-center gap-4 py-4">
-            <span className="text-caption" style={{ color: 'var(--text-secondary)' }}>Zoom image</span>
-            <button onClick={() => zoomerImage(-0.2)} className="w-10 h-10 rounded-full glass flex items-center justify-center"><Minus size={18} /></button>
-            <span className="text-body-medium w-14 text-center">{Math.round(bloc.imgScale * 100)}%</span>
-            <button onClick={() => zoomerImage(0.2)} className="w-10 h-10 rounded-full glass flex items-center justify-center"><Plus size={18} /></button>
+          <div className="flex flex-col items-center gap-3 py-4">
+            <div className="flex items-center justify-center gap-4">
+              <span className="text-caption w-24 text-right" style={{ color: 'var(--text-secondary)' }}>Zoom horizontal</span>
+              <button onClick={() => zoomerImageX(-0.2)} className="w-10 h-10 rounded-full glass flex items-center justify-center"><Minus size={18} /></button>
+              <span className="text-body-medium w-14 text-center">{Math.round(bloc.imgScaleX * 100)}%</span>
+              <button onClick={() => zoomerImageX(0.2)} className="w-10 h-10 rounded-full glass flex items-center justify-center"><Plus size={18} /></button>
+            </div>
+            <div className="flex items-center justify-center gap-4">
+              <span className="text-caption w-24 text-right" style={{ color: 'var(--text-secondary)' }}>Zoom vertical</span>
+              <button onClick={() => zoomerImageY(-0.2)} className="w-10 h-10 rounded-full glass flex items-center justify-center"><Minus size={18} /></button>
+              <span className="text-body-medium w-14 text-center">{Math.round(bloc.imgScaleY * 100)}%</span>
+              <button onClick={() => zoomerImageY(0.2)} className="w-10 h-10 rounded-full glass flex items-center justify-center"><Plus size={18} /></button>
+            </div>
           </div>
         )}
 
