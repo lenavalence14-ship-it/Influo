@@ -59,10 +59,10 @@ export default function EditeurTemplateMobile() {
         const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
         const path = `${categorie}/${inserted.id}.png`
         const { error: errUpload } = await supabase.storage
-          .from('template-thumbnails')
+          .from('templates')
           .upload(path, blob, { upsert: true, contentType: 'image/png' })
         if (errUpload) throw errUpload
-        const { data: pub } = supabase.storage.from('template-thumbnails').getPublicUrl(path)
+        const { data: pub } = supabase.storage.from('templates').getPublicUrl(path)
         imageUrl = pub.publicUrl
       }
 

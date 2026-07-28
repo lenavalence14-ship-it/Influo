@@ -20,10 +20,10 @@ export default function ChoisirArrierePlan() {
     try {
       const chemin = `${categorie}/fond_${Date.now()}_${fichier.name}`
       const { error } = await supabase.storage
-        .from('template-thumbnails')
+        .from('templates')
         .upload(chemin, fichier, { upsert: true, contentType: fichier.type })
       if (error) throw error
-      const { data: pub } = supabase.storage.from('template-thumbnails').getPublicUrl(chemin)
+      const { data: pub } = supabase.storage.from('templates').getPublicUrl(chemin)
       navigate(`/admin/souvenirs/templates/${categorie}/editeur?fond_type=photo&fond_valeur=${encodeURIComponent(pub.publicUrl)}`)
     } catch (err) {
       console.error('Erreur upload image de fond', err)
