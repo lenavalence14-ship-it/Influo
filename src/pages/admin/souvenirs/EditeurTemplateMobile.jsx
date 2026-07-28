@@ -404,7 +404,7 @@ export default function EditeurTemplateMobile() {
   const fermerPanneau = () => { setPanneau(null) }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
+    <div className="flex flex-col" style={{ backgroundColor: 'var(--bg-primary)', height: '100dvh' }}>
       <header
         className="flex items-center justify-between px-4 shrink-0"
         style={{ backgroundColor: 'var(--accent)', height: '64px', color: '#fff' }}
