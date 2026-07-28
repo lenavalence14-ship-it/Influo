@@ -21,6 +21,7 @@ export default function ValidationBlocsEditables() {
   const etat = location.state || {}
   const fondType = etat.fondType
   const fondValeur = etat.fondValeur
+  const templateId = etat.templateId // présent = on modifie un template existant (update), sinon création (insert)
 
   // Par défaut aucun bloc n'est éditable : l'admin doit choisir
   // explicitement ce que l'utilisateur pourra changer.
@@ -54,23 +55,42 @@ export default function ValidationBlocsEditables() {
   const handleValider = async () => {
     setSaving(true)
     try {
-      const { data: existants, error: errOrdre } = await supabase
-        .from('templates').select('ordre').eq('categorie', categorie)
-        .order('ordre', { ascending: false }).limit(1)
-      if (errOrdre) throw errOrdre
-      const prochainOrdre = (existants?.[0]?.ordre ?? -1) + 1
+      let templateRowId = templateId
 
-      const { data: inserted, error: errInsert } = await supabase
-        .from('templates')
-        .insert({
-          categorie,
-          ordre: prochainOrdre,
-          background_type: fondType,
-          background_valeur: fondValeur,
-          blocs, // inclut le flag editable par bloc
-        })
-        .select('id').single()
-      if (errInsert) throw errInsert
+      if (!templateRowId) {
+        // Mode création : nouveau template, on lui attribue le prochain ordre
+        // de la catégorie.
+        const { data: existants, error: errOrdre } = await supabase
+          .from('templates').select('ordre').eq('categorie', categorie)
+          .order('ordre', { ascending: false }).limit(1)
+        if (errOrdre) throw errOrdre
+        const prochainOrdre = (existants?.[0]?.ordre ?? -1) + 1
+
+        const { data: inserted, error: errInsert } = await supabase
+          .from('templates')
+          .insert({
+            categorie,
+            ordre: prochainOrdre,
+            background_type: fondType,
+            background_valeur: fondValeur,
+            blocs, // inclut le flag editable par bloc
+          })
+          .select('id').single()
+        if (errInsert) throw errInsert
+        templateRowId = inserted.id
+      } else {
+        // Mode édition : on écrase le template existant, sans toucher à
+        // son ordre ni en créer une copie.
+        const { error: errUpdate } = await supabase
+          .from('templates')
+          .update({
+            background_type: fondType,
+            background_valeur: fondValeur,
+            blocs,
+          })
+          .eq('id', templateRowId)
+        if (errUpdate) throw errUpdate
+      }
 
       let imageUrl = fondType === 'photo' ? fondValeur : null
       if (fondType === 'couleur') {
@@ -80,15 +100,15 @@ export default function ValidationBlocsEditables() {
         ctx.fillStyle = fondValeur || '#FFFFFF'
         ctx.fillRect(0, 0, canvas.width, canvas.height)
         const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
-        const path = `${categorie}/${inserted.id}.png`
+        const path = `${categorie}/${templateRowId}.png`
         const { error: errUpload } = await supabase.storage.from('templates').upload(path, blob, { upsert: true, contentType: 'image/png' })
         if (errUpload) throw errUpload
         const { data: pub } = supabase.storage.from('templates').getPublicUrl(path)
         imageUrl = pub.publicUrl
       }
 
-      const { error: errUpdate } = await supabase.from('templates').update({ image_url: imageUrl }).eq('id', inserted.id)
-      if (errUpdate) throw errUpdate
+      const { error: errUpdateImage } = await supabase.from('templates').update({ image_url: imageUrl }).eq('id', templateRowId)
+      if (errUpdateImage) throw errUpdateImage
 
       // Toujours retour vers LA catégorie d'origine, jamais ailleurs.
       navigate(`/admin/souvenirs/templates/${categorie}`)

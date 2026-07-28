@@ -180,8 +180,11 @@ export default function EditeurTemplateMobile() {
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef(null)
 
-  const fondType = searchParams.get('fond_type')
-  const fondValeur = searchParams.get('fond_valeur')
+  const templateId = searchParams.get('template_id') // présent = on édite un template existant (pas une création)
+
+  const [fondType, setFondType] = useState(searchParams.get('fond_type'))
+  const [fondValeur, setFondValeur] = useState(searchParams.get('fond_valeur'))
+  const [chargementTemplate, setChargementTemplate] = useState(Boolean(templateId))
 
   const [blocs, setBlocs] = useState([])
   const [selectedId, setSelectedId] = useState(null)
@@ -189,6 +192,42 @@ export default function EditeurTemplateMobile() {
   const canvasRef = useRef(null)
 
   useEffect(() => { chargerGoogleFonts() }, [])
+
+  // -------------------- Chargement d'un template existant --------------------
+  // Si template_id est dans l'URL (clic sur une vignette de la bibliothèque
+  // admin), on hydrate blocs + fond depuis la ligne en base au lieu de partir
+  // d'un canvas vierge. La sauvegarde en fin de parcours fera un update sur
+  // cette même ligne plutôt qu'un insert (voir ValidationBlocsEditables).
+  useEffect(() => {
+    if (!templateId) return
+    let annule = false
+    ;(async () => {
+      const { data, error } = await supabase
+        .from('templates')
+        .select('blocs, background_type, background_valeur')
+        .eq('id', templateId)
+        .single()
+      if (annule) return
+      if (error) {
+        console.error('Erreur chargement template', error)
+        alert("Impossible de charger ce template.")
+        setChargementTemplate(false)
+        return
+      }
+      setBlocs(data.blocs || [])
+      setFondType(data.background_type)
+      setFondValeur(data.background_valeur)
+      // idCounter doit repartir au-delà des ids déjà présents pour éviter
+      // toute collision si l'admin ajoute de nouveaux blocs après chargement.
+      const maxExistant = (data.blocs || []).reduce((max, b) => {
+        const n = parseInt(String(b.id).replace('bloc_', ''), 10)
+        return Number.isFinite(n) ? Math.max(max, n) : max
+      }, 0)
+      idCounter = Math.max(idCounter, maxExistant + 1)
+      setChargementTemplate(false)
+    })()
+    return () => { annule = true }
+  }, [templateId])
 
   const selected = blocs.find((b) => b.id === selectedId) || null
 
@@ -457,11 +496,19 @@ export default function EditeurTemplateMobile() {
       return
     }
     navigate(`/admin/souvenirs/templates/${categorie}/editeur/blocs-editables`, {
-      state: { categorie, fondType, fondValeur, blocs },
+      state: { categorie, fondType, fondValeur, blocs, templateId },
     })
   }
 
   const fermerPanneau = () => { setPanneau(null) }
+
+  if (chargementTemplate) {
+    return (
+      <div className="flex items-center justify-center" style={{ height: '100dvh', backgroundColor: 'var(--bg-primary)' }}>
+        <span className="text-body" style={{ color: 'var(--text-secondary)' }}>Chargement du template…</span>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col" style={{ backgroundColor: 'var(--bg-primary)', height: '100dvh' }}>

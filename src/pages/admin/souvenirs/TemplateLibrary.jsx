@@ -185,7 +185,7 @@ export default function TemplateLibrary() {
                 ) : (
                   <div key={item.id} className="relative">
                     <button
-                      onClick={() => navigate(`/souvenirs/apercu/${item.id}`)}
+                      onClick={() => navigate(`/admin/souvenirs/templates/${categorie}/editeur?template_id=${item.id}`)}
                       className="glass rounded-2xl overflow-hidden w-full active:scale-[0.97] transition-transform duration-150 block"
                       style={{ aspectRatio: '4 / 5' }}
                     >
