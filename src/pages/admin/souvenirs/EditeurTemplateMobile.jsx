@@ -341,7 +341,7 @@ export default function EditeurTemplateMobile() {
       >
         <div
           ref={canvasRef}
-          className="relative w-full max-w-sm"
+          className="relative w-full max-w-sm overflow-hidden"
           style={{
             aspectRatio: '4 / 5',
             backgroundColor: fondType === 'couleur' ? fondValeur : '#e0e0e0',
