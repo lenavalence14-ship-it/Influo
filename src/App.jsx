@@ -72,6 +72,7 @@ const AdminTemplateLibrary = lazy(() => import('./pages/admin/souvenirs/Template
 const AdminChoisirArrierePlan = lazy(() => import('./pages/admin/souvenirs/ChoisirArrierePlan'))
 const AdminChoisirCouleur = lazy(() => import('./pages/admin/souvenirs/ChoisirCouleur'))
 const AdminEditeurTemplateMobile = lazy(() => import('./pages/admin/souvenirs/EditeurTemplateMobile'))
+const AdminValidationBlocsEditables = lazy(() => import('./pages/admin/souvenirs/ValidationBlocsEditables'))
 const AdminBonneFete = lazy(() => import('./pages/admin/souvenirs/BonneFete'))
 const AdminDefiSouvenirs = lazy(() => import('./pages/admin/souvenirs/DefiSouvenirs'))
 const AdminMagazineEditorialPourQui = lazy(() => import('./pages/admin/souvenirs/MagazineEditorialPourQui'))
@@ -114,6 +115,7 @@ function AppRoutes() {
         <Route path="/admin/souvenirs/templates/:categorie/arriere-plan" element={<AdminRoute><AdminChoisirArrierePlan /></AdminRoute>} />
         <Route path="/admin/souvenirs/templates/:categorie/couleurs" element={<AdminRoute><AdminChoisirCouleur /></AdminRoute>} />
         <Route path="/admin/souvenirs/templates/:categorie/editeur" element={<AdminRoute><AdminEditeurTemplateMobile /></AdminRoute>} />
+        <Route path="/admin/souvenirs/templates/:categorie/editeur/blocs-editables" element={<AdminRoute><AdminValidationBlocsEditables /></AdminRoute>} />
         <Route path="/admin/souvenirs/bonne-fete" element={<AdminRoute><AdminBonneFete /></AdminRoute>} />
         <Route path="/admin/souvenirs/defi-souvenirs" element={<AdminRoute><AdminDefiSouvenirs /></AdminRoute>} />
         <Route path="/admin/souvenirs/magazine-editorial" element={<AdminRoute><AdminMagazineEditorialPourQui /></AdminRoute>} />

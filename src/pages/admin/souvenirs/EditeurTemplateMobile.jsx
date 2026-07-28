@@ -446,50 +446,19 @@ export default function EditeurTemplateMobile() {
   }
 
   // -------------------- Enregistrement --------------------
-  const handleEnregistrer = async () => {
-    setSaving(true)
-    try {
-      const { data: existants, error: errOrdre } = await supabase
-        .from('templates').select('ordre').eq('categorie', categorie)
-        .order('ordre', { ascending: false }).limit(1)
-      if (errOrdre) throw errOrdre
-      const prochainOrdre = (existants?.[0]?.ordre ?? -1) + 1
-
-      const { data: inserted, error: errInsert } = await supabase
-        .from('templates')
-        .insert({ categorie, ordre: prochainOrdre, background_type: fondType, background_valeur: fondValeur })
-        .select('id').single()
-      if (errInsert) throw errInsert
-
-      let imageUrl = fondType === 'photo' ? fondValeur : null
-      if (fondType === 'couleur') {
-        const canvas = document.createElement('canvas')
-        canvas.width = 1080; canvas.height = 1350
-        const ctx = canvas.getContext('2d')
-        ctx.fillStyle = fondValeur || '#FFFFFF'
-        ctx.fillRect(0, 0, canvas.width, canvas.height)
-        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
-        const path = `${categorie}/${inserted.id}.png`
-        const { error: errUpload } = await supabase.storage.from('templates').upload(path, blob, { upsert: true, contentType: 'image/png' })
-        if (errUpload) throw errUpload
-        const { data: pub } = supabase.storage.from('templates').getPublicUrl(path)
-        imageUrl = pub.publicUrl
-      }
-
-      const { error: errUpdate } = await supabase.from('templates').update({ image_url: imageUrl }).eq('id', inserted.id)
-      if (errUpdate) throw errUpdate
-
-      // TODO (prochaine étape) : persister `blocs` dans `template_layers`
-      // une fois la migration DB prête pour ce nouveau modèle de blocs.
-      console.log('BLOCS À PERSISTER', blocs)
-
-      navigate(`/admin/souvenirs/templates/${categorie}`)
-    } catch (err) {
-      console.error('Erreur enregistrement template', err)
-      alert("Erreur lors de l'enregistrement du template.")
-    } finally {
-      setSaving(false)
+  // Le check n'enregistre plus directement : il ouvre l'écran de
+  // validation où l'admin choisit quels blocs seront éditables par
+  // l'utilisateur final. La sauvegarde réelle en base se fait depuis cet
+  // écran (voir ValidationBlocsEditables.jsx), pour garantir qu'on
+  // n'enregistre jamais un template sans que ce choix ait été fait.
+  const handleEnregistrer = () => {
+    if (blocs.length === 0) {
+      alert('Ajoute au moins un bloc avant de continuer.')
+      return
     }
+    navigate(`/admin/souvenirs/templates/${categorie}/editeur/blocs-editables`, {
+      state: { categorie, fondType, fondValeur, blocs },
+    })
   }
 
   const fermerPanneau = () => { setPanneau(null) }
