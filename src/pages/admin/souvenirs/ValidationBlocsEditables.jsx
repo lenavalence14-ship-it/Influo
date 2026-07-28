@@ -75,7 +75,7 @@ export default function ValidationBlocsEditables() {
       let imageUrl = fondType === 'photo' ? fondValeur : null
       if (fondType === 'couleur') {
         const canvas = document.createElement('canvas')
-        canvas.width = 1080; canvas.height = 1350
+        canvas.width = 1080; canvas.height = 1620
         const ctx = canvas.getContext('2d')
         ctx.fillStyle = fondValeur || '#FFFFFF'
         ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -125,7 +125,7 @@ export default function ValidationBlocsEditables() {
         <div
           className="relative w-full max-w-sm overflow-hidden"
           style={{
-            aspectRatio: '4 / 5',
+            aspectRatio: '2 / 3',
             backgroundColor: fondType === 'couleur' ? fondValeur : '#e0e0e0',
             backgroundImage: fondType === 'photo' && fondValeur ? `url(${fondValeur})` : undefined,
             backgroundSize: 'cover',

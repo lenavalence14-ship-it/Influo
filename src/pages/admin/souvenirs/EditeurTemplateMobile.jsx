@@ -9,7 +9,7 @@ import {
 import { supabase } from '../../../lib/supabase'
 
 // ---------------------------------------------------------------------
-// Polices -- liste calquée sur le sélecteur de référence (images 4/5).
+// Polices -- liste calquée sur le sélecteur de référence (images 2/3).
 // Chargées via Google Fonts à la demande (on ne charge que ce qui est
 // affiché/utilisé pour ne pas plomber le poids de la page).
 // ---------------------------------------------------------------------
@@ -486,7 +486,7 @@ export default function EditeurTemplateMobile() {
           ref={canvasRef}
           className="relative w-full max-w-sm overflow-hidden"
           style={{
-            aspectRatio: '4 / 5',
+            aspectRatio: '2 / 3',
             backgroundColor: fondType === 'couleur' ? fondValeur : '#e0e0e0',
             backgroundImage: fondType === 'photo' && fondValeur ? `url(${fondValeur})` : undefined,
             backgroundSize: 'cover',

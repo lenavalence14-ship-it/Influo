@@ -27,7 +27,7 @@ import {
  */
 
 const CANVAS_WIDTH = 1080
-const CANVAS_HEIGHT = 1350 // ratio 4:5, cohérent avec les vignettes de TemplateLibrary
+const CANVAS_HEIGHT = 1620 // ratio 2:3, cohérent avec les vignettes de TemplateLibrary
 
 let idCounter = 1
 const nextId = () => `layer_${idCounter++}`

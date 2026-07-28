@@ -108,7 +108,7 @@ function OutilOpacite({ layer, onChange }) {
 }
 
 // Sous-écran "Position" -- image 3 : 4 flèches directionnelles + champ
-// "Étape" (pas de déplacement en pixels réels sur le canvas 1080x1350) +
+// "Étape" (pas de déplacement en pixels réels sur le canvas 1080x1620) +
 // +/- pour agrandir/réduire le calque en conservant son ratio largeur/hauteur.
 function PanneauPosition({ layer, onChange, onFermer }) {
   const [step, setStep] = useState(STEP_DEFAUT)
