@@ -94,7 +94,7 @@ export default function ValidationBlocsEditables() {
       navigate(`/admin/souvenirs/templates/${categorie}`)
     } catch (err) {
       console.error('Erreur enregistrement template', err)
-      alert("Erreur lors de l'enregistrement du template.")
+      alert(err?.message || JSON.stringify(err))
     } finally {
       setSaving(false)
     }
