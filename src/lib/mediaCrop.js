@@ -99,14 +99,14 @@ export function getCropTransformStyle({ naturalWidth, naturalHeight, cropFormat,
   const y = clampOffset(offsetY ?? 0, effectiveZoom, coverZoom)
 
   return {
-    // object-fit: cover en base (remplit le cadre en respectant le ratio),
-    // puis le zoom utilisateur s'ajoute par-dessus, et l'offset déplace le
-    // centre. translate en % est relatif à la taille de l'ÉLÉMENT lui-même
-    // (comportement CSS natif de translate avec des %), donc on divise par
-    // le zoom pour que le déplacement perçu reste cohérent avec le cadre.
+    // object-fit: contain (pas cover !) -- laisse le navigateur afficher
+    // l'image entière sans recadrage natif, c'est le scale() ci-dessous qui
+    // gère tout le zoom. Avec "cover" ici, le navigateur recadrerait déjà
+    // l'image pour remplir le cadre AVANT même d'appliquer le scale JS --
+    // ça annulerait silencieusement tout le calcul de containZoom.
     width: '100%',
     height: '100%',
-    objectFit: 'cover',
+    objectFit: 'contain',
     transform: `translate(${x / effectiveZoom}%, ${y / effectiveZoom}%) scale(${effectiveZoom})`,
     transformOrigin: 'center center',
   }
