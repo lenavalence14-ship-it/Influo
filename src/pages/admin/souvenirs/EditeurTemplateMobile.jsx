@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ChevronLeft, Check, Type, Shapes, Image as ImageIcon, Layers,
-  X, ArrowUpDown, RotateCcw, Move, Copy, Crop, FlipHorizontal, FlipVertical,
+  X, ArrowUpDown, RotateCcw, Move, Copy, ZoomIn, FlipHorizontal, FlipVertical,
   Plus, Minus, ArrowUp, ArrowDown, ArrowLeft as ArrowLeftIcon, ArrowRight,
   Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Palette,
 } from 'lucide-react'
@@ -86,8 +86,12 @@ function nouveauBlocPhoto(fondType, fondValeur) {
     opacite: 1,
     rotationFlipH: false,
     rotationFlipV: false,
-    // recadrage : rectangle en % relatif à l'image elle-même (0-100)
-    crop: { top: 0, right: 0, bottom: 0, left: 0 },
+    // l'image vit dans un cadre fixe (le bloc) : imgScale zoome l'image à
+    // l'intérieur, imgOffsetX/Y la déplace (en % de la largeur/hauteur du
+    // bloc). scale=1 = l'image "cover" tient exactement dans le cadre.
+    imgScale: 1,
+    imgOffsetX: 0,
+    imgOffsetY: 0,
   }
 }
 
@@ -103,9 +107,8 @@ export default function EditeurTemplateMobile() {
 
   const [blocs, setBlocs] = useState([])
   const [selectedId, setSelectedId] = useState(null)
-  const [panneau, setPanneau] = useState(null) // 'texte' | 'photo' | 'photo_source' | 'police' | 'recadrer' | 'position' | null
+  const [panneau, setPanneau] = useState(null) // 'texte' | 'photo' | 'photo_source' | 'police' | 'position' | null
   const canvasRef = useRef(null)
-  const modeRecadrage = panneau === 'recadrer'
 
   useEffect(() => { chargerGoogleFonts() }, [])
 
@@ -217,43 +220,73 @@ export default function EditeurTemplateMobile() {
     window.removeEventListener('touchend', onDragEnd)
   }
 
-  // -------------------- Recadrage (drag des bords sur le canvas) --------------------
-  const cropDragState = useRef(null)
-  const startCropDrag = (e, bloc, cote) => {
+  // -------------------- Édition image : pan (glisser) + pinch (zoom) --------------------
+  const [editionImageId, setEditionImageId] = useState(null)
+  const imgDragState = useRef(null)
+
+  const startImageDrag = (e, bloc) => {
     e.stopPropagation()
     const rect = canvasRef.current.getBoundingClientRect()
-    const point = e.touches ? e.touches[0] : e
-    cropDragState.current = {
-      id: bloc.id, cote, startX: point.clientX, startY: point.clientY,
-      orig: { ...bloc.crop }, blocWpx: (bloc.width / 100) * rect.width, blocHpx: (bloc.height / 100) * rect.height,
+    const blocWpx = (bloc.width / 100) * rect.width
+    const blocHpx = (bloc.height / 100) * rect.height
+
+    if (e.touches && e.touches.length === 2) {
+      // début pincer : on mémorise la distance entre les 2 doigts et le scale de départ
+      const [t1, t2] = e.touches
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
+      imgDragState.current = { id: bloc.id, mode: 'pinch', startDist: dist, origScale: bloc.imgScale }
+    } else {
+      const point = e.touches ? e.touches[0] : e
+      imgDragState.current = {
+        id: bloc.id, mode: 'pan', startX: point.clientX, startY: point.clientY,
+        origOffsetX: bloc.imgOffsetX, origOffsetY: bloc.imgOffsetY, blocWpx, blocHpx,
+      }
     }
-    window.addEventListener('mousemove', onCropMove)
-    window.addEventListener('mouseup', onCropEnd)
-    window.addEventListener('touchmove', onCropMove, { passive: false })
-    window.addEventListener('touchend', onCropEnd)
+    window.addEventListener('mousemove', onImageMove)
+    window.addEventListener('mouseup', onImageEnd)
+    window.addEventListener('touchmove', onImageMove, { passive: false })
+    window.addEventListener('touchend', onImageEnd)
   }
 
-  const onCropMove = (e) => {
-    if (!cropDragState.current) return
+  const onImageMove = (e) => {
+    if (!imgDragState.current) return
     e.preventDefault?.()
-    const { id, cote, startX, startY, orig, blocWpx, blocHpx } = cropDragState.current
-    const point = e.touches ? e.touches[0] : e
-    const dxPct = ((point.clientX - startX) / blocWpx) * 100
-    const dyPct = ((point.clientY - startY) / blocHpx) * 100
-    const crop = { ...orig }
-    if (cote === 'left') crop.left = Math.max(0, Math.min(85, orig.left + dxPct))
-    if (cote === 'right') crop.right = Math.max(0, Math.min(85, orig.right - dxPct))
-    if (cote === 'top') crop.top = Math.max(0, Math.min(85, orig.top + dyPct))
-    if (cote === 'bottom') crop.bottom = Math.max(0, Math.min(85, orig.bottom - dyPct))
-    updateBloc(id, { crop })
+    const state = imgDragState.current
+
+    if (e.touches && e.touches.length === 2 && state.mode !== 'pinch') {
+      // transition pan -> pinch si un 2e doigt arrive en cours de geste
+      const [t1, t2] = e.touches
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
+      const bloc = blocs.find((b) => b.id === state.id)
+      imgDragState.current = { id: state.id, mode: 'pinch', startDist: dist, origScale: bloc.imgScale }
+      return
+    }
+
+    if (state.mode === 'pinch') {
+      if (!e.touches || e.touches.length < 2) return
+      const [t1, t2] = e.touches
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
+      const facteur = dist / state.startDist
+      const newScale = Math.max(1, Math.min(5, state.origScale * facteur))
+      updateBloc(state.id, { imgScale: newScale })
+    } else {
+      const point = e.touches ? e.touches[0] : e
+      const dxPct = ((point.clientX - state.startX) / state.blocWpx) * 100
+      const dyPct = ((point.clientY - state.startY) / state.blocHpx) * 100
+      const limite = 60 // amplitude de déplacement permise dans le cadre
+      updateBloc(state.id, {
+        imgOffsetX: Math.max(-limite, Math.min(limite, state.origOffsetX + dxPct)),
+        imgOffsetY: Math.max(-limite, Math.min(limite, state.origOffsetY + dyPct)),
+      })
+    }
   }
 
-  const onCropEnd = () => {
-    cropDragState.current = null
-    window.removeEventListener('mousemove', onCropMove)
-    window.removeEventListener('mouseup', onCropEnd)
-    window.removeEventListener('touchmove', onCropMove)
-    window.removeEventListener('touchend', onCropEnd)
+  const onImageEnd = () => {
+    imgDragState.current = null
+    window.removeEventListener('mousemove', onImageMove)
+    window.removeEventListener('mouseup', onImageEnd)
+    window.removeEventListener('touchmove', onImageMove)
+    window.removeEventListener('touchend', onImageEnd)
   }
 
   const startResize = (e, bloc, handle) => {
@@ -355,16 +388,27 @@ export default function EditeurTemplateMobile() {
               key={bloc.id}
               bloc={bloc}
               selected={bloc.id === selectedId}
-              modeRecadrage={modeRecadrage && bloc.id === selectedId}
-              onSelect={(e) => { e.stopPropagation(); if (modeRecadrage) return; setSelectedId(bloc.id); setPanneau(bloc.type === 'texte' ? 'texte' : 'photo') }}
-              onDragStart={(e) => { if (modeRecadrage) return; startDrag(e, bloc) }}
+              editionImage={editionImageId === bloc.id}
+              onSelect={(e) => { e.stopPropagation(); if (editionImageId === bloc.id) return; setSelectedId(bloc.id); setPanneau(bloc.type === 'texte' ? 'texte' : 'photo') }}
+              onEntrerEditionImage={() => { setSelectedId(bloc.id); setEditionImageId(bloc.id); setPanneau(null) }}
+              onDragStart={(e) => startDrag(e, bloc)}
               onResizeStart={(e, handle) => startResize(e, bloc, handle)}
-              onCropDrag={(e, cote) => startCropDrag(e, bloc, cote)}
+              onImageDragStart={(e) => startImageDrag(e, bloc)}
               onSupprimer={() => supprimerBloc(bloc.id)}
             />
           ))}
         </div>
       </div>
+
+      {editionImageId && (
+        <button
+          onClick={() => { setEditionImageId(null); setPanneau('photo') }}
+          className="fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full text-body-medium z-40"
+          style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+        >
+          Terminer l'ajustement de l'image
+        </button>
+      )}
 
       <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFichierChoisi} className="hidden" />
 
@@ -409,20 +453,12 @@ export default function EditeurTemplateMobile() {
             onSupprimer={() => supprimerBloc(selected.id)}
             onDupliquer={() => dupliquerBloc(selected.id)}
             onOuvrirPosition={() => setPanneau('position')}
-            onOuvrirRecadrer={() => setPanneau('recadrer')}
+            onEntrerEditionImage={() => { setEditionImageId(selected.id); setPanneau(null) }}
           />
         )}
 
         {panneau === 'position' && selected && (
           <PanneauPosition
-            bloc={selected}
-            onChange={(patch) => updateBloc(selected.id, patch)}
-            onRetour={() => setPanneau('photo')}
-          />
-        )}
-
-        {panneau === 'recadrer' && selected && (
-          <PanneauRecadrer
             bloc={selected}
             onChange={(patch) => updateBloc(selected.id, patch)}
             onRetour={() => setPanneau('photo')}
@@ -436,18 +472,33 @@ export default function EditeurTemplateMobile() {
 // =======================================================================
 // Rendu d'un bloc sur le canvas (texte ou photo) + poignées de resize/drag
 // =======================================================================
-function BlocRendu({ bloc, selected, modeRecadrage, onSelect, onDragStart, onResizeStart, onCropDrag, onSupprimer }) {
+function BlocRendu({ bloc, selected, editionImage, onSelect, onEntrerEditionImage, onDragStart, onResizeStart, onImageDragStart, onSupprimer }) {
   const style = {
     position: 'absolute',
     left: `${bloc.x}%`, top: `${bloc.y}%`,
     width: `${bloc.width}%`, height: `${bloc.height}%`,
-    outline: selected ? '2px solid #3b82f6' : 'none',
-    cursor: modeRecadrage ? 'default' : 'move',
+    outline: selected ? '2px solid #3b82f6' : editionImage ? '2px dashed #22c55e' : 'none',
+    cursor: editionImage ? 'grab' : 'move',
     touchAction: 'none',
   }
 
+  const gererMouseDown = (e) => {
+    if (bloc.type === 'photo' && editionImage) {
+      e.stopPropagation()
+      onImageDragStart(e)
+      return
+    }
+    onDragStart(e)
+  }
+
   return (
-    <div style={style} onMouseDown={onDragStart} onTouchStart={onDragStart} onClick={onSelect}>
+    <div
+      style={style}
+      onMouseDown={gererMouseDown}
+      onTouchStart={gererMouseDown}
+      onClick={onSelect}
+      onDoubleClick={bloc.type === 'photo' ? (e) => { e.stopPropagation(); onEntrerEditionImage() } : undefined}
+    >
       {bloc.type === 'texte' && (
         <div
           className="w-full h-full flex overflow-hidden px-1"
@@ -473,25 +524,21 @@ function BlocRendu({ bloc, selected, modeRecadrage, onSelect, onDragStart, onRes
       )}
 
       {bloc.type === 'photo' && (
-        <div
-          className="w-full h-full overflow-hidden relative"
-          style={{ opacity: bloc.opacite }}
-        >
+        <div className="w-full h-full overflow-hidden relative" style={{ opacity: bloc.opacite }}>
           <div
             className="absolute inset-0"
             style={{
               backgroundColor: bloc.imageType === 'couleur' ? bloc.imageValeur : undefined,
               backgroundImage: bloc.imageType === 'photo' ? `url(${bloc.imageValeur})` : undefined,
-              backgroundSize: 'cover',
+              backgroundSize: '100% 100%',
               backgroundPosition: 'center',
-              transform: `scaleX(${bloc.rotationFlipH ? -1 : 1}) scaleY(${bloc.rotationFlipV ? -1 : 1})`,
-              clipPath: `inset(${bloc.crop.top}% ${bloc.crop.right}% ${bloc.crop.bottom}% ${bloc.crop.left}%)`,
+              transform: `translate(${bloc.imgOffsetX}%, ${bloc.imgOffsetY}%) scaleX(${(bloc.rotationFlipH ? -1 : 1) * bloc.imgScale}) scaleY(${(bloc.rotationFlipV ? -1 : 1) * bloc.imgScale})`,
             }}
           />
         </div>
       )}
 
-      {selected && !modeRecadrage && (
+      {selected && !editionImage && (
         <>
           {['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'].map((h) => (
             <PoigneeResize key={h} handle={h} onStart={(e) => onResizeStart(e, h)} />
@@ -507,44 +554,7 @@ function BlocRendu({ bloc, selected, modeRecadrage, onSelect, onDragStart, onRes
           </button>
         </>
       )}
-
-      {modeRecadrage && bloc.type === 'photo' && (
-        <>
-          {/* Cadre de recadrage visible + 4 poignées de bord glissables */}
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              top: `${bloc.crop.top}%`, left: `${bloc.crop.left}%`,
-              right: `${bloc.crop.right}%`, bottom: `${bloc.crop.bottom}%`,
-              border: '2px dashed #fff', boxShadow: '0 0 0 2000px rgba(0,0,0,0.35)',
-            }}
-          />
-          <BarreCrop cote="top" bloc={bloc} onCropDrag={onCropDrag} />
-          <BarreCrop cote="bottom" bloc={bloc} onCropDrag={onCropDrag} />
-          <BarreCrop cote="left" bloc={bloc} onCropDrag={onCropDrag} />
-          <BarreCrop cote="right" bloc={bloc} onCropDrag={onCropDrag} />
-        </>
-      )}
     </div>
-  )
-}
-
-function BarreCrop({ cote, bloc, onCropDrag }) {
-  const commun = { position: 'absolute', touchAction: 'none', zIndex: 20 }
-  const style = {
-    top: { ...commun, top: `${bloc.crop.top}%`, left: `${bloc.crop.left}%`, right: `${bloc.crop.right}%`, height: 14, marginTop: -7, cursor: 'ns-resize' },
-    bottom: { ...commun, bottom: `${bloc.crop.bottom}%`, left: `${bloc.crop.left}%`, right: `${bloc.crop.right}%`, height: 14, marginBottom: -7, cursor: 'ns-resize' },
-    left: { ...commun, left: `${bloc.crop.left}%`, top: `${bloc.crop.top}%`, bottom: `${bloc.crop.bottom}%`, width: 14, marginLeft: -7, cursor: 'ew-resize' },
-    right: { ...commun, right: `${bloc.crop.right}%`, top: `${bloc.crop.top}%`, bottom: `${bloc.crop.bottom}%`, width: 14, marginRight: -7, cursor: 'ew-resize' },
-  }[cote]
-
-  return (
-    <div
-      style={style}
-      onMouseDown={(e) => onCropDrag(e, cote)}
-      onTouchStart={(e) => onCropDrag(e, cote)}
-      className="bg-white/70 rounded"
-    />
   )
 }
 
@@ -749,13 +759,16 @@ function PanneauPolice({ policeActuelle, onChoisir, onRetour }) {
 // Panneau : édition d'un bloc photo (Position / Opacité / Recadrer /
 // Cloner / Retourner x2) -- reproduit la barre de l'image 2.
 // =======================================================================
-function PanneauPhoto({ bloc, onChange, onRetour, onSupprimer, onDupliquer, onOuvrirPosition, onOuvrirRecadrer }) {
+function PanneauPhoto({ bloc, onChange, onRetour, onSupprimer, onDupliquer, onOuvrirPosition, onEntrerEditionImage }) {
   return (
     <BarreAvecRetour titre="Fonctionnalité" onRetour={onRetour}>
+      <p className="text-caption text-center pt-2 px-4" style={{ color: 'var(--text-secondary)' }}>
+        Astuce : double-touchez l'image sur le canvas pour zoomer/déplacer l'image dans son cadre.
+      </p>
       <div className="grid grid-cols-4">
         <ToolButton icon={Move} label="Position" onClick={onOuvrirPosition} />
         <OpaciteButton bloc={bloc} onChange={onChange} />
-        <ToolButton icon={Crop} label="Recadrer" onClick={onOuvrirRecadrer} />
+        <ToolButton icon={ZoomIn} label="Zoomer l'image" onClick={onEntrerEditionImage} />
         <ToolButton icon={Copy} label="Cloner" onClick={onDupliquer} />
         <ToolButton icon={FlipHorizontal} label="Retourner" onClick={() => onChange({ rotationFlipH: !bloc.rotationFlipH })} />
         <ToolButton icon={FlipVertical} label="Retourner" onClick={() => onChange({ rotationFlipV: !bloc.rotationFlipV })} />
@@ -786,10 +799,10 @@ function OpaciteButton({ bloc, onChange }) {
 }
 
 // =======================================================================
-// Panneau : Position (4 flèches + ajustement -/+) -- reproduit l'image 3.
-// Le +/- de l'onglet "Relatif" ajuste le CADRAGE (crop) de l'image à
-// l'intérieur du bloc -- il ne redimensionne jamais le bloc lui-même.
-// Un "+" révèle moins de l'image (rapproche), un "-" en révèle plus.
+// Panneau : Position (4 flèches + zoom -/+) -- reproduit l'image 3.
+// Le +/- de l'onglet "Relatif" zoome/dézoome l'image À L'INTÉRIEUR du
+// cadre fixe (même valeur imgScale que le pincer sur le canvas) -- le
+// bloc/cadre lui-même ne change jamais de taille ici.
 // =======================================================================
 function PanneauPosition({ bloc, onChange, onRetour }) {
   const [etape, setEtape] = useState(10)
@@ -802,15 +815,9 @@ function PanneauPosition({ bloc, onChange, onRetour }) {
     })
   }
 
-  const ajuster = (delta) => {
+  const zoomerImage = (delta) => {
     if (bloc.type !== 'photo') return
-    const pas = delta // positif = rapprocher (crop augmente), négatif = éloigner (crop diminue)
-    const crop = { ...bloc.crop }
-    crop.top = Math.max(0, Math.min(45, crop.top + pas))
-    crop.bottom = Math.max(0, Math.min(45, crop.bottom + pas))
-    crop.left = Math.max(0, Math.min(45, crop.left + pas))
-    crop.right = Math.max(0, Math.min(45, crop.right + pas))
-    onChange({ crop })
+    onChange({ imgScale: Math.max(1, Math.min(5, bloc.imgScale + delta)) })
   }
 
   return (
@@ -853,10 +860,10 @@ function PanneauPosition({ bloc, onChange, onRetour }) {
 
         {onglet === 'relatif' && (
           <div className="flex items-center justify-center gap-4 py-4">
-            <span className="text-caption" style={{ color: 'var(--text-secondary)' }}>Ajustement</span>
-            <button onClick={() => ajuster(-5)} className="w-10 h-10 rounded-full glass flex items-center justify-center"><Minus size={18} /></button>
-            <span className="text-body-medium w-14 text-center">{Math.round(bloc.crop.top)}%</span>
-            <button onClick={() => ajuster(5)} className="w-10 h-10 rounded-full glass flex items-center justify-center"><Plus size={18} /></button>
+            <span className="text-caption" style={{ color: 'var(--text-secondary)' }}>Zoom image</span>
+            <button onClick={() => zoomerImage(-0.2)} className="w-10 h-10 rounded-full glass flex items-center justify-center"><Minus size={18} /></button>
+            <span className="text-body-medium w-14 text-center">{Math.round(bloc.imgScale * 100)}%</span>
+            <button onClick={() => zoomerImage(0.2)} className="w-10 h-10 rounded-full glass flex items-center justify-center"><Plus size={18} /></button>
           </div>
         )}
 
@@ -866,30 +873,6 @@ function PanneauPosition({ bloc, onChange, onRetour }) {
             <span className="text-caption" style={{ color: 'var(--text-secondary)' }}>Rotation non disponible pour ce bloc</span>
           </div>
         )}
-      </div>
-    </BarreAvecRetour>
-  )
-}
-
-// =======================================================================
-// Panneau : Recadrage manuel. Les poignées actives sont affichées
-// directement sur le canvas (voir BarreCrop dans BlocRendu) ; ce panneau
-// ne sert que d'instruction + bouton reset.
-// =======================================================================
-function PanneauRecadrer({ bloc, onChange, onRetour }) {
-  return (
-    <BarreAvecRetour titre="Recadrer" onRetour={onRetour}>
-      <p className="text-caption text-center py-3 px-4" style={{ color: 'var(--text-secondary)' }}>
-        Glissez les bords en surbrillance directement sur l'image pour la recadrer.
-      </p>
-      <div className="pb-3 flex justify-center">
-        <button
-          onClick={() => onChange({ crop: { top: 0, right: 0, bottom: 0, left: 0 } })}
-          className="text-caption underline"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          Réinitialiser le recadrage
-        </button>
       </div>
     </BarreAvecRetour>
   )
