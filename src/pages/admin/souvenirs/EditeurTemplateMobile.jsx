@@ -591,11 +591,18 @@ function BlocRendu({ bloc, selected, editionImage, onSelect, onEntrerEditionImag
       )}
 
       {bloc.type === 'photo' && editionImage && (
-        <>
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            transform: `translate(${bloc.imgOffsetX}%, ${bloc.imgOffsetY}%) scaleX(${(bloc.rotationFlipH ? -1 : 1) * (bloc.imgScaleX ?? 1)}) scaleY(${(bloc.rotationFlipV ? -1 : 1) * (bloc.imgScaleY ?? 1)})`,
+          }}
+        >
           {['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'].map((h) => (
-            <PoigneeResize key={h} handle={h} color="#22c55e" onStart={(e) => onImageResizeStart(e, h)} />
+            <div key={h} className="pointer-events-auto">
+              <PoigneeResize handle={h} color="#22c55e" onStart={(e) => onImageResizeStart(e, h)} />
+            </div>
           ))}
-        </>
+        </div>
       )}
 
       {selected && !editionImage && (
