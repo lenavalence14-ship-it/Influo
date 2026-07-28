@@ -281,7 +281,8 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
   const [carrouselIndex, setCarrouselIndex] = useState(0)
 
   const influencer = post.profils_influenceur
-  const isOwner = influencer?.user_id === user?.id
+  const utilisateurAuteur = post.utilisateur // renseigné uniquement pour un post-souvenir publié par un utilisateur_simple (influenceur_id est alors null)
+  const isOwner = influencer?.user_id === user?.id || utilisateurAuteur?.id === user?.id
 
   // collaboration vérifiée : ce post découle d'une commande validée
   const isCollabVerifiee = Boolean(post.commande_id)
@@ -407,13 +408,20 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
         {/* header */}
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2 min-w-0">
-            <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2 shrink-0">
-              <Avatar src={influencer?.users?.photo_url} seed={influencer?.id} size="sm" ring={activeStoryIds.has(influencer?.id)} />
-              <div className="flex items-center gap-1">
-                <span className="text-[13px] leading-[16px] font-medium">{influencer?.users?.nom_complet}</span>
-                {influencer?.verifie && <VerifiedBadge size={12} />}
+            {utilisateurAuteur ? (
+              <div className="flex items-center gap-2 shrink-0">
+                <Avatar src={utilisateurAuteur.photo_url} seed={utilisateurAuteur.id} size="sm" />
+                <span className="text-[13px] leading-[16px] font-medium">{utilisateurAuteur.nom_complet}</span>
               </div>
-            </Link>
+            ) : (
+              <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2 shrink-0">
+                <Avatar src={influencer?.users?.photo_url} seed={influencer?.id} size="sm" ring={activeStoryIds.has(influencer?.id)} />
+                <div className="flex items-center gap-1">
+                  <span className="text-[13px] leading-[16px] font-medium">{influencer?.users?.nom_complet}</span>
+                  {influencer?.verifie && <VerifiedBadge size={12} />}
+                </div>
+              </Link>
+            )}
 
             {isCollabVerifiee && client && (
               <>
@@ -651,7 +659,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
             contenu réel dépasse cette hauteur. Au clic, bascule vers l'affichage
             complet (expanded). */}
         {!isTextPost && post.legende && (
-          <CaptionWithSeeMore legende={post.legende} authorName={influencer?.users?.nom_complet} hasLikeLine={likeCount > 0} />
+          <CaptionWithSeeMore legende={post.legende} authorName={influencer?.users?.nom_complet || utilisateurAuteur?.nom_complet} hasLikeLine={likeCount > 0} />
         )}
         {post.created_at && (
           <p className="px-3 pb-2 pt-1 text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>

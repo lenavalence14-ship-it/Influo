@@ -49,6 +49,7 @@ async function fetchFeedPage({ userId, pageParam = 0 }) {
             id, legende, crop_format, type, created_at, commande_id, filtre,
             post_medias(media_url, media_type, thumbnail_url, position, filtre, zoom, offset_x, offset_y, natural_width, natural_height),
             profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
+            utilisateur:utilisateur_id(id, nom_complet, photo_url),
             client:client_id(id, nom_complet, photo_url),
             commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)
           `)

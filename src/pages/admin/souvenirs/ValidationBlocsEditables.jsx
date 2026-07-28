@@ -1,7 +1,38 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { ChevronLeft, Check, Lock, Unlock } from 'lucide-react'
+import html2canvas from 'html2canvas'
 import { supabase } from '../../../lib/supabase'
+
+// fontCss/MASQUES_SVG dupliqués depuis EditeurTemplateMobile.jsx : ce rendu
+// doit être PIXEL-IDENTIQUE à celui de l'éditeur, sinon la vignette générée
+// ici ne correspond plus à ce que l'admin a réellement construit (police,
+// zoom/position de la photo dans son cadre, masque de découpe).
+function fontCss(nomPolice) {
+  if (!nomPolice || nomPolice === 'Default') return 'inherit'
+  const GOOGLE_FONTS_MAP = {
+    'Lily Script One': 'Lily Script One', 'Bungee': 'Bungee', 'Chewy': 'Chewy',
+    'Righteous': 'Righteous', 'Roboto': 'Roboto', 'Pacifico': 'Pacifico',
+    'Sofia': 'Sofia', 'Berkshire Swash': 'Berkshire Swash', 'Amita': 'Amita',
+    'Amatic SC': 'Amatic SC', 'Tangerine': 'Tangerine', 'Parisienne': 'Parisienne',
+    'Edwardian Script ITC': 'Tangerine',
+  }
+  const mapped = GOOGLE_FONTS_MAP[nomPolice]
+  return mapped ? `'${mapped}', cursive, sans-serif` : 'inherit'
+}
+
+const MASQUES_SVG = {
+  rectangle: null,
+  cercle: <circle cx="0.5" cy="0.5" r="0.5" />,
+  coeur: (
+    <path d="M 0.5 0.88 C 0.2 0.65, 0.02 0.45, 0.02 0.28 C 0.02 0.12, 0.15 0.02, 0.3 0.02
+             C 0.4 0.02, 0.47 0.08, 0.5 0.16 C 0.53 0.08, 0.6 0.02, 0.7 0.02
+             C 0.85 0.02, 0.98 0.12, 0.98 0.28 C 0.98 0.45, 0.8 0.65, 0.5 0.88 Z" />
+  ),
+  etoile: (
+    <polygon points="0.50,0.02 0.61,0.36 0.98,0.36 0.68,0.57 0.79,0.91 0.50,0.70 0.21,0.91 0.32,0.57 0.02,0.36 0.39,0.36" />
+  ),
+}
 
 // ---------------------------------------------------------------------
 // Étape intermédiaire entre l'édition d'un template et son enregistrement
@@ -17,6 +48,8 @@ export default function ValidationBlocsEditables() {
   const navigate = useNavigate()
   const location = useLocation()
   const [saving, setSaving] = useState(false)
+  const [capturing, setCapturing] = useState(false)
+  const canvasRef = useRef(null)
 
   const etat = location.state || {}
   const fondType = etat.fondType
@@ -92,20 +125,28 @@ export default function ValidationBlocsEditables() {
         if (errUpdate) throw errUpdate
       }
 
-      let imageUrl = fondType === 'photo' ? fondValeur : null
-      if (fondType === 'couleur') {
-        const canvas = document.createElement('canvas')
-        canvas.width = 1080; canvas.height = 1620
-        const ctx = canvas.getContext('2d')
-        ctx.fillStyle = fondValeur || '#FFFFFF'
-        ctx.fillRect(0, 0, canvas.width, canvas.height)
-        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
-        const path = `${categorie}/${templateRowId}.png`
-        const { error: errUpload } = await supabase.storage.from('templates').upload(path, blob, { upsert: true, contentType: 'image/png' })
-        if (errUpload) throw errUpload
-        const { data: pub } = supabase.storage.from('templates').getPublicUrl(path)
-        imageUrl = pub.publicUrl
-      }
+      // -------------------- Génération de la vraie vignette --------------------
+      // On capture le canvas tel qu'affiché à l'écran (fond + tous les blocs,
+      // avec leur zoom/position/police réels), et non plus juste le fond seul.
+      // C'est ce screenshot qui devient l'image_url, dans tous les cas (fond
+      // photo ou couleur) : avant ce correctif, un fond "couleur" recevait un
+      // vrai rendu mais un fond "photo" gardait la photo brute sans les blocs.
+      setCapturing(true)
+      await new Promise((r) => requestAnimationFrame(r)) // laisser le DOM se repeindre sans les outlines
+      const canvasEl = canvasRef.current
+      const rendu = await html2canvas(canvasEl, {
+        useCORS: true,
+        backgroundColor: null,
+        scale: 1080 / canvasEl.offsetWidth,
+      })
+      setCapturing(false)
+
+      const blob = await new Promise((resolve) => rendu.toBlob(resolve, 'image/png'))
+      const path = `${categorie}/${templateRowId}.png`
+      const { error: errUpload } = await supabase.storage.from('templates').upload(path, blob, { upsert: true, contentType: 'image/png' })
+      if (errUpload) throw errUpload
+      const { data: pub } = supabase.storage.from('templates').getPublicUrl(path)
+      const imageUrl = pub.publicUrl
 
       const { error: errUpdateImage } = await supabase.from('templates').update({ image_url: imageUrl }).eq('id', templateRowId)
       if (errUpdateImage) throw errUpdateImage
@@ -143,6 +184,7 @@ export default function ValidationBlocsEditables() {
 
       <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
         <div
+          ref={canvasRef}
           className="relative w-full max-w-sm overflow-hidden"
           style={{
             aspectRatio: '2 / 3',
@@ -153,7 +195,7 @@ export default function ValidationBlocsEditables() {
           }}
         >
           {blocs.map((bloc) => (
-            <BlocValidation key={bloc.id} bloc={bloc} onToggle={() => toggleEditable(bloc.id)} />
+            <BlocValidation key={bloc.id} bloc={bloc} capturing={capturing} onToggle={() => toggleEditable(bloc.id)} />
           ))}
         </div>
       </div>
@@ -169,14 +211,16 @@ export default function ValidationBlocsEditables() {
   )
 }
 
-// Rendu simplifié d'un bloc pour cet écran : pas de drag/resize, juste le
-// contenu tel qu'édité + un état visuel éditable/figé au tap.
-function BlocValidation({ bloc, onToggle }) {
+// Rendu d'un bloc pour cet écran : identique au rendu réel de l'éditeur
+// (police, zoom/position photo, masque de découpe), + un état visuel
+// éditable/figé au tap qui est masqué pendant la capture de la vignette
+// pour ne pas polluer l'image enregistrée.
+function BlocValidation({ bloc, capturing, onToggle }) {
   const style = {
     position: 'absolute',
     left: `${bloc.x}%`, top: `${bloc.y}%`,
     width: `${bloc.width}%`, height: `${bloc.height}%`,
-    outline: bloc.editable ? '3px solid #22c55e' : '2px dashed rgba(0,0,0,0.25)',
+    outline: capturing ? 'none' : bloc.editable ? '3px solid #22c55e' : '2px dashed rgba(0,0,0,0.25)',
     cursor: 'pointer',
   }
 
@@ -186,17 +230,20 @@ function BlocValidation({ bloc, onToggle }) {
         <div
           className="w-full h-full flex overflow-hidden px-1 pointer-events-none"
           style={{
+            fontFamily: fontCss(bloc.police),
             fontWeight: bloc.gras ? 'bold' : 'normal',
             fontStyle: bloc.italique ? 'italic' : 'normal',
             textDecoration: bloc.souligne ? 'underline' : 'none',
             color: bloc.couleur,
             backgroundColor: bloc.fond || 'transparent',
             justifyContent: bloc.alignement === 'left' ? 'flex-start' : bloc.alignement === 'right' ? 'flex-end' : 'center',
+            alignItems: 'flex-start',
             textAlign: bloc.alignement,
             fontSize: `${bloc.taille}px`,
             lineHeight: 1.25,
             wordBreak: 'break-word',
             whiteSpace: 'pre-wrap',
+            overflowWrap: 'break-word',
           }}
         >
           <span style={{ width: '100%' }}>{bloc.contenu || ' '}</span>
@@ -205,28 +252,45 @@ function BlocValidation({ bloc, onToggle }) {
 
       {bloc.type === 'photo' && (
         <div
-          className="w-full h-full pointer-events-none"
+          className="w-full h-full overflow-hidden relative"
           style={{
-            backgroundColor: bloc.imageType === 'couleur' ? bloc.imageValeur : undefined,
-            backgroundImage: bloc.imageType === 'photo' ? `url(${bloc.imageValeur})` : undefined,
-            backgroundSize: 'contain',
-            backgroundRepeat: 'no-repeat',
-            backgroundPosition: 'center',
             opacity: bloc.opacite,
+            clipPath: (bloc.masque ?? 'rectangle') !== 'rectangle' ? `url(#masque-${bloc.id})` : undefined,
           }}
-        />
+        >
+          {(bloc.masque ?? 'rectangle') !== 'rectangle' && (
+            <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+              <clipPath id={`masque-${bloc.id}`} clipPathUnits="objectBoundingBox">
+                {MASQUES_SVG[bloc.masque]}
+              </clipPath>
+            </svg>
+          )}
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundColor: bloc.imageType === 'couleur' ? bloc.imageValeur : undefined,
+              backgroundImage: bloc.imageType === 'photo' ? `url(${bloc.imageValeur})` : undefined,
+              backgroundSize: 'contain',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'center',
+              transform: `translate(${bloc.imgOffsetX}%, ${bloc.imgOffsetY}%) scaleX(${(bloc.rotationFlipH ? -1 : 1) * (bloc.imgScaleX ?? 1)}) scaleY(${(bloc.rotationFlipV ? -1 : 1) * (bloc.imgScaleY ?? 1)})`,
+            }}
+          />
+        </div>
       )}
 
-      <div
-        className="absolute flex items-center justify-center rounded-full"
-        style={{
-          top: -10, right: -10, width: 24, height: 24,
-          backgroundColor: bloc.editable ? '#22c55e' : 'rgba(0,0,0,0.4)',
-          color: '#fff',
-        }}
-      >
-        {bloc.editable ? <Unlock size={13} /> : <Lock size={13} />}
-      </div>
+      {!capturing && (
+        <div
+          className="absolute flex items-center justify-center rounded-full"
+          style={{
+            top: -10, right: -10, width: 24, height: 24,
+            backgroundColor: bloc.editable ? '#22c55e' : 'rgba(0,0,0,0.4)',
+            color: '#fff',
+          }}
+        >
+          {bloc.editable ? <Unlock size={13} /> : <Lock size={13} />}
+        </div>
+      )}
     </div>
   )
 }
