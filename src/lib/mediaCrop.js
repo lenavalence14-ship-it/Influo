@@ -18,6 +18,7 @@ export const RATIO_VALUES = {
   horizontal: 16 / 9,
   vertical: 9 / 16,
   vertical_45: 4 / 5,
+  souvenir: 2 / 3,
 }
 
 export const ZOOM_MAX = 3
@@ -117,4 +118,5 @@ export const CROP_ASPECT_CLASSES = {
   horizontal: 'aspect-video',
   vertical: 'aspect-[9/16]',
   vertical_45: 'aspect-[4/5]',
+  souvenir: 'aspect-[2/3]', // ratio des templates souvenirs (voir TemplatePreview.jsx)
 }

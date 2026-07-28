@@ -245,7 +245,7 @@ export default function TemplatePreview() {
 
       const { data: post, error: errPost } = await supabase
         .from('posts')
-        .insert({ utilisateur_id: user.id, type: 'photo', legende: legende || null })
+        .insert({ utilisateur_id: user.id, type: 'photo', legende: legende || null, crop_format: 'souvenir' })
         .select().single()
       if (errPost) throw errPost
 
