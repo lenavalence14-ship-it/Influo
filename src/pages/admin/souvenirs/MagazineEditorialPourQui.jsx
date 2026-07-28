@@ -9,8 +9,8 @@ export default function MagazineEditorialPourQui() {
       subtitle="Pour qui voulez-vous créer ce magazine éditorial ?"
       columns={2}
       options={[
-        { emoji: 'man', label: 'Une personne', to: '/souvenirs/magazine-editorial/personne' },
-        { emojiCluster: ['man', 'woman'], label: 'Un groupe de personnes', to: '/souvenirs/templates/magazine-editorial-groupe' },
+        { emoji: 'man', label: 'Une personne', to: '/admin/souvenirs/magazine-editorial/personne' },
+        { emojiCluster: ['man', 'woman'], label: 'Un groupe de personnes', to: '/admin/souvenirs/templates/magazine-editorial-groupe' },
       ]}
     />
   )

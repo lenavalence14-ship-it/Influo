@@ -72,6 +72,13 @@ const AdminTemplateLibrary = lazy(() => import('./pages/admin/souvenirs/Template
 const AdminChoisirArrierePlan = lazy(() => import('./pages/admin/souvenirs/ChoisirArrierePlan'))
 const AdminChoisirCouleur = lazy(() => import('./pages/admin/souvenirs/ChoisirCouleur'))
 const AdminEditeurTemplateMobile = lazy(() => import('./pages/admin/souvenirs/EditeurTemplateMobile'))
+const AdminBonneFete = lazy(() => import('./pages/admin/souvenirs/BonneFete'))
+const AdminDefiSouvenirs = lazy(() => import('./pages/admin/souvenirs/DefiSouvenirs'))
+const AdminMagazineEditorialPourQui = lazy(() => import('./pages/admin/souvenirs/MagazineEditorialPourQui'))
+const AdminMagazineEditorialPersonne = lazy(() => import('./pages/admin/souvenirs/MagazineEditorialPersonne'))
+const AdminSouvenirEditorialPourQui = lazy(() => import('./pages/admin/souvenirs/SouvenirEditorialPourQui'))
+const AdminSouvenirEditorialPersonne = lazy(() => import('./pages/admin/souvenirs/SouvenirEditorialPersonne'))
+const AdminTemplatePreview = lazy(() => import('./pages/admin/souvenirs/TemplatePreview'))
 
 function RouteFallback() {
   return (
@@ -107,6 +114,13 @@ function AppRoutes() {
         <Route path="/admin/souvenirs/templates/:categorie/arriere-plan" element={<AdminRoute><AdminChoisirArrierePlan /></AdminRoute>} />
         <Route path="/admin/souvenirs/templates/:categorie/couleurs" element={<AdminRoute><AdminChoisirCouleur /></AdminRoute>} />
         <Route path="/admin/souvenirs/templates/:categorie/editeur" element={<AdminRoute><AdminEditeurTemplateMobile /></AdminRoute>} />
+        <Route path="/admin/souvenirs/bonne-fete" element={<AdminRoute><AdminBonneFete /></AdminRoute>} />
+        <Route path="/admin/souvenirs/defi-souvenirs" element={<AdminRoute><AdminDefiSouvenirs /></AdminRoute>} />
+        <Route path="/admin/souvenirs/magazine-editorial" element={<AdminRoute><AdminMagazineEditorialPourQui /></AdminRoute>} />
+        <Route path="/admin/souvenirs/magazine-editorial/personne" element={<AdminRoute><AdminMagazineEditorialPersonne /></AdminRoute>} />
+        <Route path="/admin/souvenirs/souvenir-editorial" element={<AdminRoute><AdminSouvenirEditorialPourQui /></AdminRoute>} />
+        <Route path="/admin/souvenirs/souvenir-editorial/personne" element={<AdminRoute><AdminSouvenirEditorialPersonne /></AdminRoute>} />
+        <Route path="/admin/souvenirs/apercu/:templateId" element={<AdminRoute><AdminTemplatePreview /></AdminRoute>} />
 
         {/* Chat pro (utilisateur <-> entreprise) : placé avant /messages/:id pour que
             "pro" ne soit jamais capturé comme un id de conversation normale. */}

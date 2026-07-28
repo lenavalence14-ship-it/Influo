@@ -10,8 +10,8 @@ export default function SouvenirEditorialPourQui() {
       subtitle="Pour qui voulez-vous créer ce souvenir ?"
       columns={2}
       options={[
-        { emoji: 'man', label: 'Une personne', to: '/souvenirs/souvenir-editorial/personne' },
-        { emojiCluster: ['man', 'woman'], label: 'Un groupe de personnes', to: '/souvenirs/templates/souvenir-editorial-groupe' },
+        { emoji: 'man', label: 'Une personne', to: '/admin/souvenirs/souvenir-editorial/personne' },
+        { emojiCluster: ['man', 'woman'], label: 'Un groupe de personnes', to: '/admin/souvenirs/templates/souvenir-editorial-groupe' },
       ]}
     />
   )

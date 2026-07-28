@@ -8,12 +8,12 @@ import EmojiIcon, { EmojiCluster } from '../../../components/EmojiIcon'
 // bibliothèque de templates ni édition pour l'instant -- ces écrans
 // arriveront progressivement, catégorie par catégorie.
 const MAIN_OPTIONS = [
-  { to: '/souvenirs/souvenir-editorial', emoji: 'man', label: 'Créer un souvenir éditorial' },
-  { to: '/souvenirs/magazine-editorial', emoji: 'envelope', label: 'Un magazine éditorial' },
-  { to: '/souvenirs/anniversaire', emoji: 'birthdayCake', label: 'Souhaiter un joyeux anniversaire' },
-  { to: '/souvenirs/bonne-fete', emoji: 'crescentMoon', label: 'Souhaiter bonne fête' },
-  { to: '/souvenirs/defi-souvenirs', emoji: 'flexedBiceps', label: 'Lancer un défi de souvenirs' },
-  { to: '/souvenirs/feliciter', emoji: 'trophy', label: 'Féliciter' },
+  { to: '/admin/souvenirs/souvenir-editorial', emoji: 'man', label: 'Créer un souvenir éditorial' },
+  { to: '/admin/souvenirs/magazine-editorial', emoji: 'envelope', label: 'Un magazine éditorial' },
+  { to: '/admin/souvenirs/anniversaire', emoji: 'birthdayCake', label: 'Souhaiter un joyeux anniversaire' },
+  { to: '/admin/souvenirs/bonne-fete', emoji: 'crescentMoon', label: 'Souhaiter bonne fête' },
+  { to: '/admin/souvenirs/defi-souvenirs', emoji: 'flexedBiceps', label: 'Lancer un défi de souvenirs' },
+  { to: '/admin/souvenirs/feliciter', emoji: 'trophy', label: 'Féliciter' },
 ]
 
 export default function MemoryStudio() {
@@ -21,9 +21,9 @@ export default function MemoryStudio() {
 
   const routeFor = (to) => {
     // Anniversaire et Féliciter n'ont aucun écran intermédiaire : ils mènent
-    // directement à la bibliothèque de templates.
-    if (to === '/souvenirs/anniversaire') return '/souvenirs/templates/anniversaire'
-    if (to === '/souvenirs/feliciter') return '/souvenirs/templates/feliciter'
+    // directement à la bibliothèque de templates (admin).
+    if (to === '/admin/souvenirs/anniversaire') return '/admin/souvenirs/templates/anniversaire'
+    if (to === '/admin/souvenirs/feliciter') return '/admin/souvenirs/templates/feliciter'
     return to
   }
 
