@@ -292,6 +292,53 @@ export default function EditeurTemplateMobile() {
     window.removeEventListener('touchend', onImageEnd)
   }
 
+  // -------------------- Édition image : étirement X/Y via poignées --------------------
+  const imgResizeState = useRef(null)
+
+  const startImageResize = (e, bloc, handle) => {
+    e.stopPropagation()
+    const rect = canvasRef.current.getBoundingClientRect()
+    const point = e.touches ? e.touches[0] : e
+    imgResizeState.current = {
+      id: bloc.id, handle,
+      startX: point.clientX, startY: point.clientY,
+      origScaleX: bloc.imgScaleX, origScaleY: bloc.imgScaleY,
+      blocWpx: (bloc.width / 100) * rect.width,
+      blocHpx: (bloc.height / 100) * rect.height,
+    }
+    window.addEventListener('mousemove', onImageResizeMove)
+    window.addEventListener('mouseup', onImageResizeEnd)
+    window.addEventListener('touchmove', onImageResizeMove, { passive: false })
+    window.addEventListener('touchend', onImageResizeEnd)
+  }
+
+  const onImageResizeMove = (e) => {
+    if (!imgResizeState.current) return
+    e.preventDefault?.()
+    const state = imgResizeState.current
+    const point = e.touches ? e.touches[0] : e
+    const dx = point.clientX - state.startX
+    const dy = point.clientY - state.startY
+    // 2x car scale s'applique symétriquement autour du centre de l'image
+    const dScaleX = (2 * dx) / state.blocWpx
+    const dScaleY = (2 * dy) / state.blocHpx
+
+    const updates = {}
+    if (state.handle.includes('e')) updates.imgScaleX = Math.max(0.1, Math.min(5, state.origScaleX + dScaleX))
+    if (state.handle.includes('w')) updates.imgScaleX = Math.max(0.1, Math.min(5, state.origScaleX - dScaleX))
+    if (state.handle.includes('s')) updates.imgScaleY = Math.max(0.1, Math.min(5, state.origScaleY + dScaleY))
+    if (state.handle.includes('n')) updates.imgScaleY = Math.max(0.1, Math.min(5, state.origScaleY - dScaleY))
+    updateBloc(state.id, updates)
+  }
+
+  const onImageResizeEnd = () => {
+    imgResizeState.current = null
+    window.removeEventListener('mousemove', onImageResizeMove)
+    window.removeEventListener('mouseup', onImageResizeEnd)
+    window.removeEventListener('touchmove', onImageResizeMove)
+    window.removeEventListener('touchend', onImageResizeEnd)
+  }
+
   const startResize = (e, bloc, handle) => {
     e.stopPropagation()
     const rect = canvasRef.current.getBoundingClientRect()
@@ -397,6 +444,7 @@ export default function EditeurTemplateMobile() {
               onDragStart={(e) => startDrag(e, bloc)}
               onResizeStart={(e, handle) => startResize(e, bloc, handle)}
               onImageDragStart={(e) => startImageDrag(e, bloc)}
+              onImageResizeStart={(e, handle) => startImageResize(e, bloc, handle)}
               onSupprimer={() => supprimerBloc(bloc.id)}
             />
           ))}
@@ -475,7 +523,7 @@ export default function EditeurTemplateMobile() {
 // =======================================================================
 // Rendu d'un bloc sur le canvas (texte ou photo) + poignées de resize/drag
 // =======================================================================
-function BlocRendu({ bloc, selected, editionImage, onSelect, onEntrerEditionImage, onDragStart, onResizeStart, onImageDragStart, onSupprimer }) {
+function BlocRendu({ bloc, selected, editionImage, onSelect, onEntrerEditionImage, onDragStart, onResizeStart, onImageDragStart, onImageResizeStart, onSupprimer }) {
   const style = {
     position: 'absolute',
     left: `${bloc.x}%`, top: `${bloc.y}%`,
@@ -542,6 +590,14 @@ function BlocRendu({ bloc, selected, editionImage, onSelect, onEntrerEditionImag
         </div>
       )}
 
+      {bloc.type === 'photo' && editionImage && (
+        <>
+          {['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'].map((h) => (
+            <PoigneeResize key={h} handle={h} color="#22c55e" onStart={(e) => onImageResizeStart(e, h)} />
+          ))}
+        </>
+      )}
+
       {selected && !editionImage && (
         <>
           {['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'].map((h) => (
@@ -562,7 +618,7 @@ function BlocRendu({ bloc, selected, editionImage, onSelect, onEntrerEditionImag
   )
 }
 
-function PoigneeResize({ handle, onStart }) {
+function PoigneeResize({ handle, onStart, color = '#3b82f6' }) {
   const pos = {
     nw: { top: -6, left: -6, cursor: 'nwse-resize' },
     n: { top: -6, left: '50%', marginLeft: -6, cursor: 'ns-resize' },
@@ -579,7 +635,7 @@ function PoigneeResize({ handle, onStart }) {
       onMouseDown={onStart}
       onTouchStart={onStart}
       className="absolute w-3 h-3 rounded-full bg-white border-2"
-      style={{ ...pos, position: 'absolute', borderColor: '#3b82f6', touchAction: 'none', zIndex: 10 }}
+      style={{ ...pos, position: 'absolute', borderColor: color, touchAction: 'none', zIndex: 10 }}
     />
   )
 }
