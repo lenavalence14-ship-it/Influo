@@ -11,7 +11,7 @@ import DraggableElement from './editor/DraggableElement'
 import { FONTS, getFontStyle } from './PhotoNoteEditor'
 import HlsVideo from '../../components/HlsVideo'
 import { usePostUpload } from '../../contexts/PostUploadContext'
-import { CROP_ASPECT_CLASSES, getCropTransformStyle, getMinZoom, clampZoom, clampOffset } from '../../lib/mediaCrop'
+import { CROP_ASPECT_CLASSES, getCropTransformStyle, getMinZoom, getCoverZoom, clampZoom, clampOffset } from '../../lib/mediaCrop'
 
 const RATIOS = [
   { value: 'carre', label: 'Carré', aspect: 'aspect-square' },
@@ -522,7 +522,8 @@ export default function CreatePost() {
   const computeNextCrop = (e) => {
     const rect = cropAreaRef.current.getBoundingClientRect()
     const gesture = gestureState.current
-    const minZoom = getMinZoom(gesture.start.naturalWidth, gesture.start.naturalHeight, format)
+    const minZoom = getMinZoom(gesture.start.naturalWidth, gesture.start.naturalHeight, format) // contain : plancher du zoom
+    const coverZoom = getCoverZoom(gesture.start.naturalWidth, gesture.start.naturalHeight, format) // seuil pan autorisé
 
     if (gesture.type === 'pinch' && e.touches?.length === 2) {
       const dist = distanceBetween(e.touches[0], e.touches[1])
@@ -531,8 +532,8 @@ export default function CreatePost() {
       return {
         ...gesture.start,
         zoom: nextZoom,
-        offsetX: clampOffset(gesture.start.offsetX, nextZoom, minZoom),
-        offsetY: clampOffset(gesture.start.offsetY, nextZoom, minZoom),
+        offsetX: clampOffset(gesture.start.offsetX, nextZoom, coverZoom),
+        offsetY: clampOffset(gesture.start.offsetY, nextZoom, coverZoom),
       }
     }
 
@@ -541,8 +542,8 @@ export default function CreatePost() {
     const dy = ((point.clientY - gesture.startY) / rect.height) * 100
     return {
       ...gesture.start,
-      offsetX: clampOffset(gesture.start.offsetX + dx, gesture.start.zoom, minZoom),
-      offsetY: clampOffset(gesture.start.offsetY + dy, gesture.start.zoom, minZoom),
+      offsetX: clampOffset(gesture.start.offsetX + dx, gesture.start.zoom, coverZoom),
+      offsetY: clampOffset(gesture.start.offsetY + dy, gesture.start.zoom, coverZoom),
     }
   }
 
@@ -617,18 +618,20 @@ export default function CreatePost() {
     setFormat(ratioValue)
     setCropsParMedia((prev) => prev.map((c) => {
       const minZoom = getMinZoom(c.naturalWidth, c.naturalHeight, ratioValue)
+      const coverZoom = getCoverZoom(c.naturalWidth, c.naturalHeight, ratioValue)
       const zoom = Math.max(c.zoom, minZoom)
       return {
         ...c,
         zoom,
-        offsetX: clampOffset(c.offsetX, zoom, minZoom),
-        offsetY: clampOffset(c.offsetY, zoom, minZoom),
+        offsetX: clampOffset(c.offsetX, zoom, coverZoom),
+        offsetY: clampOffset(c.offsetY, zoom, coverZoom),
       }
     }))
     setDraftCropActive((prev) => {
       const minZoom = getMinZoom(prev.naturalWidth, prev.naturalHeight, ratioValue)
+      const coverZoom = getCoverZoom(prev.naturalWidth, prev.naturalHeight, ratioValue)
       const zoom = Math.max(prev.zoom, minZoom)
-      return { ...prev, zoom, offsetX: clampOffset(prev.offsetX, zoom, minZoom), offsetY: clampOffset(prev.offsetY, zoom, minZoom) }
+      return { ...prev, zoom, offsetX: clampOffset(prev.offsetX, zoom, coverZoom), offsetY: clampOffset(prev.offsetY, zoom, coverZoom) }
     })
   }
 
@@ -768,10 +771,14 @@ export default function CreatePost() {
         <div className="flex-1 relative flex items-center justify-center overflow-hidden px-4">
           <div
             ref={cropAreaRef}
-            className={`relative w-full ${EDIT_ASPECT_CLASSES[format] || 'aspect-square'} overflow-hidden touch-none`}
+            className={`relative w-full bg-black ${EDIT_ASPECT_CLASSES[format] || 'aspect-square'} overflow-hidden touch-none`}
             onPointerDown={startGesture}
             onTouchStart={startGesture}
           >
+            {/* fond noir : au zoom minimum (contain), la photo entière est visible
+                et laisse du vide sur les côtés ou en haut/bas selon son ratio --
+                ce fond comble cet espace proprement (façon Instagram), plutôt
+                que de laisser transparaître le fond de l'écran */}
             {activeMediaIsVideo ? (
               <video
                 key={activeMedia}
@@ -855,11 +862,12 @@ export default function CreatePost() {
             value={draftCropActive.zoom}
             onChange={(e) => {
               const nextZoom = clampZoom(Number(e.target.value), minZoomActif)
+              const coverZoomActif = getCoverZoom(draftCropActive.naturalWidth, draftCropActive.naturalHeight, format)
               setDraftCropActive((prev) => ({
                 ...prev,
                 zoom: nextZoom,
-                offsetX: clampOffset(prev.offsetX, nextZoom, minZoomActif),
-                offsetY: clampOffset(prev.offsetY, nextZoom, minZoomActif),
+                offsetX: clampOffset(prev.offsetX, nextZoom, coverZoomActif),
+                offsetY: clampOffset(prev.offsetY, nextZoom, coverZoomActif),
               }))
             }}
             className="flex-1 accent-white"

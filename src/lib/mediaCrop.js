@@ -3,10 +3,15 @@
 //
 // Principe : le cadre a un ratio fixe (carré / 16:9 / 9:16). L'image/vidéo est
 // affichée dedans avec un zoom (échelle) et un offset (décalage du centre, en
-// % du cadre). Le zoom minimum autorisé est celui qui garantit que l'image
-// remplit ENTIÈREMENT le cadre, quel que soit son ratio d'origine — c'est ce
-// qui interdit structurellement tout espace vide, sans avoir à y penser au
-// moment de l'édition ni du rendu.
+// % du cadre). Deux seuils de zoom coexistent :
+// - "contain" (getContainZoom / getMinZoom) : la photo entière est visible,
+//   c'est le plancher du zoom dans l'éditeur -- l'utilisateur voit toujours
+//   sa photo en entier au minimum, comme Instagram à l'ouverture du crop.
+// - "cover" (getCoverZoom) : la photo remplit tout le cadre sans bord vide.
+//   C'est le seuil à partir duquel le pan (déplacement) est autorisé -- en
+//   dessous, déplacer l'image ne ferait que translater le vide, donc bloqué.
+// Entre les deux, l'utilisateur zoome progressivement de "toute la photo
+// visible" à "cadre rempli, recadrage possible".
 
 export const RATIO_VALUES = {
   carre: 1,
@@ -17,10 +22,15 @@ export const RATIO_VALUES = {
 
 export const ZOOM_MAX = 3
 
-// Zoom minimum : le plus petit facteur qui fait que l'image couvre tout le
-// cadre. Si l'image est plus "large" (proportionnellement) que le cadre, il
-// faut zoomer pour que sa hauteur remplisse le cadre (et inversement).
-export function getMinZoom(naturalWidth, naturalHeight, cropFormat) {
+// Zoom "cover" : le plus petit facteur qui fait que l'image couvre tout le
+// cadre (façon feed / PostCard). Si l'image est plus "large" (proportion-
+// nellement) que le cadre, il faut zoomer pour que sa hauteur remplisse le
+// cadre (et inversement). C'est le seuil à partir duquel il n'y a JAMAIS de
+// bord vide -- c'est pour ça que le pan (déplacement) n'est autorisé qu'à
+// partir de ce zoom : en dessous, l'image est plus petite que le cadre dans
+// au moins une dimension, donc la déplacer ne fait que changer le côté où
+// le vide apparaît, ça n'a pas de sens visuellement (comportement Instagram).
+export function getCoverZoom(naturalWidth, naturalHeight, cropFormat) {
   const frameRatio = RATIO_VALUES[cropFormat] || 1
   if (!naturalWidth || !naturalHeight) return 1
   const mediaRatio = naturalWidth / naturalHeight
@@ -28,11 +38,32 @@ export function getMinZoom(naturalWidth, naturalHeight, cropFormat) {
   // ratio = largeur/hauteur. Si mediaRatio > frameRatio, l'image est
   // "trop large" pour sa hauteur par rapport au cadre : à zoom 1 (image
   // affichée en object-contain dans le cadre), il resterait du vide sur les
-  // côtés si on ne zoomait pas -- le zoom minimum compense exactement ça.
+  // côtés si on ne zoomait pas -- le zoom cover compense exactement ça.
   if (mediaRatio > frameRatio) {
     return mediaRatio / frameRatio
   }
   return frameRatio / mediaRatio
+}
+
+// Zoom "contain" : l'inverse du cover. C'est le plus GRAND facteur qui fait
+// que l'image tient ENTIÈREMENT dans le cadre (aucun bord coupé), quel que
+// soit son ratio d'origine. C'est le nouveau plancher du zoom dans l'éditeur
+// (CreatePost) : au minimum, l'utilisateur voit toute sa photo, comme sur
+// Instagram à l'ouverture de l'éditeur de recadrage. Zoomer au-delà permet
+// ensuite de recadrer normalement.
+export function getContainZoom(naturalWidth, naturalHeight, cropFormat) {
+  const coverZoom = getCoverZoom(naturalWidth, naturalHeight, cropFormat)
+  // le contain est mathématiquement l'inverse du cover par rapport à 1 :
+  // si cover = mediaRatio/frameRatio (>1), contain = frameRatio/mediaRatio (<1)
+  return 1 / coverZoom
+}
+
+// Zoom minimum autorisé par le slider/pinch dans l'éditeur : c'est le zoom
+// contain (photo entière visible au minimum). Gardé sous ce nom pour ne pas
+// casser les appels existants ; utiliser getCoverZoom() explicitement pour
+// le seuil "pan autorisé" (voir clampOffset).
+export function getMinZoom(naturalWidth, naturalHeight, cropFormat) {
+  return getContainZoom(naturalWidth, naturalHeight, cropFormat)
 }
 
 // Contraint un zoom demandé dans les bornes [min, ZOOM_MAX].
@@ -40,15 +71,14 @@ export function clampZoom(zoom, minZoom) {
   return Math.min(ZOOM_MAX, Math.max(minZoom, zoom))
 }
 
-// Contraint un offset (en % du cadre) pour que l'image ne laisse jamais
-// apparaître de bord vide, compte tenu du zoom actuel. Au zoom minimum,
-// l'offset autorisé est 0 (l'image remplit tout juste le cadre, aucune marge
-// de manœuvre). Plus on zoome, plus on peut déplacer l'image.
-export function clampOffset(offset, zoom, minZoom) {
-  if (zoom <= minZoom) return 0
-  // marge disponible en % : proportionnelle à l'excédent de zoom par rapport
-  // au minimum requis pour remplir le cadre.
-  const maxOffsetPercent = 50 * (1 - minZoom / zoom)
+// Contraint un offset (en % du cadre). Le pan n'est autorisé qu'à partir du
+// zoom "cover" (coverZoom) : en dessous, l'image ne remplit pas le cadre
+// dans au moins une dimension, donc déplacer ne fait que translater le vide
+// -- comportement bloqué, comme Instagram. Au-dessus de coverZoom, la marge
+// est proportionnelle à l'excédent de zoom par rapport à ce seuil.
+export function clampOffset(offset, zoom, coverZoom) {
+  if (zoom <= coverZoom) return 0
+  const maxOffsetPercent = 50 * (1 - coverZoom / zoom)
   return Math.min(maxOffsetPercent, Math.max(-maxOffsetPercent, offset))
 }
 
@@ -58,10 +88,15 @@ export function clampOffset(offset, zoom, minZoom) {
 // garantit "jamais recalculer un nouveau cadrage au moment du rendu" -- la
 // fonction est la même des deux côtés, seules les valeurs stockées varient.
 export function getCropTransformStyle({ naturalWidth, naturalHeight, cropFormat, zoom, offsetX, offsetY }) {
-  const minZoom = getMinZoom(naturalWidth, naturalHeight, cropFormat)
-  const effectiveZoom = clampZoom(zoom ?? 1, minZoom)
-  const x = clampOffset(offsetX ?? 0, effectiveZoom, minZoom)
-  const y = clampOffset(offsetY ?? 0, effectiveZoom, minZoom)
+  const minZoom = getMinZoom(naturalWidth, naturalHeight, cropFormat) // contain : plancher du zoom
+  const coverZoom = getCoverZoom(naturalWidth, naturalHeight, cropFormat) // seuil à partir duquel le pan a un sens
+  // fallback sur coverZoom (pas 1) : posts legacy sans zoom stocké en base
+  // (colonne ajoutée après coup) -- sans ce fallback ils tomberaient au
+  // nouveau plancher "contain" et afficheraient du vide dans le feed alors
+  // qu'ils n'ont jamais été édités avec ce système.
+  const effectiveZoom = clampZoom(zoom ?? coverZoom, minZoom)
+  const x = clampOffset(offsetX ?? 0, effectiveZoom, coverZoom)
+  const y = clampOffset(offsetY ?? 0, effectiveZoom, coverZoom)
 
   return {
     // object-fit: cover en base (remplit le cadre en respectant le ratio),
