@@ -247,7 +247,7 @@ function TextPostBody({ texte }) {
   )
 }
 
-function PostCard({ post, onDeleted, autoOpenComments = false, priority = false, muted: mutedProp, onToggleMute: onToggleMuteProp, isFollowingAuthor, onToggleFollowAuthor }) {
+function PostCard({ post, onDeleted, autoOpenComments = false, priority = false, muted: mutedProp, onToggleMute: onToggleMuteProp }) {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const activeStoryIds = useActiveStories()
@@ -299,14 +299,14 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
   // d'abonnement (B1) et le badge "Suggestion" (B2). Jamais affiché sur son
   // propre post (isOwner).
   const auteurUserId = influencer?.user_id || utilisateurAuteur?.id
-  // Batch (Feed.jsx) en priorité -- un seul fetch pour tout le feed au lieu
-  // d'une requête follows par carte affichée. Repli sur le hook individuel
-  // uniquement quand la prop n'est pas fournie (carte affichée seule, ex:
-  // PostDetail), même pattern que muted/onToggleMute ci-dessus.
-  const individualFollow = useFollow(!isOwner && !isFollowingAuthor ? auteurUserId : undefined)
-  const isFollowing = isFollowingAuthor ? isFollowingAuthor.has(auteurUserId) : individualFollow.isFollowing
-  const toggleFollow = isFollowingAuthor ? () => onToggleFollowAuthor(auteurUserId) : individualFollow.toggleFollow
-  const followPending = isFollowingAuthor ? false : individualFollow.pending
+  // useFollow lit/écrit désormais le cache React Query PARTAGÉ
+  // ['following-ids', user.id] (voir hooks/useFollow.js) : cet appel voit
+  // exactement le même isFollowing que n'importe quel autre appel de
+  // useFollow ailleurs dans l'app (page profil, autre carte du feed...), et
+  // s'abonner ici met à jour tous les autres immédiatement -- plus besoin de
+  // faire descendre isFollowingAuthor/onToggleFollowAuthor en props depuis
+  // Feed.jsx pour éviter un désync, le cache partagé s'en charge nativement.
+  const { isFollowing, toggleFollow, pending: followPending } = useFollow(!isOwner ? auteurUserId : undefined)
 
   // collaboration vérifiée : ce post découle d'une commande validée
   const isCollabVerifiee = Boolean(post.commande_id)
