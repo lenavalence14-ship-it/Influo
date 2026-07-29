@@ -306,6 +306,9 @@ export default function InfluencerProfile() {
               <Button variant="glass" shape="rect" onClick={() => navigate('/dashboard')}>
                 Dashboard
               </Button>
+              <Button variant="glass" shape="rect" onClick={() => navigate('/profil/media-kit', { state: { reseaux } })}>
+                Media Kit
+              </Button>
             </>
           ) : (
             <>
