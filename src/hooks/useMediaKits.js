@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../lib/supabase'
 
 // Fetch partagé de tous les media kits existants, avec résolution du bon id
 // de navigation (profils_influenceur.id, pas users.id -- media_kits.influenceur_id
