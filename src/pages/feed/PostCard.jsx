@@ -525,11 +525,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
                 onClick={toggleFollow}
                 disabled={followPending}
                 className="px-3 py-1.5 rounded-full text-[12px] font-medium disabled:opacity-60 whitespace-nowrap"
-                style={
-                  isFollowing
-                    ? { backgroundColor: 'transparent', border: '1px solid var(--accent)', color: 'var(--accent)' }
-                    : { backgroundColor: 'var(--accent)', color: '#fff' }
-                }
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--accent)', color: 'var(--accent)' }}
               >
                 {isFollowing ? 'Abonné(e)' : "S'abonner"}
               </button>
