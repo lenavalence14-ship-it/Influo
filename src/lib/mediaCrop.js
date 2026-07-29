@@ -73,15 +73,18 @@ export function clampZoom(zoom, minZoom) {
   return Math.min(ZOOM_MAX, Math.max(minZoom, zoom))
 }
 
-// Contraint un offset (en % du cadre). Le pan n'est autorisé qu'à partir du
-// zoom "cover" (coverZoom) : en dessous, l'image ne remplit pas le cadre
-// dans au moins une dimension, donc déplacer ne fait que translater le vide
-// -- comportement bloqué, comme Instagram. Au-dessus de coverZoom, la marge
-// est proportionnelle à l'excédent de zoom par rapport à ce seuil.
+// Contraint un offset (en % du cadre). Marge FIXE (pas proportionnelle au
+// zoom) : contrairement à l'ancienne version qui bloquait quasiment tout pan
+// tant que le zoom restait proche du minimum "cover", ici l'utilisateur peut
+// toujours déplacer l'image haut/bas/gauche/droite de façon perceptible, à
+// n'importe quel niveau de zoom -- au prix, à zoom faible, de pouvoir laisser
+// apparaître un peu de fond (le fond noir du cadre côté éditeur) si on pousse
+// le déplacement au maximum. C'est un choix assumé : la liberté de recadrage
+// prime sur la garantie "jamais de bord vide".
+const MAX_PAN_PERCENT = 50
+
 export function clampOffset(offset, zoom, coverZoom) {
-  if (zoom <= coverZoom) return 0
-  const maxOffsetPercent = 50 * (1 - coverZoom / zoom)
-  return Math.min(maxOffsetPercent, Math.max(-maxOffsetPercent, offset))
+  return Math.min(MAX_PAN_PERCENT, Math.max(-MAX_PAN_PERCENT, offset))
 }
 
 // Construit le style CSS (transform) à appliquer au média À L'INTÉRIEUR d'un
