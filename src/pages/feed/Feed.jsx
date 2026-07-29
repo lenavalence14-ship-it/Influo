@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -15,6 +15,15 @@ import { usePullToRefresh } from '../../hooks/usePullToRefresh'
 import Logo from '../../components/ui/Logo'
 
 const PAGE_SIZE = 10
+
+// Un seul fetch pour TOUS les comptes suivis par l'utilisateur, réutilisé par
+// chaque PostCard (voir followingIds plus bas) -- avant ce correctif, chaque
+// carte affichée appelait individuellement useFollow, donc une requête
+// réseau par post visible dans le feed au lieu d'une requête pour tout le feed.
+async function fetchFollowingIds(userId) {
+  const { data } = await supabase.from('follows').select('followed_id').eq('follower_id', userId)
+  return new Set((data || []).map((f) => f.followed_id))
+}
 
 // Récupère une page de posts, puis les compteurs (likes/commentaires) uniquement pour
 // ces posts, en parallèle plutôt qu'en série. La pagination (10 posts par page au lieu
@@ -47,6 +56,7 @@ async function fetchFeedPage({ userId, pageParam = 0 }) {
           .from('posts')
           .select(`
             id, legende, crop_format, type, created_at, commande_id, filtre,
+            audio_url, audio_start, audio_duration,
             post_medias(media_url, media_type, thumbnail_url, position, filtre, zoom, offset_x, offset_y, natural_width, natural_height),
             profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
             utilisateur:utilisateur_id(id, nom_complet, photo_url),
@@ -140,6 +150,37 @@ export default function Feed() {
   })
 
   const posts = data?.pages.flatMap((p) => p.posts) || []
+
+  // followingIds : un seul fetch pour tout le feed (voir fetchFollowingIds
+  // plus haut). staleTime généreux : le feed se recharge de toute façon à
+  // chaque follow/unfollow via l'invalidation ci-dessous, pas besoin de
+  // reinterroger la base à chaque scroll.
+  const { data: followingIds = new Set() } = useQuery({
+    queryKey: ['following-ids', user?.id],
+    queryFn: () => fetchFollowingIds(user.id),
+    enabled: !!user,
+    staleTime: 60_000,
+  })
+
+  // Bascule optimiste locale (S1/S2) : on met à jour le cache React Query
+  // directement, sans refetch réseau -- chaque PostCard n'a plus besoin
+  // d'appeler useFollow individuellement, il suffit de lui passer isFollowing
+  // (dérivé de followingIds) et ce callback pour agir au clic.
+  const toggleFollowUser = useCallback(async (targetUserId) => {
+    if (!user?.id || !targetUserId) return
+    const isFollowing = followingIds.has(targetUserId)
+    queryClient.setQueryData(['following-ids', user.id], (old) => {
+      const next = new Set(old || [])
+      if (isFollowing) next.delete(targetUserId)
+      else next.add(targetUserId)
+      return next
+    })
+    if (isFollowing) {
+      await supabase.from('follows').delete().eq('follower_id', user.id).eq('followed_id', targetUserId)
+    } else {
+      await supabase.from('follows').insert({ follower_id: user.id, followed_id: targetUserId })
+    }
+  }, [user?.id, followingIds, queryClient])
 
   const { pullDistance, refreshing, threshold } = usePullToRefresh(refetch)
 
@@ -286,6 +327,8 @@ export default function Feed() {
                 priority={i < 2}
                 muted={feedMuted}
                 onToggleMute={toggleFeedMuted}
+                isFollowingAuthor={followingIds}
+                onToggleFollowAuthor={toggleFollowUser}
               />
             )
           )}

@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react'
-import { Heart, MessageCircle, Send, MoreHorizontal, X, Trash2, Pencil, Volume2, VolumeX, Repeat2, Bookmark } from 'lucide-react'
+import { Heart, MessageCircle, Send, MoreHorizontal, X, Trash2, Pencil, Volume2, VolumeX, Repeat2, Bookmark, Music } from 'lucide-react'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { InstagramIcon, TikTokIcon } from '../../components/ui/SocialIcons'
 import Avatar from '../../components/ui/Avatar'
@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
 import CommentsSheet from './CommentsSheet'
 import { useActiveStories } from '../../hooks/useActiveStories'
+import { useFollow } from '../../hooks/useFollow'
 import { timeAgo } from '../../lib/time'
 import { getFilterCss } from './editor/FilterPicker'
 import { CROP_ASPECT_CLASSES, getCropTransformStyle } from '../../lib/mediaCrop'
@@ -246,7 +247,7 @@ function TextPostBody({ texte }) {
   )
 }
 
-function PostCard({ post, onDeleted, autoOpenComments = false, priority = false, muted: mutedProp, onToggleMute: onToggleMuteProp }) {
+function PostCard({ post, onDeleted, autoOpenComments = false, priority = false, muted: mutedProp, onToggleMute: onToggleMuteProp, isFollowingAuthor, onToggleFollowAuthor }) {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const activeStoryIds = useActiveStories()
@@ -280,9 +281,32 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
   const carrouselRef = useRef(null)
   const [carrouselIndex, setCarrouselIndex] = useState(0)
 
+  // -------------------- Musique du post (C1/C2/C3) --------------------
+  // Indépendante du son des vidéos (muted/onToggleMute ci-dessus) : sa
+  // lecture démarre/coupe automatiquement selon la visibilité du post,
+  // et l'utilisateur peut la couper manuellement sans affecter le son
+  // d'une éventuelle vidéo du même post.
+  const hasMusique = Boolean(post.audio_url)
+  const audioMusiqueRef = useRef(null)
+  const [musicMuted, setMusicMuted] = useState(false)
+  const musicStopTimeoutRef = useRef(null)
+
   const influencer = post.profils_influenceur
   const utilisateurAuteur = post.utilisateur // renseigné uniquement pour un post-souvenir publié par un utilisateur_simple (influenceur_id est alors null)
   const isOwner = influencer?.user_id === user?.id || utilisateurAuteur?.id === user?.id
+
+  // user_id de l'auteur, quel que soit le type de compte, pour le bouton
+  // d'abonnement (B1) et le badge "Suggestion" (B2). Jamais affiché sur son
+  // propre post (isOwner).
+  const auteurUserId = influencer?.user_id || utilisateurAuteur?.id
+  // Batch (Feed.jsx) en priorité -- un seul fetch pour tout le feed au lieu
+  // d'une requête follows par carte affichée. Repli sur le hook individuel
+  // uniquement quand la prop n'est pas fournie (carte affichée seule, ex:
+  // PostDetail), même pattern que muted/onToggleMute ci-dessus.
+  const individualFollow = useFollow(!isOwner && !isFollowingAuthor ? auteurUserId : undefined)
+  const isFollowing = isFollowingAuthor ? isFollowingAuthor.has(auteurUserId) : individualFollow.isFollowing
+  const toggleFollow = isFollowingAuthor ? () => onToggleFollowAuthor(auteurUserId) : individualFollow.toggleFollow
+  const followPending = isFollowingAuthor ? false : individualFollow.pending
 
   // collaboration vérifiée : ce post découle d'une commande validée
   const isCollabVerifiee = Boolean(post.commande_id)
@@ -391,6 +415,57 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
     return () => playObserver.disconnect()
   }, [isVideo, mediaMounted])
 
+  // Lecture de la musique du post : même principe que l'autoplay vidéo
+  // (Instagram-like) -- joue automatiquement dès que le post est visible à
+  // plus de 60%, coupe sinon. Boucle sur la seule fenêtre choisie par
+  // l'auteur (audio_start -> audio_start + audio_duration), pas le fichier
+  // entier (le fichier stocké est déjà découpé à cette fenêtre exacte, voir
+  // CreatePost.jsx : audio_start vaut donc toujours 0 en pratique, mais on
+  // respecte la valeur réelle en base par prudence).
+  useEffect(() => {
+    if (!hasMusique || musicMuted) return
+    const audio = audioMusiqueRef.current
+    const container = mediaContainerRef.current
+    if (!audio || !container) return
+
+    const start = post.audio_start ?? 0
+    const duration = post.audio_duration
+
+    const clearMusicStop = () => {
+      if (musicStopTimeoutRef.current) {
+        clearTimeout(musicStopTimeoutRef.current)
+        musicStopTimeoutRef.current = null
+      }
+    }
+
+    const playFromStart = () => {
+      audio.currentTime = start
+      audio.play().catch(() => {})
+      clearMusicStop()
+      if (Number.isFinite(duration) && duration > 0) {
+        musicStopTimeoutRef.current = setTimeout(playFromStart, duration * 1000) // boucle sur la fenêtre choisie
+      }
+    }
+
+    const musicObserver = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+          playFromStart()
+        } else {
+          audio.pause()
+          clearMusicStop()
+        }
+      },
+      { threshold: [0, 0.6, 1] }
+    )
+    musicObserver.observe(container)
+    return () => {
+      musicObserver.disconnect()
+      clearMusicStop()
+      audio.pause()
+    }
+  }, [hasMusique, musicMuted, post.audio_start, post.audio_duration])
+
   const sortedMedias = allMedias.slice().sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
 
   const handleCarrouselScroll = () => {
@@ -411,14 +486,24 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
             {utilisateurAuteur ? (
               <div className="flex items-center gap-2 shrink-0">
                 <Avatar src={utilisateurAuteur.photo_url} seed={utilisateurAuteur.id} size="sm" />
-                <span className="text-[13px] leading-[16px] font-medium">{utilisateurAuteur.nom_complet}</span>
+                <div className="flex flex-col leading-tight">
+                  <span className="text-[13px] leading-[16px] font-medium">{utilisateurAuteur.nom_complet}</span>
+                  {!isOwner && !isFollowing && (
+                    <span className="text-[11px] leading-[13px]" style={{ color: 'var(--text-secondary)' }}>Suggestion</span>
+                  )}
+                </div>
               </div>
             ) : (
               <Link to={`/influenceur/${influencer?.id}`} className="flex items-center gap-2 shrink-0">
                 <Avatar src={influencer?.users?.photo_url} seed={influencer?.id} size="sm" ring={activeStoryIds.has(influencer?.id)} />
-                <div className="flex items-center gap-1">
-                  <span className="text-[13px] leading-[16px] font-medium">{influencer?.users?.nom_complet}</span>
-                  {influencer?.verifie && <VerifiedBadge size={12} />}
+                <div className="flex flex-col leading-tight">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[13px] leading-[16px] font-medium">{influencer?.users?.nom_complet}</span>
+                    {influencer?.verifie && <VerifiedBadge size={12} />}
+                  </div>
+                  {!isOwner && !isFollowing && (
+                    <span className="text-[11px] leading-[13px]" style={{ color: 'var(--text-secondary)' }}>Suggestion</span>
+                  )}
                 </div>
               </Link>
             )}
@@ -434,15 +519,32 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
             )}
           </div>
 
-          {isOwner && (
-            <button
-              onClick={() => setShowMenu(true)}
-              aria-label="Options"
-              className="w-9 h-9 -mr-1.5 flex items-center justify-center text-[var(--text-secondary)] shrink-0"
-            >
-              <MoreHorizontal size={19} />
-            </button>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {!isOwner && auteurUserId && (
+              <button
+                onClick={toggleFollow}
+                disabled={followPending}
+                className="px-3 py-1.5 rounded-full text-[12px] font-medium disabled:opacity-60 whitespace-nowrap"
+                style={
+                  isFollowing
+                    ? { backgroundColor: 'transparent', border: '1px solid var(--accent)', color: 'var(--accent)' }
+                    : { backgroundColor: 'var(--accent)', color: '#fff' }
+                }
+              >
+                {isFollowing ? 'Abonné(e)' : "S'abonner"}
+              </button>
+            )}
+
+            {isOwner && (
+              <button
+                onClick={() => setShowMenu(true)}
+                aria-label="Options"
+                className="w-9 h-9 -mr-1.5 flex items-center justify-center text-[var(--text-secondary)] shrink-0"
+              >
+                <MoreHorizontal size={19} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* post texte : pas de média, le texte s'affiche directement sous
@@ -580,6 +682,24 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
                 />
                 <TextOverlay media={allMedias[0]} />
               </div>
+            )}
+
+            {/* Musique du post (C2/C3) : lecture indépendante des vidéos,
+                bouton mute/unmute dédié. Décalé vers le haut (bottom-12 au
+                lieu de bottom-2) quand la carte affiche déjà un contrôle en
+                bas à droite (mute vidéo) ou en bas (points de carrousel),
+                pour ne jamais se superposer à un autre contrôle. */}
+            {hasMusique && (
+              <>
+                <audio ref={audioMusiqueRef} src={post.audio_url} muted={musicMuted} loop={false} />
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMusicMuted((m) => !m) }}
+                  aria-label={musicMuted ? 'Activer la musique' : 'Couper la musique'}
+                  className={`absolute ${isVideo || isCarrousel ? 'bottom-12' : 'bottom-2'} right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white`}
+                >
+                  {musicMuted ? <VolumeX size={16} /> : <Music size={16} />}
+                </button>
+              </>
             )}
           </div>
         )}
