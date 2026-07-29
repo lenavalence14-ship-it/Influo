@@ -6,7 +6,7 @@ import Avatar from '../../components/ui/Avatar'
 import BottomSheet from '../../components/ui/BottomSheet'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import CommentsSheet from './CommentsSheet'
 import { useActiveStories } from '../../hooks/useActiveStories'
 import { useFollow } from '../../hooks/useFollow'
@@ -250,6 +250,7 @@ function TextPostBody({ texte }) {
 function PostCard({ post, onDeleted, autoOpenComments = false, priority = false, muted: mutedProp, onToggleMute: onToggleMuteProp, isFollowingAuthor, onToggleFollowAuthor }) {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const activeStoryIds = useActiveStories()
   const [liked, setLiked] = useState(post.liked_by_me)
   const [likeCount, setLikeCount] = useState(post.like_count || 0)
@@ -288,7 +289,6 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
   // d'une éventuelle vidéo du même post.
   const hasMusique = Boolean(post.audio_url)
   const audioMusiqueRef = useRef(null)
-  const [musicMuted, setMusicMuted] = useState(false)
   const musicStopTimeoutRef = useRef(null)
 
   const influencer = post.profils_influenceur
@@ -423,7 +423,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
   // CreatePost.jsx : audio_start vaut donc toujours 0 en pratique, mais on
   // respecte la valeur réelle en base par prudence).
   useEffect(() => {
-    if (!hasMusique || musicMuted) return
+    if (!hasMusique || muted) return
     const audio = audioMusiqueRef.current
     const container = mediaContainerRef.current
     if (!audio || !container) return
@@ -464,7 +464,22 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
       clearMusicStop()
       audio.pause()
     }
-  }, [hasMusique, musicMuted, post.audio_start, post.audio_duration])
+  }, [hasMusique, muted, post.audio_start, post.audio_duration])
+
+  // Coupe la musique du post dès qu'on quitte le Feed : la route est gardée
+  // en vie par KeepAliveTabs (display:none au lieu d'être démontée), donc
+  // sans ceci la musique continuait de jouer en arrière-plan sur les autres
+  // écrans (Note, Profil…) et pouvait se superposer à leur propre son.
+  useEffect(() => {
+    if (location.pathname !== '/') {
+      const audio = audioMusiqueRef.current
+      if (audio) audio.pause()
+      if (musicStopTimeoutRef.current) {
+        clearTimeout(musicStopTimeoutRef.current)
+        musicStopTimeoutRef.current = null
+      }
+    }
+  }, [location.pathname])
 
   const sortedMedias = allMedias.slice().sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
 
@@ -687,13 +702,13 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
                 pour ne jamais se superposer à un autre contrôle. */}
             {hasMusique && (
               <>
-                <audio ref={audioMusiqueRef} src={post.audio_url} muted={musicMuted} loop={false} />
+                <audio ref={audioMusiqueRef} src={post.audio_url} muted={muted} loop={false} />
                 <button
-                  onClick={(e) => { e.stopPropagation(); setMusicMuted((m) => !m) }}
-                  aria-label={musicMuted ? 'Activer la musique' : 'Couper la musique'}
+                  onClick={(e) => { e.stopPropagation(); onToggleMute() }}
+                  aria-label={muted ? 'Activer le son' : 'Couper le son'}
                   className={`absolute ${isVideo || isCarrousel ? 'bottom-12' : 'bottom-2'} right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white`}
                 >
-                  {musicMuted ? <VolumeX size={16} /> : <Music size={16} />}
+                  {muted ? <VolumeX size={16} /> : <Music size={16} />}
                 </button>
               </>
             )}
@@ -827,5 +842,6 @@ export default memo(PostCard, (prev, next) => (
   prev.autoOpenComments === next.autoOpenComments &&
   prev.priority === next.priority &&
   prev.muted === next.muted &&
-  prev.onToggleMute === next.onToggleMute
+  prev.onToggleMute === next.onToggleMute &&
+  prev.isFollowingAuthor === next.isFollowingAuthor
 ))
