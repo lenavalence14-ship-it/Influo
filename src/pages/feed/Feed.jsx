@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import NoteBar from './NoteBar'
 import PostCard from './PostCard'
+import MediaKitSuggestion from './MediaKitSuggestion'
 import OfferCard from './OfferCard'
 import Card from '../../components/ui/Card'
 import { Sun, Moon, MessageCircle, Plus, RefreshCw } from 'lucide-react'
@@ -301,6 +302,8 @@ export default function Feed() {
       )}
 
       <NoteBar />
+
+      <MediaKitSuggestion />
 
       {loading ? (
         <div className="flex justify-center py-20">
