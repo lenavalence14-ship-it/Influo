@@ -46,7 +46,11 @@ export default function MediaKitSuggestion() {
   if (!chosen) return null
 
   return (
-    <div className="w-full aspect-[4/5]" style={{ backgroundColor: '#dcdcd4' }}>
+    <div className="w-full">
+      <p className="px-4 py-2 text-caption-medium text-[var(--text-secondary)]">
+        Suggestion pour toi
+      </p>
+      <div className="w-full aspect-[4/5]" style={{ backgroundColor: '#dcdcd4' }}>
       <div className="flex items-center justify-between px-5 pt-5 text-[11px] tracking-[0.2em] text-black/80 uppercase">
         <span>Media Kit</span>
         <span>Content Creator</span>
@@ -89,6 +93,7 @@ export default function MediaKitSuggestion() {
         {chosen.abonnes_tiktok != null && (
           <p className="text-[13px] underline">TikTok Followers: {chosen.abonnes_tiktok.toLocaleString()}</p>
         )}
+      </div>
       </div>
     </div>
   )
