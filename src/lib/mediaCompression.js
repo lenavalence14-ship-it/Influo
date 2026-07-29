@@ -23,10 +23,36 @@ export async function getMediaDimensions(file) {
       video.src = url
       video.muted = true
       video.playsInline = true
+      video.preload = 'metadata'
+      // Timeout de sécurité : sur certains fichiers (codec mal supporté par le
+      // WebView, fichier partiellement corrompu, conteneur exotique),
+      // onloadedmetadata ne se déclenche parfois jamais et onerror non plus --
+      // sans ce timeout, la promesse reste bloquée indéfiniment, et l'appelant
+      // (CreatePost.jsx) attend silencieusement avant de retomber sur des
+      // dimensions null. Avec ce timeout, l'échec est au moins explicite et
+      // rapide, ce qui permet un vrai retry ou un fallback informé.
       await new Promise((resolve, reject) => {
-        video.onloadedmetadata = resolve
-        video.onerror = reject
+        const timeoutId = setTimeout(
+          () => reject(new Error('getMediaDimensions: timeout de lecture des métadonnées vidéo')),
+          8000
+        )
+        video.onloadedmetadata = () => {
+          clearTimeout(timeoutId)
+          resolve()
+        }
+        video.onerror = () => {
+          clearTimeout(timeoutId)
+          reject(new Error('getMediaDimensions: échec de décodage vidéo'))
+        }
       })
+      // videoWidth/videoHeight peuvent rester à 0 même après un metadata "chargé"
+      // sur certains navigateurs/codecs -- ce n'est pas une exception, donc pas
+      // rattrapé par le catch de l'appelant. Signalé explicitement ici pour ne
+      // jamais renvoyer silencieusement des dimensions à 0 (qui feraient échouer
+      // le calcul de zoom en aval, cf mediaCrop.js).
+      if (!video.videoWidth || !video.videoHeight) {
+        throw new Error('getMediaDimensions: dimensions vidéo nulles après chargement des métadonnées')
+      }
       return { width: video.videoWidth, height: video.videoHeight }
     } finally {
       URL.revokeObjectURL(url)
