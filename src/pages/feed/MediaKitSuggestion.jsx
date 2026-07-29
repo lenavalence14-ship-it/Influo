@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { Camera } from 'lucide-react'
+import { getCropTransformStyle } from '../../lib/mediaCrop'
 
 // Rendu visuel d'un media kit "suggestion", façon suggestion Instagram :
 // aucune identité affichée (pas d'avatar, pas de nom de profil), juste le
@@ -30,7 +31,18 @@ export default function MediaKitSuggestion({ mediaKit, label = 'Suggestion pour 
           aria-label="Voir le profil"
         >
           {mediaKit.photo_url ? (
-            <img src={mediaKit.photo_url} alt="" className="w-full h-full object-cover" />
+            <img
+              src={mediaKit.photo_url}
+              alt=""
+              style={getCropTransformStyle({
+                naturalWidth: mediaKit.photo_natural_width,
+                naturalHeight: mediaKit.photo_natural_height,
+                cropFormat: 'media_kit',
+                zoom: mediaKit.photo_zoom,
+                offsetX: mediaKit.photo_offset_x,
+                offsetY: mediaKit.photo_offset_y,
+              })}
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-black/30">
               <Camera size={32} />

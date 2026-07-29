@@ -19,6 +19,7 @@ export const RATIO_VALUES = {
   vertical: 9 / 16,
   vertical_45: 4 / 5,
   souvenir: 2 / 3,
+  media_kit: 4 / 3, // cadre photo du Media Kit (MediaKit.jsx / MediaKitSuggestion.jsx)
 }
 
 export const ZOOM_MAX = 3
@@ -119,4 +120,5 @@ export const CROP_ASPECT_CLASSES = {
   vertical: 'aspect-[9/16]',
   vertical_45: 'aspect-[4/5]',
   souvenir: 'aspect-[2/3]', // ratio des templates souvenirs (voir TemplatePreview.jsx)
+  media_kit: 'aspect-[4/3]',
 }

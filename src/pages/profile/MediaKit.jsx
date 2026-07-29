@@ -5,7 +5,9 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import { compressImage } from '../../lib/mediaCompression'
+import { compressImage, getMediaDimensions } from '../../lib/mediaCompression'
+import { getCropTransformStyle } from '../../lib/mediaCrop'
+import PhotoCropEditor from '../../components/PhotoCropEditor'
 
 // Catégories fixes proposées à l'influenceur, 3 maximum.
 const CATEGORIES = [
@@ -42,6 +44,12 @@ export default function MediaKit() {
   const [selectedCategories, setSelectedCategories] = useState([])
   const [photoFile, setPhotoFile] = useState(null)
   const [photoPreview, setPhotoPreview] = useState('')
+  // Recadrage zoom/pan de la photo (voir lib/mediaCrop.js, format 'media_kit').
+  // null quand aucun recadrage manuel n'a encore été fait sur CETTE photo :
+  // getCropTransformStyle retombe alors sur son fallback (coverZoom, cadre
+  // rempli sans bord vide), donc l'aperçu reste correct même sans recadrage.
+  const [photoCrop, setPhotoCrop] = useState(null)
+  const [showCropEditor, setShowCropEditor] = useState(false)
   const [abonnesInstagram, setAbonnesInstagram] = useState('')
   const [abonnesTiktok, setAbonnesTiktok] = useState('')
 
@@ -72,6 +80,15 @@ export default function MediaKit() {
         setNom(kitResult.data.nom)
         setSelectedCategories(kitResult.data.categories || [])
         setPhotoPreview(kitResult.data.photo_url || '')
+        if (kitResult.data.photo_zoom != null) {
+          setPhotoCrop({
+            zoom: kitResult.data.photo_zoom,
+            offsetX: kitResult.data.photo_offset_x ?? 0,
+            offsetY: kitResult.data.photo_offset_y ?? 0,
+            naturalWidth: kitResult.data.photo_natural_width,
+            naturalHeight: kitResult.data.photo_natural_height,
+          })
+        }
         setAbonnesInstagram(kitResult.data.abonnes_instagram != null ? String(kitResult.data.abonnes_instagram) : '')
         setAbonnesTiktok(kitResult.data.abonnes_tiktok != null ? String(kitResult.data.abonnes_tiktok) : '')
       } else {
@@ -104,6 +121,13 @@ export default function MediaKit() {
     if (!file) return
     setPhotoFile(file)
     setPhotoPreview(URL.createObjectURL(file))
+    setPhotoCrop(null) // nouvelle photo : on efface le recadrage de l'ancienne, l'utilisateur en refait un
+    setShowCropEditor(true)
+  }
+
+  const handleCropConfirm = (crop) => {
+    setPhotoCrop(crop)
+    setShowCropEditor(false)
   }
 
   const handleSave = async () => {
@@ -136,6 +160,11 @@ export default function MediaKit() {
         prenom: prenom.trim(),
         nom: nom.trim(),
         photo_url: photoUrl,
+        photo_zoom: photoCrop?.zoom ?? null,
+        photo_offset_x: photoCrop?.offsetX ?? null,
+        photo_offset_y: photoCrop?.offsetY ?? null,
+        photo_natural_width: photoCrop?.naturalWidth ?? null,
+        photo_natural_height: photoCrop?.naturalHeight ?? null,
         categories: selectedCategories,
         abonnes_instagram: Number.isFinite(finalInstagram) ? finalInstagram : null,
         abonnes_tiktok: Number.isFinite(finalTiktok) ? finalTiktok : null,
@@ -188,16 +217,43 @@ export default function MediaKit() {
         <div className="px-4 py-4 space-y-5">
           {errorMsg && <p className="text-caption text-red-500">{errorMsg}</p>}
 
+          {/* Aperçu = exactement le cadre 4/3 qui sera affiché dans le Media
+              Kit et repris dans le Feed (MediaKitSuggestion) -- pas un avatar
+              rond, pour que ce que l'influenceur recadre ici soit bien ce
+              qu'il voit ensuite en plein cadre. */}
           <div className="flex flex-col items-center gap-3">
-            <label className="relative w-28 h-28 rounded-full overflow-hidden glass flex items-center justify-center cursor-pointer">
+            <div className="relative w-full max-w-[220px] aspect-[4/3] rounded-lg overflow-hidden glass">
               {photoPreview ? (
-                <img src={photoPreview} alt="" className="w-full h-full object-cover" />
+                <img
+                  src={photoPreview}
+                  alt=""
+                  style={getCropTransformStyle({
+                    naturalWidth: photoCrop?.naturalWidth,
+                    naturalHeight: photoCrop?.naturalHeight,
+                    cropFormat: 'media_kit',
+                    zoom: photoCrop?.zoom,
+                    offsetX: photoCrop?.offsetX,
+                    offsetY: photoCrop?.offsetY,
+                  })}
+                />
               ) : (
-                <Camera size={28} className="text-[var(--text-secondary)]" />
+                <label className="w-full h-full flex items-center justify-center cursor-pointer">
+                  <Camera size={28} className="text-[var(--text-secondary)]" />
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+                </label>
               )}
-              <input type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
-            </label>
-            <span className="text-caption text-[var(--text-secondary)]">Toucher pour changer la photo</span>
+            </div>
+            <div className="flex gap-4">
+              <label className="text-caption text-[var(--accent)] cursor-pointer">
+                Changer la photo
+                <input type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+              </label>
+              {photoPreview && (
+                <button type="button" onClick={() => setShowCropEditor(true)} className="text-caption text-[var(--accent)]">
+                  Repositionner
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -257,9 +313,20 @@ export default function MediaKit() {
           prenom={existingKit?.prenom}
           nom={existingKit?.nom}
           photoUrl={existingKit?.photo_url}
+          photoCrop={photoCrop}
           categories={existingKit?.categories || []}
           abonnesInstagram={displayInstagram}
           abonnesTiktok={displayTiktok}
+        />
+      )}
+
+      {showCropEditor && photoPreview && (
+        <PhotoCropEditor
+          imageSrc={photoPreview}
+          cropFormat="media_kit"
+          initialCrop={photoCrop}
+          onCancel={() => setShowCropEditor(false)}
+          onConfirm={handleCropConfirm}
         />
       )}
     </div>
@@ -268,7 +335,11 @@ export default function MediaKit() {
 
 // Rendu visuel du media kit final, au format demandé (photo pleine largeur en
 // haut, nom en grandes lettres espacées, bandeau catégories, chiffres en bas).
-function MediaKitCard({ prenom, nom, photoUrl, categories, abonnesInstagram, abonnesTiktok }) {
+// photoCrop : { zoom, offsetX, offsetY, naturalWidth, naturalHeight } ou null
+// -- même donnée que celle enregistrée en base (photo_zoom/offset_x/offset_y/
+// natural_width/natural_height), reprise telle quelle par MediaKitSuggestion
+// dans le Feed via getCropTransformStyle (aucun recalcul différent).
+function MediaKitCard({ prenom, nom, photoUrl, photoCrop, categories, abonnesInstagram, abonnesTiktok }) {
   return (
     <div className="mx-4 mt-2 rounded-2xl overflow-hidden" style={{ backgroundColor: '#dcdcd4' }}>
       <div className="flex items-center justify-between px-5 pt-5 text-[11px] tracking-[0.2em] text-black/80 uppercase">
@@ -278,7 +349,18 @@ function MediaKitCard({ prenom, nom, photoUrl, categories, abonnesInstagram, abo
 
       <div className="mx-5 mt-4 aspect-[4/3] rounded-lg overflow-hidden bg-black/10">
         {photoUrl ? (
-          <img src={photoUrl} alt="" className="w-full h-full object-cover" />
+          <img
+            src={photoUrl}
+            alt=""
+            style={getCropTransformStyle({
+              naturalWidth: photoCrop?.naturalWidth,
+              naturalHeight: photoCrop?.naturalHeight,
+              cropFormat: 'media_kit',
+              zoom: photoCrop?.zoom,
+              offsetX: photoCrop?.offsetX,
+              offsetY: photoCrop?.offsetY,
+            })}
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-black/30">
             <Camera size={32} />
