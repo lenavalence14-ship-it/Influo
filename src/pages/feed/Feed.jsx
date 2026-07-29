@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -6,6 +6,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import NoteBar from './NoteBar'
 import PostCard from './PostCard'
 import MediaKitSuggestion from './MediaKitSuggestion'
+import { useMediaKits } from '../../hooks/useMediaKits'
 import OfferCard from './OfferCard'
 import Card from '../../components/ui/Card'
 import { Sun, Moon, MessageCircle, Plus, RefreshCw } from 'lucide-react'
@@ -151,6 +152,40 @@ export default function Feed() {
   })
 
   const posts = data?.pages.flatMap((p) => p.posts) || []
+
+  // Media kits "suggestion" : un en haut de feed, d'autres intercalés en
+  // scrollant à intervalles aléatoires (façon Instagram), sans jamais
+  // répéter deux fois le même media kit dans un même rendu du feed.
+  const { data: mediaKits = [] } = useMediaKits()
+
+  // Tirage mémoïsé : ne se refait pas à chaque re-render (sinon les media
+  // kits affichés changeraient sous les yeux de l'utilisateur pendant qu'il
+  // scrolle), seulement quand la liste de media kits disponibles ou de
+  // posts change réellement (nouvelle page chargée).
+  const feedItemsWithMediaKits = useMemo(() => {
+    if (mediaKits.length === 0) return { top: null, items: posts.map((post) => ({ type: 'post', post })) }
+
+    const shuffled = [...mediaKits].sort(() => Math.random() - 0.5)
+    const top = shuffled[0]
+    const pool = shuffled.slice(1) // le reste, disponible pour l'intercalation -- jamais le même qu'en haut
+
+    const items = []
+    let poolIndex = 0
+    let nextInsertAt = pool.length > 0 ? Math.floor(Math.random() * 7) + 6 : Infinity // entre 6 et 12 posts
+
+    posts.forEach((post, i) => {
+      items.push({ type: 'post', post })
+      if (pool.length > 0 && i + 1 === nextInsertAt) {
+        const mk = pool[poolIndex % pool.length]
+        items.push({ type: 'media-kit', mediaKit: mk, key: `mk-${i}` })
+        poolIndex += 1
+        nextInsertAt = i + 1 + Math.floor(Math.random() * 7) + 6
+      }
+    })
+
+    return { top, items }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaKits.length, posts.length])
 
   // followingIds : un seul fetch pour tout le feed (voir fetchFollowingIds
   // plus haut). staleTime généreux : le feed se recharge de toute façon à
@@ -303,7 +338,7 @@ export default function Feed() {
 
       <NoteBar />
 
-      <MediaKitSuggestion />
+      <MediaKitSuggestion mediaKit={feedItemsWithMediaKits.top} />
 
       {loading ? (
         <div className="flex justify-center py-20">
@@ -319,8 +354,12 @@ export default function Feed() {
         </div>
       ) : (
         <div className="pt-0">
-          {posts.map((post, i) =>
-            post.item_type === 'offre' ? (
+          {feedItemsWithMediaKits.items.map((item, i) => {
+            if (item.type === 'media-kit') {
+              return <MediaKitSuggestion key={item.key} mediaKit={item.mediaKit} label="Suggestion pour toi" />
+            }
+            const post = item.post
+            return post.item_type === 'offre' ? (
               <OfferCard key={post.id} offer={post} onDeleted={handleDeleted} />
             ) : (
               <PostCard
@@ -334,7 +373,7 @@ export default function Feed() {
                 onToggleFollowAuthor={toggleFollowUser}
               />
             )
-          )}
+          })}
           {hasNextPage && (
             <div ref={observerRef} className="flex justify-center py-6">
               {isFetchingNextPage && (
