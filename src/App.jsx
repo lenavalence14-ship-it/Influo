@@ -41,7 +41,6 @@ const ReelsViewer = lazy(() => import('./pages/feed/ReelsViewer'))
 const PostDetail = lazy(() => import('./pages/feed/PostDetail'))
 
 const InfluencerProfile = lazy(() => import('./pages/profile/InfluencerProfile'))
-const MediaKit = lazy(() => import('./pages/profile/MediaKit'))
 const EditProfile = lazy(() => import('./pages/profile/EditProfile'))
 const ClientProfileView = lazy(() => import('./pages/profile/ClientProfileView'))
 const SimpleUserProfileView = lazy(() => import('./pages/profile/SimpleUserProfileView'))
@@ -246,7 +245,6 @@ function AppRoutes() {
           <Route path="/post/:id" element={<PostDetail />} />
           <Route path="/profil" element={<MyProfileRouter />} />
           <Route path="/profil/modifier" element={<EditProfile />} />
-          <Route path="/profil/media-kit" element={<MediaKit />} />
           <Route path="/influenceur/:id" element={<InfluencerProfile />} />
           <Route path="/entreprise/:id" element={<ClientProfileView />} />
           <Route path="/utilisateur/:id" element={<SimpleUserProfileView />} />
