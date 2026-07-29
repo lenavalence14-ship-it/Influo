@@ -300,11 +300,14 @@ export default function InfluencerProfile() {
         <div className="mt-4 flex gap-2">
           {isMe ? (
             <>
-              <Button variant="glass" shape="rect" fullWidth onClick={() => navigate('/profil/modifier')}>
-                Modifier le profil
+              <Button variant="glass" shape="rect" className="flex-1" onClick={() => navigate('/profil/modifier')}>
+                Modifier
               </Button>
-              <Button variant="glass" shape="rect" onClick={() => navigate('/dashboard')}>
+              <Button variant="glass" shape="rect" className="flex-1" onClick={() => navigate('/dashboard')}>
                 Dashboard
+              </Button>
+              <Button variant="glass" shape="rect" className="flex-1" onClick={() => navigate('/profil/media-kit', { state: { reseaux } })}>
+                Media Kit
               </Button>
             </>
           ) : (
