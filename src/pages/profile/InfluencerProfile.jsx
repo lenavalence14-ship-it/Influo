@@ -31,6 +31,8 @@ export default function InfluencerProfile() {
   const [offres, setOffres] = useState([])
   const [reseaux, setReseaux] = useState([])
   const [collabCount, setCollabCount] = useState(0)
+  const [collabPhotoCount, setCollabPhotoCount] = useState(0)
+  const [collabVideoCount, setCollabVideoCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
   const activeNoteUserIds = useActiveNotes()
@@ -116,10 +118,24 @@ export default function InfluencerProfile() {
           for (const a of auteurs || []) {
             countByPost[a.post_id] = (countByPost[a.post_id] || 0) + 1
           }
-          setCollabCount(Object.values(countByPost).filter((n) => n > 1).length)
+          const collabPostIds = Object.keys(countByPost).filter((pid) => countByPost[pid] > 1)
+          const typeByPostId = {}
+          for (const p of enrichedPosts) typeByPostId[p.id] = p.type
+
+          let photoN = 0
+          let videoN = 0
+          for (const pid of collabPostIds) {
+            if (typeByPostId[pid] === 'video') videoN++
+            else photoN++
+          }
+          setCollabCount(collabPostIds.length)
+          setCollabPhotoCount(photoN)
+          setCollabVideoCount(videoN)
         }
       } else if (!cancelled) {
         setCollabCount(0)
+        setCollabPhotoCount(0)
+        setCollabVideoCount(0)
       }
       setLoading(false)
     }
@@ -360,20 +376,22 @@ export default function InfluencerProfile() {
           <button
             onClick={() => setSubTab('grille')}
             aria-label="Grille"
-            className={`flex-1 py-2.5 flex items-center justify-center ${
+            className={`flex-1 py-2.5 flex items-center justify-center gap-1.5 ${
               subTab === 'grille' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
             }`}
           >
             <Grid3x3 size={20} />
+            <span className="text-caption">{collabPhotoCount}</span>
           </button>
           <button
             onClick={() => setSubTab('video')}
             aria-label="Vidéo"
-            className={`flex-1 py-2.5 flex items-center justify-center ${
+            className={`flex-1 py-2.5 flex items-center justify-center gap-1.5 ${
               subTab === 'video' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
             }`}
           >
             <Video size={20} />
+            <span className="text-caption">{collabVideoCount}</span>
           </button>
         </div>
       )}

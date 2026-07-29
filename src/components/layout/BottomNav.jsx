@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Home, Search, Heart, Sparkles } from 'lucide-react'
+import { Home, Search, Bell, Sparkles } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useUnreadCounts } from '../../hooks/useUnreadCounts'
 
@@ -71,7 +71,7 @@ export default function BottomNav() {
     ...(canUseMemoryStudio ? [{ to: '/souvenirs', icon: Sparkles, label: 'Souvenirs' }] : []),
     {
       to: '/notifications',
-      icon: Heart,
+      icon: Bell,
       label: 'Notifications',
       dot: hasUnreadNotifications,
     },

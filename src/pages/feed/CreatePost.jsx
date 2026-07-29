@@ -3,10 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { Image as ImageIcon, X, RotateCcw, Check } from 'lucide-react'
-import { compressImage, compressVideo, generateVideoThumbnail, getMediaDimensions } from '../../lib/mediaCompression'
+import { Image as ImageIcon, X, RotateCcw, Check, Music } from 'lucide-react'
+import { compressImage, compressVideo, generateVideoThumbnail, getMediaDimensions, trimAudio } from '../../lib/mediaCompression'
 import { triggerHlsTranscode } from '../../lib/hlsTranscode'
 import FilterPicker, { getFilterCss } from './editor/FilterPicker'
+import MusicPicker from './editor/MusicPicker'
 import DraggableElement from './editor/DraggableElement'
 import { FONTS, getFontStyle } from './PhotoNoteEditor'
 import HlsVideo from '../../components/HlsVideo'
@@ -17,6 +18,7 @@ const RATIOS = [
   { value: 'carre', label: 'Carré', aspect: 'aspect-square' },
   { value: 'vertical', label: 'Vertical', aspect: 'aspect-[9/16]' },
   { value: 'horizontal', label: 'Paysage', aspect: 'aspect-video' },
+  { value: 'souvenir', label: '2:3', aspect: 'aspect-[2/3]' },
 ]
 
 // Classes aspect-ratio par format, pour que le cadre d'édition adopte
@@ -39,6 +41,12 @@ export default function CreatePost() {
   const [step, setStep] = useState(isEditing ? 'edit' : 'select') // 'select' | 'edit' | 'crop' | 'texte' | 'texte_post'
   const [textePostDraft, setTextePostDraft] = useState('') // contenu d'un post 100% texte (pas de média), distinct de textEl (overlay sur photo/vidéo)
   const [showFilters, setShowFilters] = useState(false)
+  const [showMusic, setShowMusic] = useState(false)
+  // Musique du post (globale, comme la légende) : { file, start, duration } | null.
+  // Même forme que dans PhotoNoteEditor/MusicPicker -- le fichier source complet
+  // est gardé tel quel, le découpage (trimAudio) n'a lieu qu'à la publication.
+  const [musique, setMusique] = useState(null)
+  const [existingAudioUrl, setExistingAudioUrl] = useState(null)
   const [files, setFiles] = useState([])
   const [previews, setPreviews] = useState([])
   const [existingMediaUrls, setExistingMediaUrls] = useState([])
@@ -123,6 +131,11 @@ export default function CreatePost() {
       if (data) {
         setLegende(data.legende || '')
         setFormat(data.crop_format || 'carre')
+        // Musique existante : on ne peut pas re-proposer le fichier source original
+        // (non conservé, seul le passage découpé est en storage) ni le re-uploader
+        // tel quel dans MusicPicker (qui attend un File, pas une URL). On affiche
+        // juste l'info via existingAudioUrl -- MusicPicker permet de la remplacer.
+        setExistingAudioUrl(data.audio_url || null)
         const sorted = [...(data.post_medias || [])].sort((a, b) => a.position - b.position)
         setExistingMediaUrls(sorted.map((m) => m.media_url))
         setExistingMediaIds(sorted.map((m) => m.id))
@@ -264,14 +277,48 @@ export default function CreatePost() {
     setLoading(true)
     setPublishError(null)
 
-    // Champs réellement globaux au post : la légende, et le ratio (crop_format)
-    // -- commun au carrousel puisque tous ses éléments s'affichent au même
-    // format. Le crop réel (zoom/pan), comme le filtre et le texte overlay,
-    // est désormais indépendant par média, écrit directement sur chaque ligne
-    // post_medias (voir plus bas).
+    // Musique (optionnelle), même logique que CreateNote.jsx : on ne garde QUE
+    // le passage choisi (15 ou 20s) -- découpage réel via trimAudio (Web Audio
+    // API) avant l'upload, plutôt que d'envoyer le morceau source entier.
+    // audio_start reste à 0 puisque le fichier uploadé DÉMARRE déjà au bon
+    // endroit. Si l'utilisateur n'a pas touché à la musique en édition, on
+    // conserve l'URL existante (existingAudioUrl) sans re-uploader.
+    let audioUrl = musique ? null : existingAudioUrl
+    let audioDuration = musique ? null : (existingAudioUrl ? undefined : null)
+    if (musique?.file) {
+      try {
+        const trimmed = await trimAudio(musique.file, musique.start, musique.duration)
+        const audioFileName = `${(influencerProfile?.id || user.id)}/post-audio-${Date.now()}.wav`
+        const { error: audioUploadError } = await supabase.storage.from('posts').upload(audioFileName, trimmed)
+        if (audioUploadError) {
+          setLoading(false)
+          setPublishError(audioUploadError.message)
+          return
+        }
+        const { data: audioUrlData } = supabase.storage.from('posts').getPublicUrl(audioFileName)
+        audioUrl = audioUrlData.publicUrl
+        audioDuration = musique.duration
+      } catch (trimError) {
+        // Le découpage a échoué (fichier corrompu, format non décodable) : on
+        // publie quand même le post SANS musique plutôt que de tout bloquer.
+        console.error('Échec découpage musique de post :', trimError)
+        audioUrl = null
+        audioDuration = null
+      }
+    }
+
+    // Champs réellement globaux au post : la légende, le ratio (crop_format)
+    // et désormais la musique -- communs au carrousel puisque tous ses
+    // éléments s'affichent au même format et partagent la même bande son. Le
+    // crop réel (zoom/pan), comme le filtre et le texte overlay, reste
+    // indépendant par média, écrit directement sur chaque ligne post_medias
+    // (voir plus bas).
     const commonFields = {
       legende,
       crop_format: format,
+      audio_url: audioUrl,
+      audio_start: audioUrl ? 0 : null,
+      audio_duration: audioUrl ? audioDuration : null,
     }
 
     if (isEditing) {
@@ -989,6 +1036,13 @@ export default function CreatePost() {
         </button>
         <div className="flex items-center gap-4">
           <button
+            onClick={() => setShowMusic((s) => !s)}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white"
+            style={{ background: musique || existingAudioUrl ? 'var(--accent)' : 'rgba(255,255,255,0.1)' }}
+          >
+            <Music size={16} />
+          </button>
+          <button
             onClick={openCrop}
             className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white"
           >
@@ -1130,6 +1184,16 @@ export default function CreatePost() {
         <div className="shrink-0 bg-black/95 pt-2" style={{ animation: 'slideUpPanel 0.2s ease-out' }}>
           <p className="text-center text-white/60 text-caption pb-1">Filtres</p>
           <FilterPicker imageUrl={activeMedia} isVideo={activeMediaIsVideo} value={filtre} onChange={setFiltre} />
+        </div>
+      )}
+
+      {showMusic && (
+        <div className="shrink-0 bg-black/95 pt-2" style={{ animation: 'slideUpPanel 0.2s ease-out' }}>
+          <MusicPicker
+            initial={musique}
+            onChange={(next) => setMusique(next)}
+            onClose={() => setShowMusic(false)}
+          />
         </div>
       )}
 
