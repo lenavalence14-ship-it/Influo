@@ -72,11 +72,11 @@ export default function InfluencerProfile() {
           .from('posts')
           .select(`
             id, legende, crop_format, created_at, type, filtre,
-            post_medias(media_url, media_type, thumbnail_url, position),
+            post_medias(media_url, media_type, thumbnail_url, position, filtre, zoom, offset_x, offset_y, natural_width, natural_height),
             profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
           `)
           .eq('influenceur_id', targetId)
-          .in('type', ['photo', 'carrousel', 'video'])
+          .in('type', ['photo', 'carrousel', 'video', 'texte'])
           .order('created_at', { ascending: false })
           .limit(60),
         isMe ? offresQuery : offresQuery.eq('actif', true),
