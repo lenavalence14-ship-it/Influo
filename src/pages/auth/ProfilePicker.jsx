@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MoreHorizontal, ChevronRight } from 'lucide-react'
-import { getSavedAccounts, switchToAccount, saveAccount } from '../../lib/accountSwitcher'
-import { supabase } from '../../lib/supabase'
+import { getSavedAccounts, switchToAccount } from '../../lib/accountSwitcher'
 import { useTheme } from '../../contexts/ThemeContext'
 import Avatar from '../../components/ui/Avatar'
 import appIcon from '../../assets/app-icon.png'
@@ -12,7 +11,6 @@ export default function ProfilePicker() {
   const [accounts, setAccounts] = useState(null)
   const [switchingId, setSwitchingId] = useState(null)
   const [error, setError] = useState('')
-  const [debugInfo, setDebugInfo] = useState('') // DEBUG TEMPORAIRE — à retirer une fois la cause trouvée.
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
@@ -30,37 +28,7 @@ export default function ProfilePicker() {
     setError('')
     setSwitchingId(userId)
 
-    // DEBUG TEMPORAIRE — à retirer une fois la cause trouvée.
-    const accountsBeforeSwitch = await getSavedAccounts()
-    const targetAccount = accountsBeforeSwitch.find((a) => a.userId === userId)
-    const debugLines = [
-      `Comptes stockés localement: ${accountsBeforeSwitch.length}`,
-      `Compte ciblé trouvé: ${targetAccount ? 'oui' : 'NON'}`,
-      `refreshToken présent: ${targetAccount?.refreshToken ? 'oui (' + targetAccount.refreshToken.length + ' car.)' : 'NON'}`,
-    ]
-
-    const { data: currentSessionData } = await supabase.auth.getSession()
-    const currentSession = currentSessionData?.session
-    debugLines.push(`Session active avant switch: ${currentSession ? 'oui, user=' + currentSession.user.id.slice(0, 8) : 'aucune'}`)
-
-    if (currentSession?.user?.id && currentSession.user.id !== userId) {
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('nom_complet, photo_url')
-        .eq('id', currentSession.user.id)
-        .maybeSingle()
-      await saveAccount({
-        userId: currentSession.user.id,
-        nomComplet: userRow?.nom_complet || currentSession.user.email,
-        email: currentSession.user.email,
-        photoUrl: userRow?.photo_url || null,
-        refreshToken: currentSession.refresh_token,
-      })
-    }
-
     const { error } = await switchToAccount(userId)
-    debugLines.push(`Résultat switchToAccount: ${error ? 'ERREUR — ' + (error.message || JSON.stringify(error)) : 'succès'}`)
-    setDebugInfo(debugLines.join('\n'))
     setSwitchingId(null)
     if (error) {
       const list = await getSavedAccounts()
@@ -108,12 +76,6 @@ export default function ProfilePicker() {
 
         {error && (
           <p className="text-center text-small text-[var(--accent)] mb-4">{error}</p>
-        )}
-
-        {debugInfo && (
-          <div className="mb-4 p-3 rounded-xl bg-black/80 text-white text-[10px] leading-relaxed whitespace-pre-wrap select-all">
-            {debugInfo}
-          </div>
         )}
 
         <div className="space-y-3 mb-8">
