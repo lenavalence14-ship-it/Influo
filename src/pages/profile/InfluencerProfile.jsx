@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import Button from '../../components/ui/Button'
-import { LogOut, Plus, X, Link2, Grid3x3, Video, ArrowLeft } from 'lucide-react'
+import { LogOut, Plus, Link2, Grid3x3, Video, ArrowLeft } from 'lucide-react'
 import { InstagramIcon, TikTokIcon, FacebookIcon, YouTubeIcon, XIcon, SnapchatIcon } from '../../components/ui/SocialIcons'
 
 const PLATFORM_ICONS = {
@@ -27,7 +27,6 @@ export default function InfluencerProfile() {
   const [tab, setTab] = useState('publications')
   const [subTab, setSubTab] = useState('grille')
   const [posts, setPosts] = useState([])
-  const [selectedPost, setSelectedPost] = useState(null)
   const [offres, setOffres] = useState([])
   const [reseaux, setReseaux] = useState([])
   const [collabCount, setCollabCount] = useState(0)
@@ -406,47 +405,18 @@ export default function InfluencerProfile() {
             subTab === 'video' ? p.type === 'video' : p.type !== 'video'
           )
           return (
-            <div className="grid grid-cols-3 gap-0.5 p-0.5">
+            <div className="pt-0">
               {filteredPosts.length === 0 ? (
-                <div className="col-span-3 py-16 text-center text-[var(--text-secondary)] text-body">
+                <div className="py-16 text-center text-[var(--text-secondary)] text-body">
                   {subTab === 'video' ? 'Aucune vidéo.' : 'Aucune publication.'}
                 </div>
               ) : (
                 filteredPosts.map((p) => (
-                  <button
+                  <PostCard
                     key={p.id}
-                    onClick={() => (p.type === 'video' ? navigate(`/video/${p.id}`) : setSelectedPost(p))}
-                    className="aspect-[4/5] bg-black/20 relative"
-                  >
-                    {p.post_medias?.[0]?.media_url && (
-                      p.type === 'video' ? (
-                        p.post_medias[0].thumbnail_url ? (
-                          <img
-                            src={p.post_medias[0].thumbnail_url}
-                            alt=""
-                            loading="lazy"
-                            decoding="async"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          // Pas de thumbnail générée (ancien post) : on n'affiche jamais le fichier
-                          // vidéo complet ici (ça téléchargerait toute la vidéo juste pour peupler
-                          // une case de grille). On garde le fond neutre avec une icône vidéo discrète.
-                          <div className="w-full h-full flex items-center justify-center bg-black/30">
-                            <Video size={20} className="text-white/40" />
-                          </div>
-                        )
-                      ) : (
-                        <img
-                          src={p.post_medias[0].media_url}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover"
-                        />
-                      )
-                    )}
-                  </button>
+                    post={p}
+                    onDeleted={(id) => setPosts((ps) => ps.filter((post) => post.id !== id))}
+                  />
                 ))
               )}
             </div>
@@ -474,28 +444,6 @@ export default function InfluencerProfile() {
         </div>
       )}
 
-      {selectedPost && (
-        <div className="fixed inset-0 z-[100] bg-[var(--bg-primary)] overflow-y-auto">
-          <div className="flex items-center px-4 py-3 sticky top-0 bg-[var(--bg-primary)]/90 backdrop-blur-xl z-10">
-            <button
-              onClick={() => setSelectedPost(null)}
-              aria-label="Fermer"
-              className="w-11 h-11 -ml-2 flex items-center justify-center"
-            >
-              <X size={22} />
-            </button>
-          </div>
-          <div className="px-4 pb-6">
-            <PostCard
-              post={selectedPost}
-              onDeleted={(id) => {
-                setPosts((ps) => ps.filter((p) => p.id !== id))
-                setSelectedPost(null)
-              }}
-            />
-          </div>
-        </div>
-      )}
       {noteViewer}
     </div>
   )
