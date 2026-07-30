@@ -267,7 +267,7 @@ export default function Feed() {
 
   return (
     <div>
-      <header className="flex items-center justify-between px-4 pt-6 pb-2 sticky top-0 z-30 bg-[var(--bg-primary)]/80 backdrop-blur-xl">
+      <header className="flex items-center justify-between px-4 pt-6 pb-2 sticky top-0 z-30 bg-[var(--bg-primary)]">
         <Logo size={20} />
 
         <div className="flex items-center gap-1.5">
