@@ -334,20 +334,6 @@ export default function Feed() {
         </div>
       </header>
 
-      {/* Barre "Quoi de neuf ?" façon Facebook -- purement visuelle pour
-          l'instant, PAS de navigation au clic (demande explicite : ajouter
-          l'élément d'abord, brancher une action plus tard). */}
-      <div className="flex items-center gap-2.5 px-4 py-2">
-        <img
-          src={profile?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${user?.id}`}
-          alt=""
-          className="w-8 h-8 rounded-full object-cover shrink-0"
-        />
-        <div className="flex-1 glass rounded-full px-3.5 py-1.5 text-caption text-[var(--text-secondary)]">
-          Quoi de neuf ?
-        </div>
-      </div>
-
       {(pullDistance > 0 || refreshing) && (
         <div
           className="flex justify-center items-center overflow-hidden transition-[height]"
