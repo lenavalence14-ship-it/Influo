@@ -54,12 +54,21 @@ export default function SwitchAccount() {
 
   const handleConsent = async (remember) => {
     if (remember && pendingSession) {
+      // On NE réutilise PAS pendingSession.refreshToken tel quel : du temps s'est
+      // écoulé depuis le signIn (le temps que l'utilisateur lise l'écran de
+      // consentement et clique), et Supabase peut avoir déjà rafraîchi ce token
+      // automatiquement entre-temps (autoRefreshToken: true) -- le stocker
+      // écraserait alors une valeur plus récente et valide par une déjà morte,
+      // provoquant "Refresh Token Not Found" au prochain switch. On relit donc
+      // la session courante au moment même de l'écriture.
+      const { data: currentSessionData } = await supabase.auth.getSession()
+      const freshRefreshToken = currentSessionData?.session?.refresh_token || pendingSession.refreshToken
       await saveAccount({
         userId: pendingSession.userId,
         nomComplet: pendingSession.nomComplet,
         email: pendingSession.email,
         photoUrl: pendingSession.photoUrl,
-        refreshToken: pendingSession.refreshToken,
+        refreshToken: freshRefreshToken,
       })
     }
     navigate('/')
