@@ -8,6 +8,7 @@ import Input from '../../components/ui/Input'
 import { compressImage, getMediaDimensions } from '../../lib/mediaCompression'
 import { getCropTransformStyle } from '../../lib/mediaCrop'
 import PhotoCropEditor from '../../components/PhotoCropEditor'
+import { MEDIA_KIT_TEMPLATES } from '../feed/media-kit-templates'
 
 // Catégories fixes proposées à l'influenceur, 3 maximum.
 const CATEGORIES = [
@@ -309,15 +310,32 @@ export default function MediaKit() {
           </Button>
         </div>
       ) : (
-        <MediaKitCard
-          prenom={existingKit?.prenom}
-          nom={existingKit?.nom}
-          photoUrl={existingKit?.photo_url}
-          photoCrop={photoCrop}
-          categories={existingKit?.categories || []}
-          abonnesInstagram={displayInstagram}
-          abonnesTiktok={displayTiktok}
-        />
+        <div className="space-y-8 pb-8">
+          <p className="px-4 text-caption text-[var(--text-secondary)]">
+            Voici les différents designs sous lesquels ton Media Kit peut apparaître dans le Feed
+            (un design différent est tiré au hasard à chaque apparition).
+          </p>
+          {MEDIA_KIT_TEMPLATES.map((Template, i) => (
+            <div key={i} className="mx-4 rounded-2xl overflow-hidden">
+              <Template
+                mediaKit={{
+                  prenom: existingKit?.prenom,
+                  nom: existingKit?.nom,
+                  photo_url: existingKit?.photo_url,
+                  photo_zoom: photoCrop?.zoom,
+                  photo_offset_x: photoCrop?.offsetX,
+                  photo_offset_y: photoCrop?.offsetY,
+                  photo_natural_width: photoCrop?.naturalWidth,
+                  photo_natural_height: photoCrop?.naturalHeight,
+                  categories: existingKit?.categories || [],
+                  abonnes_instagram: displayInstagram,
+                  abonnes_tiktok: displayTiktok,
+                }}
+                onOpenProfile={() => {}}
+              />
+            </div>
+          ))}
+        </div>
       )}
 
       {showCropEditor && photoPreview && (
@@ -329,68 +347,6 @@ export default function MediaKit() {
           onConfirm={handleCropConfirm}
         />
       )}
-    </div>
-  )
-}
-
-// Rendu visuel du media kit final, au format demandé (photo pleine largeur en
-// haut, nom en grandes lettres espacées, bandeau catégories, chiffres en bas).
-// photoCrop : { zoom, offsetX, offsetY, naturalWidth, naturalHeight } ou null
-// -- même donnée que celle enregistrée en base (photo_zoom/offset_x/offset_y/
-// natural_width/natural_height), reprise telle quelle par MediaKitSuggestion
-// dans le Feed via getCropTransformStyle (aucun recalcul différent).
-function MediaKitCard({ prenom, nom, photoUrl, photoCrop, categories, abonnesInstagram, abonnesTiktok }) {
-  return (
-    <div className="mx-4 mt-2 rounded-2xl overflow-hidden" style={{ backgroundColor: '#dcdcd4' }}>
-      <div className="flex items-center justify-between px-5 pt-5 text-[11px] tracking-[0.2em] text-black/80 uppercase">
-        <span>Media Kit</span>
-        <span>Content Creator</span>
-      </div>
-
-      <div className="mx-5 mt-4 aspect-[4/3] rounded-lg overflow-hidden bg-black/10">
-        {photoUrl ? (
-          <img
-            src={photoUrl}
-            alt=""
-            style={getCropTransformStyle({
-              naturalWidth: photoCrop?.naturalWidth,
-              naturalHeight: photoCrop?.naturalHeight,
-              cropFormat: 'media_kit',
-              zoom: photoCrop?.zoom,
-              offsetX: photoCrop?.offsetX,
-              offsetY: photoCrop?.offsetY,
-            })}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-black/30">
-            <Camera size={32} />
-          </div>
-        )}
-      </div>
-
-      <div className="flex justify-between px-5 mt-5 text-black">
-        <span className="text-[26px] tracking-[0.15em] uppercase">{prenom || 'Prénom'}</span>
-        <span className="text-[26px] tracking-[0.15em] uppercase">{nom || 'Nom'}</span>
-      </div>
-
-      {categories.length > 0 && (
-        <div className="px-5 mt-6">
-          <div className="inline-block px-3 py-1.5" style={{ backgroundColor: '#2fae8f' }}>
-            <span className="text-[13px] tracking-[0.2em] uppercase text-black">
-              {categories.join(' • ')}
-            </span>
-          </div>
-        </div>
-      )}
-
-      <div className="px-5 mt-8 pb-6 space-y-2 text-black">
-        {abonnesInstagram != null && (
-          <p className="text-right text-[14px] underline">Instagram Followers: {abonnesInstagram.toLocaleString()}</p>
-        )}
-        {abonnesTiktok != null && (
-          <p className="text-[14px] underline">TikTok Followers: {abonnesTiktok.toLocaleString()}</p>
-        )}
-      </div>
     </div>
   )
 }
