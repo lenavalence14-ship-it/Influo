@@ -3,7 +3,6 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
-import NoteBar from './NoteBar'
 import PostCard from './PostCard'
 import MediaKitSuggestion from './MediaKitSuggestion'
 import { useMediaKits } from '../../hooks/useMediaKits'
@@ -369,8 +368,6 @@ export default function Feed() {
           />
         </div>
       )}
-
-      <NoteBar />
 
       <MediaKitSuggestion mediaKit={feedItemsWithMediaKits.top} />
 
