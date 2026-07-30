@@ -271,15 +271,15 @@ export default function Feed() {
       <header className="flex items-center justify-between px-4 pt-6 pb-2 sticky top-0 z-30 bg-[var(--bg-primary)]/80 backdrop-blur-xl">
         <Logo size={20} />
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {profile?.role === 'influenceur' ? (
             <button
               onClick={() => navigate('/publier')}
               aria-label="Publier"
-              className="relative glass rounded-2xl w-11 h-11 flex items-center justify-center"
+              className="relative glass rounded-xl w-7 h-7 flex items-center justify-center"
             >
               {uploadProgress !== null && (
-                <svg className="absolute inset-0 w-11 h-11 -rotate-90" viewBox="0 0 36 36">
+                <svg className="absolute inset-0 w-7 h-7 -rotate-90" viewBox="0 0 36 36">
                   <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--border)" strokeWidth="2" />
                   <circle
                     cx="18"
@@ -295,7 +295,7 @@ export default function Feed() {
                   />
                 </svg>
               )}
-              <Plus size={19} />
+              <Plus size={14} />
               {uploadProgress !== null && (
                 <span
                   className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-semibold px-1 rounded-full whitespace-nowrap"
@@ -309,28 +309,28 @@ export default function Feed() {
             <button
               onClick={() => navigate('/publier-offre')}
               aria-label="Publier un appel d'offre"
-              className="glass rounded-2xl w-11 h-11 flex items-center justify-center"
+              className="glass rounded-xl w-7 h-7 flex items-center justify-center"
             >
-              <Plus size={19} />
+              <Plus size={14} />
             </button>
           ) : null}
 
           <button
             onClick={() => navigate('/messages')}
             aria-label="Messages"
-            className="relative glass rounded-2xl w-11 h-11 flex items-center justify-center"
+            className="relative glass rounded-xl w-7 h-7 flex items-center justify-center"
           >
-            <MessageCircle size={19} />
+            <MessageCircle size={14} />
             {hasUnreadMessages && (
-              <span className="absolute top-2 right-2.5 w-2 h-2 rounded-full" style={{ backgroundColor: '#4f0c2d' }} />
+              <span className="absolute top-1 right-1.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#4f0c2d' }} />
             )}
           </button>
           <button
             onClick={toggleTheme}
             aria-label="Changer de thème"
-            className="glass rounded-2xl w-11 h-11 flex items-center justify-center"
+            className="glass rounded-xl w-7 h-7 flex items-center justify-center"
           >
-            {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
           </button>
         </div>
       </header>
@@ -338,13 +338,13 @@ export default function Feed() {
       {/* Barre "Quoi de neuf ?" façon Facebook -- purement visuelle pour
           l'instant, PAS de navigation au clic (demande explicite : ajouter
           l'élément d'abord, brancher une action plus tard). */}
-      <div className="flex items-center gap-3 px-4 py-3">
+      <div className="flex items-center gap-2.5 px-4 py-2">
         <img
           src={profile?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${user?.id}`}
           alt=""
-          className="w-10 h-10 rounded-full object-cover shrink-0"
+          className="w-8 h-8 rounded-full object-cover shrink-0"
         />
-        <div className="flex-1 glass rounded-full px-4 py-2.5 text-body text-[var(--text-secondary)]">
+        <div className="flex-1 glass rounded-full px-3.5 py-1.5 text-caption text-[var(--text-secondary)]">
           Quoi de neuf ?
         </div>
       </div>
