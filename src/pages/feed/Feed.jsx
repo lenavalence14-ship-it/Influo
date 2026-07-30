@@ -269,54 +269,52 @@ export default function Feed() {
   return (
     <div>
       <header className="flex items-center justify-between px-4 pt-6 pb-2 sticky top-0 z-30 bg-[var(--bg-primary)]/80 backdrop-blur-xl">
-        {profile?.role === 'influenceur' ? (
-          <button
-            onClick={() => navigate('/publier')}
-            aria-label="Publier"
-            className="relative w-9 h-9 flex items-center justify-center"
-          >
-            {uploadProgress !== null && (
-              <svg className="absolute inset-0 w-9 h-9 -rotate-90" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--border)" strokeWidth="2" />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.5"
-                  fill="none"
-                  stroke="var(--accent)"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeDasharray={2 * Math.PI * 15.5}
-                  strokeDashoffset={2 * Math.PI * 15.5 * (1 - uploadProgress / 100)}
-                  style={{ transition: 'stroke-dashoffset 0.3s ease' }}
-                />
-              </svg>
-            )}
-            <Plus size={24} />
-            {uploadProgress !== null && (
-              <span
-                className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-semibold px-1 rounded-full whitespace-nowrap"
-                style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--accent)' }}
-              >
-                {uploadProgress}%
-              </span>
-            )}
-          </button>
-        ) : profile?.role === 'client' ? (
-          <button
-            onClick={() => navigate('/publier-offre')}
-            aria-label="Publier un appel d'offre"
-            className="w-9 h-9 flex items-center justify-center"
-          >
-            <Plus size={24} />
-          </button>
-        ) : (
-          <div className="w-9 h-9" />
-        )}
-
-        <Logo size={30} />
+        <Logo size={20} />
 
         <div className="flex items-center gap-2">
+          {profile?.role === 'influenceur' ? (
+            <button
+              onClick={() => navigate('/publier')}
+              aria-label="Publier"
+              className="relative glass rounded-2xl w-11 h-11 flex items-center justify-center"
+            >
+              {uploadProgress !== null && (
+                <svg className="absolute inset-0 w-11 h-11 -rotate-90" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--border)" strokeWidth="2" />
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15.5"
+                    fill="none"
+                    stroke="var(--accent)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 15.5}
+                    strokeDashoffset={2 * Math.PI * 15.5 * (1 - uploadProgress / 100)}
+                    style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                  />
+                </svg>
+              )}
+              <Plus size={19} />
+              {uploadProgress !== null && (
+                <span
+                  className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-semibold px-1 rounded-full whitespace-nowrap"
+                  style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--accent)' }}
+                >
+                  {uploadProgress}%
+                </span>
+              )}
+            </button>
+          ) : profile?.role === 'client' ? (
+            <button
+              onClick={() => navigate('/publier-offre')}
+              aria-label="Publier un appel d'offre"
+              className="glass rounded-2xl w-11 h-11 flex items-center justify-center"
+            >
+              <Plus size={19} />
+            </button>
+          ) : null}
+
           <button
             onClick={() => navigate('/messages')}
             aria-label="Messages"
@@ -336,6 +334,20 @@ export default function Feed() {
           </button>
         </div>
       </header>
+
+      {/* Barre "Quoi de neuf ?" façon Facebook -- purement visuelle pour
+          l'instant, PAS de navigation au clic (demande explicite : ajouter
+          l'élément d'abord, brancher une action plus tard). */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <img
+          src={profile?.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${user?.id}`}
+          alt=""
+          className="w-10 h-10 rounded-full object-cover shrink-0"
+        />
+        <div className="flex-1 glass rounded-full px-4 py-2.5 text-body text-[var(--text-secondary)]">
+          Quoi de neuf ?
+        </div>
+      </div>
 
       {(pullDistance > 0 || refreshing) && (
         <div
