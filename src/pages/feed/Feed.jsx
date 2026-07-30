@@ -158,34 +158,56 @@ export default function Feed() {
   // répéter deux fois le même media kit dans un même rendu du feed.
   const { data: mediaKits = [] } = useMediaKits()
 
-  // Tirage mémoïsé : ne se refait pas à chaque re-render (sinon les media
-  // kits affichés changeraient sous les yeux de l'utilisateur pendant qu'il
-  // scrolle), seulement quand la liste de media kits disponibles ou de
-  // posts change réellement (nouvelle page chargée).
+  // Tirage mémoïsé : ne se refait PAS à chaque re-render ni à chaque nouvelle
+  // page de posts chargée (posts.length grandit à chaque scroll) -- sinon tout
+  // le tirage (position des media kits ET, en cascade via un remount, leur
+  // template) repart de zéro à chaque scroll, donnant une impression de
+  // "clignotement" au lieu d'un feed stable comme Instagram. On dépend
+  // seulement de la LISTE de media kits disponibles (via une clé stable faite
+  // de leurs ids triés, pas juste sa longueur) : le tirage n'est refait que si
+  // l'ensemble réel de media kits change, jamais pour une simple page de plus.
+  const mediaKitsKey = useMemo(
+    () => [...mediaKits].map((mk) => mk.id).sort().join(','),
+    [mediaKits]
+  )
+
+  // On garde le résultat déjà calculé pour les posts déjà vus, et on
+  // n'étend le calcul QUE sur les posts nouvellement chargés -- jamais de
+  // retirage sur une position déjà décidée précédemment.
+  const feedItemsCache = useRef({ mediaKitsKey: null, top: null, items: [], postsProcessed: 0, poolIndex: 0, nextInsertAt: null, pool: [] })
+
   const feedItemsWithMediaKits = useMemo(() => {
-    if (mediaKits.length === 0) return { top: null, items: posts.map((post) => ({ type: 'post', post })) }
+    const cache = feedItemsCache.current
 
-    const shuffled = [...mediaKits].sort(() => Math.random() - 0.5)
-    const top = shuffled[0]
-    const pool = shuffled.slice(1) // le reste, disponible pour l'intercalation -- jamais le même qu'en haut
+    // Nouvel ensemble de media kits (changement réel, pas juste un scroll) :
+    // on retire tout depuis le début, une seule fois.
+    if (cache.mediaKitsKey !== mediaKitsKey) {
+      const shuffled = [...mediaKits].sort(() => Math.random() - 0.5)
+      cache.mediaKitsKey = mediaKitsKey
+      cache.top = mediaKits.length > 0 ? shuffled[0] : null
+      cache.pool = mediaKits.length > 0 ? shuffled.slice(1) : []
+      cache.items = []
+      cache.postsProcessed = 0
+      cache.poolIndex = 0
+      cache.nextInsertAt = cache.pool.length > 0 ? Math.floor(Math.random() * 7) + 6 : Infinity
+    }
 
-    const items = []
-    let poolIndex = 0
-    let nextInsertAt = pool.length > 0 ? Math.floor(Math.random() * 7) + 6 : Infinity // entre 6 et 12 posts
-
-    posts.forEach((post, i) => {
-      items.push({ type: 'post', post })
-      if (pool.length > 0 && i + 1 === nextInsertAt) {
-        const mk = pool[poolIndex % pool.length]
-        items.push({ type: 'media-kit', mediaKit: mk, key: `mk-${i}` })
-        poolIndex += 1
-        nextInsertAt = i + 1 + Math.floor(Math.random() * 7) + 6
+    // On ajoute uniquement les posts pas encore traités (nouvelle page de
+    // scroll) à la suite des items déjà stables, sans toucher à ce qui a
+    // déjà été décidé pour les posts précédents.
+    for (let i = cache.postsProcessed; i < posts.length; i++) {
+      cache.items.push({ type: 'post', post: posts[i] })
+      if (cache.pool.length > 0 && i + 1 === cache.nextInsertAt) {
+        const mk = cache.pool[cache.poolIndex % cache.pool.length]
+        cache.items.push({ type: 'media-kit', mediaKit: mk, key: `mk-${i}` })
+        cache.poolIndex += 1
+        cache.nextInsertAt = i + 1 + Math.floor(Math.random() * 7) + 6
       }
-    })
+    }
+    cache.postsProcessed = posts.length
 
-    return { top, items }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediaKits.length, posts.length])
+    return { top: cache.top, items: cache.items }
+  }, [mediaKitsKey, posts, mediaKits])
 
   // followingIds : un seul fetch pour tout le feed (voir fetchFollowingIds
   // plus haut). staleTime généreux : le feed se recharge de toute façon à
