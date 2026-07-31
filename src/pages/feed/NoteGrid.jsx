@@ -155,7 +155,7 @@ export default function NoteGrid() {
       <div className="grid grid-cols-2 gap-1 px-1 pt-1">
         {/* Case 1 : toujours "Ajouter à ta note" */}
         <div
-          className="relative aspect-[3/4] rounded-lg overflow-hidden cursor-pointer"
+          className="relative aspect-[9/16] rounded-lg overflow-hidden cursor-pointer"
           onClick={() => navigate('/notes/nouvelle')}
         >
           <img
@@ -170,7 +170,7 @@ export default function NoteGrid() {
           >
             <Plus size={14} className="text-white" strokeWidth={3} />
           </button>
-          <span className="absolute bottom-2 left-2 right-2 text-white text-caption font-medium truncate">
+          <span className="absolute bottom-2 left-2 right-9 text-white text-caption font-medium truncate">
             Ajouter à ta note
           </span>
         </div>
@@ -178,19 +178,19 @@ export default function NoteGrid() {
         {/* Case 2 (si j'ai une note) : MA note */}
         {myGroup && (
           <div
-            className="relative aspect-[3/4] rounded-lg overflow-hidden cursor-pointer"
+            className="relative aspect-[9/16] rounded-lg overflow-hidden cursor-pointer"
             onClick={() => openViewerForUser(user?.id)}
           >
             <img src={thumbFor(myGroup)} alt="" className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
             <button
-              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 flex items-center justify-center"
+              className="absolute bottom-2 right-2 w-6 h-6 rounded-full bg-black/40 flex items-center justify-center"
               aria-label="Options"
               onClick={(e) => e.stopPropagation()}
             >
               <MoreHorizontal size={14} className="text-white" />
             </button>
-            <span className="absolute bottom-2 left-2 right-2 text-white text-caption font-medium truncate">
+            <span className="absolute bottom-2 left-2 right-9 text-white text-caption font-medium truncate">
               Ta note
             </span>
           </div>
@@ -200,19 +200,19 @@ export default function NoteGrid() {
         {finalOtherGroups.map((g) => (
           <div
             key={g.userId}
-            className="relative aspect-[3/4] rounded-lg overflow-hidden cursor-pointer"
+            className="relative aspect-[9/16] rounded-lg overflow-hidden cursor-pointer"
             onClick={() => openViewerForUser(g.userId)}
           >
             <img src={thumbFor(g)} alt="" className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
             <button
-              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 flex items-center justify-center"
+              className="absolute bottom-2 right-2 w-6 h-6 rounded-full bg-black/40 flex items-center justify-center"
               aria-label="Options"
               onClick={(e) => e.stopPropagation()}
             >
               <MoreHorizontal size={14} className="text-white" />
             </button>
-            <span className="absolute bottom-2 left-2 right-2 text-white text-caption font-medium truncate">
+            <span className="absolute bottom-2 left-2 right-9 text-white text-caption font-medium truncate">
               {g.isRepostGroup
                 ? `${g.items[0].original.users?.nom_complet?.split(' ')[0]} & ${g.displayUser?.nom_complet?.split(' ')[0]}`
                 : g.displayUser?.nom_complet?.split(' ')[0]}
@@ -224,7 +224,7 @@ export default function NoteGrid() {
         {usersWithoutNote.map((u) => (
           <div
             key={u.id}
-            className="relative aspect-[3/4] rounded-lg overflow-hidden cursor-pointer opacity-70"
+            className="relative aspect-[9/16] rounded-lg overflow-hidden cursor-pointer opacity-70"
             onClick={() => navigate(profileRoute(u.id, u.role))}
           >
             <img
@@ -233,7 +233,7 @@ export default function NoteGrid() {
               className="absolute inset-0 w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-            <span className="absolute bottom-2 left-2 right-2 text-white text-caption font-medium truncate">
+            <span className="absolute bottom-2 left-2 right-9 text-white text-caption font-medium truncate">
               {u.nom_complet?.split(' ')[0]}
             </span>
           </div>
