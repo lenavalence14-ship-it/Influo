@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import NoteBar from './NoteBar'
+import NoteGrid from './NoteGrid'
 
 export default function Amis() {
   const navigate = useNavigate()
@@ -18,7 +18,7 @@ export default function Amis() {
         <h1 className="text-h1">Amis</h1>
       </header>
 
-      <NoteBar />
+      <NoteGrid />
     </div>
   )
 }
