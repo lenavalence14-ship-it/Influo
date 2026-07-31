@@ -347,7 +347,7 @@ export default function InfluencerProfile() {
             tab === 'publications' ? 'border-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'
           }`}
         >
-          Collaboration vérifiée
+          Collaboration vérifiée ({collabCount})
         </button>
         <button
           onClick={() => setTab('offres')}
@@ -355,48 +355,9 @@ export default function InfluencerProfile() {
             tab === 'offres' ? 'border-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'
           }`}
         >
-          Offre
+          Offre ({offres.length})
         </button>
       </div>
-
-      {/* compteur collaborations vérifiées / offres, façon résumé sous les tabs */}
-      <div className="flex justify-center gap-1.5 py-2 text-caption text-[var(--text-secondary)] border-b border-[var(--border)]">
-        <span>
-          <span className="text-[var(--text-primary)] font-medium">{collabCount}</span>{' '}
-          {collabCount > 1 ? 'collaborations vérifiées' : 'collaboration vérifiée'}
-        </span>
-        <span>·</span>
-        <span>
-          <span className="text-[var(--text-primary)] font-medium">{offres.length}</span>{' '}
-          {offres.length > 1 ? 'offres' : 'offre'}
-        </span>
-      </div>
-
-      {/* sous-barre grille / vidéo, uniquement dans l'onglet Collaboration vérifiée */}
-      {tab === 'publications' && (
-        <div className="flex border-b border-[var(--border)]">
-          <button
-            onClick={() => setSubTab('grille')}
-            aria-label="Grille"
-            className={`flex-1 py-2.5 flex items-center justify-center gap-1.5 ${
-              subTab === 'grille' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
-            }`}
-          >
-            <Grid3x3 size={20} />
-            <span className="text-caption">{collabPhotoCount}</span>
-          </button>
-          <button
-            onClick={() => setSubTab('video')}
-            aria-label="Vidéo"
-            className={`flex-1 py-2.5 flex items-center justify-center gap-1.5 ${
-              subTab === 'video' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
-            }`}
-          >
-            <Video size={20} />
-            <span className="text-caption">{collabVideoCount}</span>
-          </button>
-        </div>
-      )}
 
       {/* contenu onglet */}
       {tab === 'publications' ? (
