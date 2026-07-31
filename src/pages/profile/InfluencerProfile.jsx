@@ -354,11 +354,11 @@ export default function InfluencerProfile() {
       </div>
 
       {/* cercles des marques ayant collaboré, la plus fréquente en premier */}
-      <div className="flex gap-4 px-4 py-3 overflow-x-auto border-t border-[var(--border)]">
+      <div className="flex gap-4 px-4 py-3 overflow-x-auto">
         {brandCircles.length > 0 ? (
           brandCircles.map((c) => (
             <div key={c.id} className="flex flex-col items-center gap-1 shrink-0 w-16">
-              <div className="w-14 h-14 rounded-full border-2 border-[var(--accent)] overflow-hidden bg-[var(--bg-secondary)] flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full overflow-hidden bg-[var(--bg-secondary)] flex items-center justify-center">
                 {c.photo_url ? (
                   <img src={c.photo_url} alt={c.nom_complet} className="w-full h-full object-cover" />
                 ) : (
@@ -378,7 +378,7 @@ export default function InfluencerProfile() {
       </div>
 
       {/* onglets */}
-      <div className="flex border-t border-[var(--border)] sticky top-0 bg-[var(--bg-primary)]/90 backdrop-blur-xl z-20">
+      <div className="flex sticky top-0 bg-[var(--bg-primary)]/90 backdrop-blur-xl z-20">
         <button
           onClick={() => setTab('publications')}
           className={`flex-1 py-3 text-body-medium border-b-2 transition-colors ${
