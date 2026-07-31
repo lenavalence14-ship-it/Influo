@@ -26,6 +26,10 @@ export default function InfluencerProfile() {
   const [target, setTarget] = useState(null)
   const [tab, setTab] = useState('publications')
   const [subTab, setSubTab] = useState('grille')
+  // Même pattern que feedMuted dans Feed.jsx : état partagé par toutes les
+  // PostCard de cette page, pour un comportement cohérent avec le feed
+  // (au lieu du fallback localMuted indépendant par carte).
+  const [profileMuted, setProfileMuted] = useState(true)
   const [brandCircles, setBrandCircles] = useState([])
   const [posts, setPosts] = useState([])
   const [offres, setOffres] = useState([])
@@ -405,6 +409,24 @@ export default function InfluencerProfile() {
           )
           return (
             <div className="pt-0">
+              {/* sous-onglets grille/vidéo : la logique de filtre existait déjà
+                  (subTab, setSubTab) mais aucun bouton ne l'appelait */}
+              <div className="flex justify-center gap-8 py-3 border-b border-[var(--border-color,rgba(255,255,255,0.1))]">
+                <button
+                  onClick={() => setSubTab('grille')}
+                  className={subTab === 'grille' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}
+                  aria-label="Grille"
+                >
+                  <Grid3x3 size={20} />
+                </button>
+                <button
+                  onClick={() => setSubTab('video')}
+                  className={subTab === 'video' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}
+                  aria-label="Vidéos"
+                >
+                  <Video size={20} />
+                </button>
+              </div>
               {filteredPosts.length === 0 ? (
                 <div className="py-16 text-center text-[var(--text-secondary)] text-body">
                   {subTab === 'video' ? 'Aucune vidéo.' : 'Aucune publication.'}
@@ -414,6 +436,8 @@ export default function InfluencerProfile() {
                   <PostCard
                     key={p.id}
                     post={p}
+                    muted={profileMuted}
+                    onToggleMute={() => setProfileMuted((m) => !m)}
                     onDeleted={(id) => setPosts((ps) => ps.filter((post) => post.id !== id))}
                   />
                 ))
