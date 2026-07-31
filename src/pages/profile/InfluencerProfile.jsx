@@ -76,7 +76,7 @@ export default function InfluencerProfile() {
         supabase
           .from('posts')
           .select(`
-            id, legende, crop_format, created_at, type, filtre, client_id,
+            id, legende, crop_format, created_at, type, filtre, client_id, audio_url,
             post_medias(media_url, media_type, thumbnail_url, position, filtre, zoom, offset_x, offset_y, natural_width, natural_height),
             profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
             client:client_id(id, nom_complet, photo_url)
