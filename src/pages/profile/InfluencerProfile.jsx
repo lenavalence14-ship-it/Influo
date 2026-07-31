@@ -26,6 +26,7 @@ export default function InfluencerProfile() {
   const [target, setTarget] = useState(null)
   const [tab, setTab] = useState('publications')
   const [subTab, setSubTab] = useState('grille')
+  const [brandCircles, setBrandCircles] = useState([])
   const [posts, setPosts] = useState([])
   const [offres, setOffres] = useState([])
   const [reseaux, setReseaux] = useState([])
@@ -71,9 +72,10 @@ export default function InfluencerProfile() {
         supabase
           .from('posts')
           .select(`
-            id, legende, crop_format, created_at, type, filtre,
+            id, legende, crop_format, created_at, type, filtre, client_id,
             post_medias(media_url, media_type, thumbnail_url, position, filtre, zoom, offset_x, offset_y, natural_width, natural_height),
-            profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url))
+            profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
+            client:client_id(id, nom_complet, photo_url)
           `)
           .eq('influenceur_id', targetId)
           .in('type', ['photo', 'carrousel', 'video', 'texte'])
@@ -97,6 +99,18 @@ export default function InfluencerProfile() {
         like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
         liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === user?.id) || false,
       }))
+
+      // Classement des marques par nombre de collaborations (posts liés à ce client),
+      // la marque la plus fréquente en premier, pour affichage en cercles sous les boutons.
+      const clientCounts = new Map()
+      for (const p of enrichedPosts) {
+        if (!p.client) continue
+        const existing = clientCounts.get(p.client.id)
+        if (existing) existing.count += 1
+        else clientCounts.set(p.client.id, { ...p.client, count: 1 })
+      }
+      const topClients = Array.from(clientCounts.values()).sort((a, b) => b.count - a.count)
+      setBrandCircles(topClients)
 
       setTarget(prof)
       setPosts(enrichedPosts)
@@ -337,6 +351,30 @@ export default function InfluencerProfile() {
           )}
         </div>
 
+      </div>
+
+      {/* cercles des marques ayant collaboré, la plus fréquente en premier */}
+      <div className="flex gap-4 px-4 py-3 overflow-x-auto border-t border-[var(--border)]">
+        {brandCircles.length > 0 ? (
+          brandCircles.map((c) => (
+            <div key={c.id} className="flex flex-col items-center gap-1 shrink-0 w-16">
+              <div className="w-14 h-14 rounded-full border-2 border-[var(--accent)] overflow-hidden bg-[var(--bg-secondary)] flex items-center justify-center">
+                {c.photo_url ? (
+                  <img src={c.photo_url} alt={c.nom_complet} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-caption text-[var(--text-secondary)]">{c.nom_complet?.[0]}</span>
+                )}
+              </div>
+              <span className="text-caption text-[var(--text-secondary)] truncate w-full text-center">
+                {c.nom_complet}
+              </span>
+            </div>
+          ))
+        ) : (
+          <div className="flex flex-col items-center gap-1 shrink-0 w-16">
+            <div className="w-14 h-14 rounded-full bg-[var(--accent)]" />
+          </div>
+        )}
       </div>
 
       {/* onglets */}
