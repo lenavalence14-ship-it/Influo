@@ -2,16 +2,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MoreHorizontal, ChevronRight } from 'lucide-react'
 import { getSavedAccounts, switchToAccount } from '../../lib/accountSwitcher'
-import { useTheme } from '../../contexts/ThemeContext'
 import Avatar from '../../components/ui/Avatar'
 import appIcon from '../../assets/app-icon.png'
-import { Sun, Moon } from 'lucide-react'
 
 export default function ProfilePicker() {
   const [accounts, setAccounts] = useState(null)
   const [switchingId, setSwitchingId] = useState(null)
   const [error, setError] = useState('')
-  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -52,14 +49,6 @@ export default function ProfilePicker() {
         <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-white/[0.04] blur-3xl" />
         <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-white/[0.03] blur-3xl" />
       </div>
-
-      <button
-        onClick={toggleTheme}
-        className="absolute top-6 right-16 glass rounded-full p-3 z-10"
-        aria-label="Changer de thème"
-      >
-        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-      </button>
 
       <button
         onClick={() => navigate('/profils/gerer')}

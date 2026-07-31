@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { useTheme } from '../../contexts/ThemeContext'
 import GlassCard from '../../components/ui/GlassCard'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import { Sun, Moon, User, Briefcase, Users, ArrowLeft } from 'lucide-react'
+import { User, Briefcase, Users, ArrowLeft } from 'lucide-react'
 import appIcon from '../../assets/app-icon.png'
 export default function Signup() {
   const [role, setRole] = useState(null) // 'influenceur/créateur de contenu' | 'client' | 'utilisateur_simple'
@@ -15,7 +14,6 @@ export default function Signup() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { signUp } = useAuth()
-  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -54,14 +52,6 @@ export default function Signup() {
         aria-label="Retour"
       >
         <ArrowLeft size={18} />
-      </button>
-
-      <button
-        onClick={toggleTheme}
-        className="absolute top-6 right-6 glass rounded-full p-3 z-10"
-        aria-label="Changer de thème"
-      >
-        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
       </button>
 
       <div className="w-full max-w-sm relative z-10 animate-fade-in">

@@ -11,10 +11,21 @@ const ThemeContext = createContext()
 // - thème clair   -> fond de page blanc, icônes de la barre système noires
 // Aucun écran ne gère la barre système de son côté.
 
+const getSystemTheme = () =>
+  window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+    ? 'light'
+    : 'dark'
+
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('influo-theme') || 'dark'
-  })
+  const [theme, setTheme] = useState(getSystemTheme)
+
+  // Suit le mode système en direct (changement de thème OS sans relancer l'app)
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: light)')
+    const handler = (e) => setTheme(e.matches ? 'light' : 'dark')
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   useEffect(() => {
     const root = document.documentElement

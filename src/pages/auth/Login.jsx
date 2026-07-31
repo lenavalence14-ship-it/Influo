@@ -1,11 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { useTheme } from '../../contexts/ThemeContext'
 import GlassCard from '../../components/ui/GlassCard'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import { Sun, Moon } from 'lucide-react'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -13,7 +11,6 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { signIn } = useAuth()
-  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -36,14 +33,6 @@ export default function Login() {
         <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-white/[0.04] blur-3xl" />
         <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-white/[0.03] blur-3xl" />
       </div>
-
-      <button
-        onClick={toggleTheme}
-        className="absolute top-6 right-6 glass rounded-full p-3 z-10"
-        aria-label="Changer de thème"
-      >
-        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-      </button>
 
       <div className="w-full max-w-sm relative z-10 animate-fade-in">
         <div className="mb-10 text-center">

@@ -2,13 +2,12 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { useTheme } from '../../contexts/ThemeContext'
 import PostCard from './PostCard'
 import MediaKitSuggestion from './MediaKitSuggestion'
 import { useMediaKits } from '../../hooks/useMediaKits'
 import OfferCard from './OfferCard'
 import Card from '../../components/ui/Card'
-import { Sun, Moon, MessageCircle, Plus, RefreshCw } from 'lucide-react'
+import { MessageCircle, Plus, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useUnreadCounts } from '../../hooks/useUnreadCounts'
 import { usePostUploadProgress } from '../../contexts/PostUploadContext'
@@ -124,7 +123,6 @@ async function fetchFeedPage({ userId, pageParam = 0 }) {
 
 export default function Feed() {
   const { user, profile, influencerProfile } = useAuth()
-  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const { hasUnreadMessages } = useUnreadCounts()
   const uploadProgress = usePostUploadProgress(influencerProfile?.id)
@@ -323,13 +321,6 @@ export default function Feed() {
             {hasUnreadMessages && (
               <span className="absolute top-1 right-1.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#4f0c2d' }} />
             )}
-          </button>
-          <button
-            onClick={toggleTheme}
-            aria-label="Changer de thème"
-            className="glass rounded-xl w-7 h-7 flex items-center justify-center"
-          >
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
           </button>
         </div>
       </header>
