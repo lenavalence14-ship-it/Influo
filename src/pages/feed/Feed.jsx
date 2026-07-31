@@ -7,7 +7,7 @@ import MediaKitSuggestion from './MediaKitSuggestion'
 import { useMediaKits } from '../../hooks/useMediaKits'
 import OfferCard from './OfferCard'
 import Card from '../../components/ui/Card'
-import { MessageCircle, Plus, RefreshCw } from 'lucide-react'
+import { MessageCircle, Plus, RefreshCw, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useUnreadCounts } from '../../hooks/useUnreadCounts'
 import { usePostUploadProgress } from '../../contexts/PostUploadContext'
@@ -269,6 +269,14 @@ export default function Feed() {
         <Logo size={20} />
 
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => navigate('/amis')}
+            aria-label="Amis"
+            className="glass rounded-xl w-7 h-7 flex items-center justify-center"
+          >
+            <Users size={14} />
+          </button>
+
           {profile?.role === 'influenceur' ? (
             <button
               onClick={() => navigate('/publier')}

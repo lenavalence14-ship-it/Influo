@@ -24,6 +24,7 @@ const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'))
 const ManageProfiles = lazy(() => import('./pages/auth/ManageProfiles'))
 
 const Feed = lazy(() => import('./pages/feed/Feed'))
+const Amis = lazy(() => import('./pages/feed/Amis'))
 const Search = lazy(() => import('./pages/feed/Search'))
 const Notifications = lazy(() => import('./pages/feed/Notifications'))
 const CreatePost = lazy(() => import('./pages/feed/CreatePost'))
@@ -226,6 +227,7 @@ function AppRoutes() {
           }
         >
           <Route path="/" element={<Feed />} />
+          <Route path="/amis" element={<Amis />} />
           <Route path="/recherche" element={<Search />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/publier" element={<CreatePost />} />
