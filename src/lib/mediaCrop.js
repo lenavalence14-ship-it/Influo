@@ -32,8 +32,8 @@ export const ZOOM_MAX = 3
 // partir de ce zoom : en dessous, l'image est plus petite que le cadre dans
 // au moins une dimension, donc la déplacer ne fait que changer le côté où
 // le vide apparaît, ça n'a pas de sens visuellement (comportement Instagram).
-export function getCoverZoom(naturalWidth, naturalHeight, cropFormat, frameRatioOverride) {
-  const frameRatio = frameRatioOverride || RATIO_VALUES[cropFormat] || 1
+export function getCoverZoom(naturalWidth, naturalHeight, cropFormat) {
+  const frameRatio = RATIO_VALUES[cropFormat] || 1
   if (!naturalWidth || !naturalHeight) return 1
   const mediaRatio = naturalWidth / naturalHeight
 
@@ -53,8 +53,8 @@ export function getCoverZoom(naturalWidth, naturalHeight, cropFormat, frameRatio
 // (CreatePost) : au minimum, l'utilisateur voit toute sa photo, comme sur
 // Instagram à l'ouverture de l'éditeur de recadrage. Zoomer au-delà permet
 // ensuite de recadrer normalement.
-export function getContainZoom(naturalWidth, naturalHeight, cropFormat, frameRatioOverride) {
-  const coverZoom = getCoverZoom(naturalWidth, naturalHeight, cropFormat, frameRatioOverride)
+export function getContainZoom(naturalWidth, naturalHeight, cropFormat) {
+  const coverZoom = getCoverZoom(naturalWidth, naturalHeight, cropFormat)
   // le contain est mathématiquement l'inverse du cover par rapport à 1 :
   // si cover = mediaRatio/frameRatio (>1), contain = frameRatio/mediaRatio (<1)
   return 1 / coverZoom
@@ -64,8 +64,8 @@ export function getContainZoom(naturalWidth, naturalHeight, cropFormat, frameRat
 // contain (photo entière visible au minimum). Gardé sous ce nom pour ne pas
 // casser les appels existants ; utiliser getCoverZoom() explicitement pour
 // le seuil "pan autorisé" (voir clampOffset).
-export function getMinZoom(naturalWidth, naturalHeight, cropFormat, frameRatioOverride) {
-  return getContainZoom(naturalWidth, naturalHeight, cropFormat, frameRatioOverride)
+export function getMinZoom(naturalWidth, naturalHeight, cropFormat) {
+  return getContainZoom(naturalWidth, naturalHeight, cropFormat)
 }
 
 // Contraint un zoom demandé dans les bornes [min, ZOOM_MAX].
@@ -92,9 +92,9 @@ export function clampOffset(offset, zoom, coverZoom) {
 // l'éditeur en aperçu temps réel et par le feed au rendu final : c'est ce qui
 // garantit "jamais recalculer un nouveau cadrage au moment du rendu" -- la
 // fonction est la même des deux côtés, seules les valeurs stockées varient.
-export function getCropTransformStyle({ naturalWidth, naturalHeight, cropFormat, zoom, offsetX, offsetY, frameRatioOverride }) {
-  const minZoom = getMinZoom(naturalWidth, naturalHeight, cropFormat, frameRatioOverride) // contain : plancher du zoom
-  const coverZoom = getCoverZoom(naturalWidth, naturalHeight, cropFormat, frameRatioOverride) // seuil à partir duquel le pan a un sens
+export function getCropTransformStyle({ naturalWidth, naturalHeight, cropFormat, zoom, offsetX, offsetY }) {
+  const minZoom = getMinZoom(naturalWidth, naturalHeight, cropFormat) // contain : plancher du zoom
+  const coverZoom = getCoverZoom(naturalWidth, naturalHeight, cropFormat) // seuil à partir duquel le pan a un sens
   // fallback sur coverZoom (pas 1) : posts legacy sans zoom stocké en base
   // (colonne ajoutée après coup) -- sans ce fallback ils tomberaient au
   // nouveau plancher "contain" et afficheraient du vide dans le feed alors

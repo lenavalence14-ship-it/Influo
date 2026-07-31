@@ -11,7 +11,7 @@ import HlsVideo from '../../components/HlsVideo'
 import { getCropTransformStyle } from '../../lib/mediaCrop'
 import { getFontStyle } from './PhotoNoteEditor'
 
-function getMediaCropStyle(media, cropFormat, viewportRatio) {
+function getMediaCropStyle(media, cropFormat) {
   return getCropTransformStyle({
     naturalWidth: media?.natural_width,
     naturalHeight: media?.natural_height,
@@ -19,7 +19,6 @@ function getMediaCropStyle(media, cropFormat, viewportRatio) {
     zoom: media?.zoom,
     offsetX: media?.offset_x,
     offsetY: media?.offset_y,
-    frameRatioOverride: cropFormat === 'vertical' ? viewportRatio : undefined,
   })
 }
 
@@ -350,16 +349,6 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
   const media = reel.post_medias?.[0]
   const mediaUrl = media?.media_url
   const thumbnailUrl = media?.thumbnail_url
-  // Ratio RÉEL du viewport (largeur/hauteur), pas le ratio théorique 9/16 --
-  // un écran de téléphone moderne est presque toujours plus étiré que 9:16
-  // (encoche, barres système), donc utiliser 9/16 en dur laissait des bandes
-  // noires haut/bas même pour une vidéo déjà au format "vertical".
-  const [viewportRatio, setViewportRatio] = useState(() => window.innerWidth / window.innerHeight)
-  useEffect(() => {
-    const onResize = () => setViewportRatio(window.innerWidth / window.innerHeight)
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
   // Le cadrage (zoom/pan) choisi dans l'éditeur pour le feed s'applique
   // TOUJOURS en Reels, qu'importe le format -- sinon un élément volontairement
   // coupé au cadrage (ex: watermark d'une autre app) réapparaîtrait en Reels,
@@ -369,7 +358,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
   // dans les deux cas c'est le MÊME rectangle cadré qu'on affiche, jamais la
   // vidéo brute non recadrée.
   const isLandscape = reel.crop_format === 'horizontal'
-  const cropStyle = getMediaCropStyle(media, reel.crop_format, viewportRatio)
+  const cropStyle = getMediaCropStyle(media, reel.crop_format)
   // HLS utilisé uniquement si le transcodage est bien allé au bout (voir
   // hls_status côté service de transcodage). Sinon, repli silencieux sur le
   // MP4 classique déjà uploadé à la publication — l'utilisateur ne voit jamais
