@@ -19,16 +19,15 @@ export default function StoryRing({
   uploading = false,
   onClick,
   rotate = 0,
-  size = 60,
+  size = 88,
 }) {
   const hasNote = hasStory
-  const height = size * 1.3
   return (
     <motion.div
       layoutId={layoutId}
       onClick={onClick}
       className="relative shrink-0"
-      style={{ width: size, height, rotate }}
+      style={{ width: size, height: size, rotate }}
       transition={{ type: 'tween', duration: 0.05 }}
     >
       {uploading && (
