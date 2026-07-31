@@ -152,90 +152,94 @@ export default function NoteGrid() {
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-1 px-1 pt-1">
+      <div className="grid grid-cols-2 gap-x-1 gap-y-3 px-1 pt-1">
         {/* Case 1 : toujours "Ajouter à ta note" */}
-        <div
-          className="relative aspect-[9/16] rounded-lg overflow-hidden cursor-pointer"
-          onClick={() => navigate('/notes/nouvelle')}
-        >
-          <img
-            src={myPhotoUrl || `https://api.dicebear.com/9.x/glass/svg?seed=${user?.id}`}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-black/30" />
-          <button
-            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[var(--accent)] border-2 border-white flex items-center justify-center"
-            aria-label="Ajouter une note"
+        <div className="flex flex-col">
+          <div
+            className="relative aspect-[9/16] rounded-2xl overflow-hidden cursor-pointer"
+            onClick={() => navigate('/notes/nouvelle')}
           >
-            <Plus size={14} className="text-white" strokeWidth={3} />
-          </button>
-          <span className="absolute bottom-2 left-2 right-9 text-white text-caption font-medium truncate">
-            Ajouter à ta note
-          </span>
+            <img
+              src={myPhotoUrl || `https://api.dicebear.com/9.x/glass/svg?seed=${user?.id}`}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-black/30" />
+            <button
+              className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[var(--accent)] border-2 border-white flex items-center justify-center"
+              aria-label="Ajouter une note"
+            >
+              <Plus size={14} className="text-white" strokeWidth={3} />
+            </button>
+            <span className="absolute bottom-2 left-2 right-2 text-white text-caption font-medium truncate">
+              Ajouter à ta note
+            </span>
+          </div>
+          <div className="flex justify-end pt-1">
+            <MoreHorizontal size={16} className="text-[var(--text-secondary)]" />
+          </div>
         </div>
 
         {/* Case 2 (si j'ai une note) : MA note */}
         {myGroup && (
-          <div
-            className="relative aspect-[9/16] rounded-lg overflow-hidden cursor-pointer"
-            onClick={() => openViewerForUser(user?.id)}
-          >
-            <img src={thumbFor(myGroup)} alt="" className="absolute inset-0 w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-            <button
-              className="absolute bottom-2 right-2 w-6 h-6 rounded-full bg-black/40 flex items-center justify-center"
-              aria-label="Options"
-              onClick={(e) => e.stopPropagation()}
+          <div className="flex flex-col">
+            <div
+              className="relative aspect-[9/16] rounded-2xl overflow-hidden cursor-pointer"
+              onClick={() => openViewerForUser(user?.id)}
             >
-              <MoreHorizontal size={14} className="text-white" />
-            </button>
-            <span className="absolute bottom-2 left-2 right-9 text-white text-caption font-medium truncate">
-              Ta note
-            </span>
+              <img src={thumbFor(myGroup)} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+              <span className="absolute bottom-2 left-2 right-2 text-white text-caption font-medium truncate">
+                Ta note
+              </span>
+            </div>
+            <div className="flex justify-end pt-1">
+              <MoreHorizontal size={16} className="text-[var(--text-secondary)]" />
+            </div>
           </div>
         )}
 
         {/* Notes des autres */}
         {finalOtherGroups.map((g) => (
-          <div
-            key={g.userId}
-            className="relative aspect-[9/16] rounded-lg overflow-hidden cursor-pointer"
-            onClick={() => openViewerForUser(g.userId)}
-          >
-            <img src={thumbFor(g)} alt="" className="absolute inset-0 w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-            <button
-              className="absolute bottom-2 right-2 w-6 h-6 rounded-full bg-black/40 flex items-center justify-center"
-              aria-label="Options"
-              onClick={(e) => e.stopPropagation()}
+          <div key={g.userId} className="flex flex-col">
+            <div
+              className="relative aspect-[9/16] rounded-2xl overflow-hidden cursor-pointer"
+              onClick={() => openViewerForUser(g.userId)}
             >
-              <MoreHorizontal size={14} className="text-white" />
-            </button>
-            <span className="absolute bottom-2 left-2 right-9 text-white text-caption font-medium truncate">
-              {g.isRepostGroup
-                ? `${g.items[0].original.users?.nom_complet?.split(' ')[0]} & ${g.displayUser?.nom_complet?.split(' ')[0]}`
-                : g.displayUser?.nom_complet?.split(' ')[0]}
-            </span>
+              <img src={thumbFor(g)} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+              <span className="absolute bottom-2 left-2 right-2 text-white text-caption font-medium truncate">
+                {g.isRepostGroup
+                  ? `${g.items[0].original.users?.nom_complet?.split(' ')[0]} & ${g.displayUser?.nom_complet?.split(' ')[0]}`
+                  : g.displayUser?.nom_complet?.split(' ')[0]}
+              </span>
+            </div>
+            <div className="flex justify-end pt-1">
+              <MoreHorizontal size={16} className="text-[var(--text-secondary)]" />
+            </div>
           </div>
         ))}
 
         {/* Utilisateurs sans note : renvoie vers leur profil */}
         {usersWithoutNote.map((u) => (
-          <div
-            key={u.id}
-            className="relative aspect-[9/16] rounded-lg overflow-hidden cursor-pointer opacity-70"
-            onClick={() => navigate(profileRoute(u.id, u.role))}
-          >
-            <img
-              src={u.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${u.id}`}
-              alt=""
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-            <span className="absolute bottom-2 left-2 right-9 text-white text-caption font-medium truncate">
-              {u.nom_complet?.split(' ')[0]}
-            </span>
+          <div key={u.id} className="flex flex-col">
+            <div
+              className="relative aspect-[9/16] rounded-2xl overflow-hidden cursor-pointer opacity-70"
+              onClick={() => navigate(profileRoute(u.id, u.role))}
+            >
+              <img
+                src={u.photo_url || `https://api.dicebear.com/9.x/glass/svg?seed=${u.id}`}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+              <span className="absolute bottom-2 left-2 right-2 text-white text-caption font-medium truncate">
+                {u.nom_complet?.split(' ')[0]}
+              </span>
+            </div>
+            <div className="flex justify-end pt-1">
+              <MoreHorizontal size={16} className="text-[var(--text-secondary)]" />
+            </div>
           </div>
         ))}
       </div>
