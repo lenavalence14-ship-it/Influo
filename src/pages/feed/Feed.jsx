@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import PostCard from './PostCard'
 import MediaKitSuggestion from './MediaKitSuggestion'
+import NoteBar from './NoteBar'
 import { useMediaKits } from '../../hooks/useMediaKits'
 import OfferCard from './OfferCard'
 import Card from '../../components/ui/Card'
@@ -354,6 +355,8 @@ export default function Feed() {
           />
         </div>
       )}
+
+      <NoteBar />
 
       <MediaKitSuggestion mediaKit={feedItemsWithMediaKits.top} />
 

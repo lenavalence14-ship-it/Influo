@@ -42,21 +42,23 @@ export default function StoryRing({
         />
       )}
       <div
-        className="relative w-full h-full rounded-full"
+        className="relative w-full h-full"
         style={{
           padding: '2px',
+          borderRadius: '30%',
           background: hasNote
             ? 'linear-gradient(45deg, var(--accent), #ff2d6b)'
             : 'var(--border-color, rgba(128,128,128,0.35))',
         }}
       >
-        <div className="w-full h-full rounded-full p-[2px]" style={{ background: 'var(--bg-primary)' }}>
+        <div className="w-full h-full p-[2px]" style={{ background: 'var(--bg-primary)', borderRadius: '30%' }}>
           <img
             src={photoUrl || `https://api.dicebear.com/9.x/glass/svg?seed=${fallbackSeed}`}
             alt=""
             loading="eager"
             decoding="async"
-            className="w-full h-full rounded-full object-cover"
+            className="w-full h-full object-cover"
+            style={{ borderRadius: '30%' }}
           />
         </div>
       </div>
