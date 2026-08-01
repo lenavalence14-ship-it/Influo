@@ -149,7 +149,10 @@ export default function MessageBubble({
 
     return (
       <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-        <div className="w-[220px] rounded-2xl overflow-hidden glass">
+        <div
+          className="w-[220px] rounded-2xl overflow-hidden border"
+          style={{ background: 'var(--surface-primary)', borderColor: 'var(--border)' }}
+        >
           {sharedPostLoading ? (
             <div className="aspect-square flex items-center justify-center">
               <div className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin" />

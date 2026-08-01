@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { X, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -30,6 +30,7 @@ export default function CreateNote() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const location = useLocation()
   const editId = searchParams.get('edit')
   const fileInputRef = useRef(null)
   const { startUpload, finishUpload } = useNoteUpload()
@@ -67,6 +68,22 @@ export default function CreateNote() {
     setPhotoFile(file)
     setPhotoPreview(URL.createObjectURL(file))
   }
+
+  // Partage d'un post en note (voir SharePostSheet.jsx -- "Ajouter à la
+  // note" doit ouvrir le même éditeur photo existant, pas un écran
+  // inventé) : le fichier a déjà été téléchargé depuis l'URL du post et
+  // passé via navigate(..., { state }), on l'ouvre directement dans
+  // PhotoNoteEditor comme si l'utilisateur venait de le choisir dans sa
+  // galerie -- même chemin exactement que handlePickPhoto ci-dessus.
+  useEffect(() => {
+    const sharedFile = location.state?.sharedFile
+    if (!sharedFile) return
+    setPhotoFile(sharedFile)
+    setPhotoPreview(URL.createObjectURL(sharedFile))
+    // On efface le state de navigation pour qu'un retour arrière ou un
+    // rafraîchissement ne rouvre pas indéfiniment le même fichier partagé.
+    window.history.replaceState({}, '')
+  }, [location.state])
 
   // Publication réelle d'une note photo : compression + upload + insert.
   // Volontairement PAS awaité par l'appelant (fire-and-forget) : l'écran se

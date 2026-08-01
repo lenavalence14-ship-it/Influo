@@ -55,20 +55,3 @@ export async function sendPostToUsers({ myId, otherUserIds, postId }) {
   const failedUserIds = otherUserIds.filter((_, i) => results[i].status === 'rejected')
   return { failedUserIds, succeededCount: otherUserIds.length - failedUserIds.length }
 }
-
-// "Ajouter à la story" d'un post partagé = publier une note dont le média
-// est la photo/vidéo du post (mediaUrl, déjà résolu côté SharePostSheet
-// depuis post_medias). Même schéma que CreateNote.jsx (photo_url, expire_at
-// 24h) : pas de filtre/texte custom ici, on republie tel quel, comme
-// convenu ("c'est la même chose" -- pas d'overlay supplémentaire ajouté par
-// cette fonction, le nom de l'auteur d'origine reste visible via le cadre
-// habituel de lecture des notes, pas incrusté dans l'image).
-export async function shareToNote({ myId, mediaUrl }) {
-  const { error } = await supabase.from('notes').insert({
-    user_id: myId,
-    contenu: ' ',
-    photo_url: mediaUrl,
-    expire_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-  })
-  if (error) throw error
-}

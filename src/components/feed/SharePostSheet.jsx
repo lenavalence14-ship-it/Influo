@@ -1,8 +1,9 @@
+import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { X, Link2, Share2, BookImage } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { sendPostToUsers, shareToNote } from '../../lib/sharePost'
+import { sendPostToUsers } from '../../lib/sharePost'
 import Avatar from '../ui/Avatar'
 
 const MAX_RECIPIENTS = 5
@@ -17,6 +18,7 @@ const MAX_RECIPIENTS = 5
 // ici pour éviter une requête redondante).
 export default function SharePostSheet({ postId, mediaUrl, onClose }) {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [contacts, setContacts] = useState([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState([]) // array of user ids
@@ -74,31 +76,41 @@ export default function SharePostSheet({ postId, mediaUrl, onClose }) {
     setTimeout(() => setLinkCopied(false), 1500)
   }
 
-  // Partage hors app (WhatsApp, etc.) : Web Share API native du téléphone,
-  // envoie juste le lien -- pas d'intégration API WhatsApp comme précisé
-  // ("j'ai pas d'api WhatsApp").
+  const nativeShareSupported = typeof navigator !== 'undefined' && Boolean(navigator.share)
+
+  // Partage hors app (WhatsApp, etc.) : Web Share API native du téléphone.
+  // On n'envoie QUE l'URL -- l'aperçu avec image (comme Instagram) est
+  // généré par WhatsApp lui-même à partir des balises Open Graph que le
+  // serveur injecte pour /post/:id (voir server.js), pas par ce bouton.
   const handleNativeShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({ url: postUrl })
-      } catch {
-        // annulé par l'utilisateur, rien à faire
-      }
-    } else {
-      handleCopyLink()
+    if (!nativeShareSupported) return
+    try {
+      await navigator.share({ url: postUrl })
+    } catch {
+      // annulé par l'utilisateur, rien à faire
     }
   }
 
+  const [downloadingForNote, setDownloadingForNote] = useState(false)
+
+  // "Ajouter à la note" doit ouvrir le même éditeur photo existant (crop,
+  // filtre, texte, musique) que pour n'importe quelle note -- PAS une
+  // publication directe : c'est l'utilisateur qui appuie sur "Partager"
+  // dans cet éditeur pour publier réellement (voir CreateNote.jsx).
+  // On télécharge donc le média du post en fichier local d'abord, puisque
+  // l'éditeur/l'upload de note attendent un vrai File, pas une URL distante.
   const handleAddToNote = async () => {
-    if (!user?.id || !mediaUrl) return
-    setSending(true)
+    if (!mediaUrl) return
+    setDownloadingForNote(true)
     try {
-      await shareToNote({ myId: user.id, mediaUrl })
+      const response = await fetch(mediaUrl)
+      const blob = await response.blob()
+      const file = new File([blob], 'post-partage.jpg', { type: blob.type || 'image/jpeg' })
       onClose()
+      navigate('/notes/nouvelle', { state: { sharedFile: file } })
     } catch (err) {
-      console.error('Échec ajout à la note :', err)
-    } finally {
-      setSending(false)
+      console.error('Échec téléchargement du média pour la note :', err)
+      setDownloadingForNote(false)
     }
   }
 
@@ -186,9 +198,13 @@ export default function SharePostSheet({ postId, mediaUrl, onClose }) {
         )}
 
         <div className="flex justify-around items-center px-4 py-4 border-t border-white/10">
-          <button onClick={handleAddToNote} disabled={sending} className="flex flex-col items-center gap-1.5">
+          <button onClick={handleAddToNote} disabled={downloadingForNote} className="flex flex-col items-center gap-1.5">
             <div className="w-12 h-12 rounded-full glass flex items-center justify-center">
-              <BookImage size={20} />
+              {downloadingForNote ? (
+                <div className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+              ) : (
+                <BookImage size={20} />
+              )}
             </div>
             <span className="text-[11px] text-center">Ajouter à la note</span>
           </button>
@@ -198,7 +214,11 @@ export default function SharePostSheet({ postId, mediaUrl, onClose }) {
             </div>
             <span className="text-[11px] text-center">{linkCopied ? 'Copié !' : 'Copier le lien'}</span>
           </button>
-          <button onClick={handleNativeShare} className="flex flex-col items-center gap-1.5">
+          <button
+            onClick={handleNativeShare}
+            disabled={!nativeShareSupported}
+            className="flex flex-col items-center gap-1.5 disabled:opacity-40"
+          >
             <div className="w-12 h-12 rounded-full glass flex items-center justify-center">
               <Share2 size={20} />
             </div>
