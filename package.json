@@ -6,10 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "start": "node server.js",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node server.js"
   },
   "dependencies": {
+    "express": "^4.19.2",
     "@capacitor/android": "^8.4.2",
     "@capacitor/app": "^8.1.1",
     "@capacitor/core": "^8.4.2",
@@ -29,7 +32,8 @@
     "react-easy-crop": "^6.2.3",
     "react-konva": "^19.2.5",
     "react-router-dom": "^7.18.1",
-    "use-image": "^1.1.4"
+    "use-image": "^1.1.4",
+    "express": "^4.21.2"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.4.2",
