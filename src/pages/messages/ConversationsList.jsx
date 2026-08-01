@@ -94,7 +94,7 @@ export default function ConversationsList() {
               id, updated_at, user_a_id, user_b_id, user_a_last_read_at, user_b_last_read_at,
               user_a:user_a_id(id, nom_complet, photo_url),
               user_b:user_b_id(id, nom_complet, photo_url),
-              messages_sociale(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all)
+              messages_sociale(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all, shared_post_id)
             `)
             .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
             .order('updated_at', { ascending: false })
@@ -278,9 +278,9 @@ export default function ConversationsList() {
             } else if (isUnread && unreadReceived.length > 1) {
               previewText = `${unreadReceived.length} nouveaux messages`
             } else if (lastMsgIsMine) {
-              previewText = `Vous : ${lastMsg.contenu || (lastMsg.fichier_url ? 'Pièce jointe' : '')}`
+              previewText = `Vous : ${lastMsg.contenu || (lastMsg.shared_post_id ? 'Publication partagée' : lastMsg.fichier_url ? 'Pièce jointe' : '')}`
             } else {
-              previewText = lastMsg.contenu || (lastMsg.fichier_url ? 'Pièce jointe' : '')
+              previewText = lastMsg.contenu || (lastMsg.shared_post_id ? 'Publication partagée' : lastMsg.fichier_url ? 'Pièce jointe' : '')
             }
 
             const targetRoute = isBiz

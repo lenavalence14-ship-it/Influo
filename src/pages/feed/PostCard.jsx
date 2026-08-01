@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import CommentsSheet from './CommentsSheet'
+import SharePostSheet from '../../components/feed/SharePostSheet'
 import { useActiveStories } from '../../hooks/useActiveStories'
 import { useFollow } from '../../hooks/useFollow'
 import { timeAgo } from '../../lib/time'
@@ -267,6 +268,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
   const [showComments, setShowComments] = useState(autoOpenComments)
   const [showMenu, setShowMenu] = useState(false)
   const [deleted, setDeleted] = useState(false)
+  const [showShareSheet, setShowShareSheet] = useState(false)
   // le son est partagé entre toutes les vidéos du feed quand le parent (Feed.jsx)
   // passe muted/onToggleMute ; sinon (ex: PostDetail, une seule carte affichée)
   // on retombe sur un état local propre à cette carte
@@ -740,7 +742,10 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
               <Repeat2 size={24} className={reposted ? 'text-[var(--accent)]' : ''} strokeWidth={1.75} />
               {repostCount > 0 && <span className="text-[12px] leading-[15px] font-medium">{repostCount}</span>}
             </button>
-            <button className="active:scale-90 transition-transform duration-200">
+            <button
+              onClick={() => setShowShareSheet(true)}
+              className="active:scale-90 transition-transform duration-200"
+            >
               <Send size={22} strokeWidth={1.75} />
             </button>
           </div>
@@ -804,6 +809,14 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
           postId={post.id}
           onClose={() => setShowComments(false)}
           onCommentAdded={() => setCommentCount((c) => c + 1)}
+        />
+      )}
+
+      {showShareSheet && (
+        <SharePostSheet
+          postId={post.id}
+          mediaUrl={mediaUrl}
+          onClose={() => setShowShareSheet(false)}
         />
       )}
 

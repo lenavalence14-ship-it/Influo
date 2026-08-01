@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Copy, Pencil, Trash2 } from 'lucide-react'
 import { timeShort } from '../../lib/time'
+import { supabase } from '../../lib/supabase'
+import Avatar from '../ui/Avatar'
 
 const EDIT_WINDOW_MS = 2 * 60 * 1000 // 2 minutes, comme convenu
 
@@ -38,6 +40,36 @@ export default function MessageBubble({
   const [editValue, setEditValue] = useState(message.contenu || '')
   const pressTimer = useRef(null)
   const bubbleRef = useRef(null)
+
+  // Post partagé (bouton Send de PostCard, voir sharePost.js) : on charge
+  // les infos d'affichage à la demande, uniquement pour les bulles qui en
+  // ont besoin -- pas dans la query globale des messages de ChatSociale.
+  const [sharedPost, setSharedPost] = useState(null)
+  const [sharedPostLoading, setSharedPostLoading] = useState(Boolean(message.shared_post_id))
+
+  useEffect(() => {
+    if (!message.shared_post_id) return
+    let cancelled = false
+    supabase
+      .from('posts')
+      .select(`
+        id, legende,
+        post_medias(media_url, media_type, position),
+        profils_influenceur(user_id, users:user_id(nom_complet, photo_url)),
+        utilisateur:utilisateur_id(nom_complet, photo_url)
+      `)
+      .eq('id', message.shared_post_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) {
+          setSharedPost(data)
+          setSharedPostLoading(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [message.shared_post_id])
 
   // Un message supprimé "pour moi" ne doit jamais s'afficher chez moi, quel
   // que soit son état chez l'autre — deleted_for est propre à chaque personne.
@@ -105,6 +137,50 @@ export default function MessageBubble({
         <div className="glass rounded-2xl px-4 py-2 text-caption text-center text-[var(--text-secondary)] max-w-[85%]">
           {message.contenu}
         </div>
+      </div>
+    )
+  }
+
+  if (message.shared_post_id) {
+    const authorName =
+      sharedPost?.profils_influenceur?.users?.nom_complet || sharedPost?.utilisateur?.nom_complet || '…'
+    const authorPhoto = sharedPost?.profils_influenceur?.users?.photo_url || sharedPost?.utilisateur?.photo_url
+    const media = sharedPost?.post_medias?.slice().sort((a, b) => (a.position ?? 0) - (b.position ?? 0))[0]
+
+    return (
+      <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+        <div className="w-[220px] rounded-2xl overflow-hidden glass">
+          {sharedPostLoading ? (
+            <div className="aspect-square flex items-center justify-center">
+              <div className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+            </div>
+          ) : !sharedPost ? (
+            <div className="aspect-square flex items-center justify-center text-caption text-[var(--text-secondary)] px-3 text-center">
+              Publication indisponible
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 px-2.5 py-2">
+                <Avatar src={authorPhoto} seed={sharedPost.id} size="sm" />
+                <span className="text-caption font-medium truncate">{authorName}</span>
+              </div>
+              {media?.media_type === 'video' ? (
+                <video src={media.media_url} className="w-full aspect-square object-cover" muted playsInline />
+              ) : (
+                <img src={media?.media_url} alt="" className="w-full aspect-square object-cover" />
+              )}
+              <div className="px-2.5 py-2">
+                <span className="text-caption font-medium">{authorName}</span>{' '}
+                {sharedPost.legende && <span className="text-caption">{sharedPost.legende}</span>}
+              </div>
+            </>
+          )}
+        </div>
+        {message.created_at && (
+          <span className="text-[11px] mt-1 px-1" style={{ color: 'var(--text-secondary)' }}>
+            {timeShort(message.created_at)}
+          </span>
+        )}
       </div>
     )
   }
