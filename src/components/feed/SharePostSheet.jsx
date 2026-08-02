@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { X, Link2, Share2, BookImage } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import * as messagesApi from '../../api/messages'
 import { useAuth } from '../../contexts/AuthContext'
 import { sendPostToUsers } from '../../lib/sharePost'
 import Avatar from '../ui/Avatar'
@@ -29,28 +29,10 @@ export default function SharePostSheet({ postId, mediaUrl, onClose }) {
     let cancelled = false
     const load = async () => {
       if (!user?.id) return
-      const [{ data: following }, { data: followers }, { data: convos }] = await Promise.all([
-        supabase.from('follows').select('users:followed_id(id, nom_complet, photo_url)').eq('follower_id', user.id),
-        supabase.from('follows').select('users:follower_id(id, nom_complet, photo_url)').eq('followed_id', user.id),
-        supabase
-          .from('conversations_sociale')
-          .select('user_a:user_a_id(id, nom_complet, photo_url), user_b:user_b_id(id, nom_complet, photo_url)')
-          .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`),
-      ])
-
-      const byId = new Map()
-      const addContact = (u) => {
-        if (u && u.id !== user.id && !byId.has(u.id)) byId.set(u.id, u)
-      }
-      following?.forEach((f) => addContact(f.users))
-      followers?.forEach((f) => addContact(f.users))
-      convos?.forEach((c) => {
-        addContact(c.user_a)
-        addContact(c.user_b)
-      })
+      const contactsList = await messagesApi.fetchShareContacts(user.id)
 
       if (!cancelled) {
-        setContacts(Array.from(byId.values()))
+        setContacts(contactsList)
         setLoading(false)
       }
     }

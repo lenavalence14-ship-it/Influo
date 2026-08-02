@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as dashboardApi from '../../api/dashboard'
 import { useAuth } from '../../contexts/AuthContext'
 import { ArrowLeft, Wallet as WalletIcon } from 'lucide-react'
 
@@ -12,20 +12,8 @@ export default function InfluencerDashboard() {
   useEffect(() => {
     const load = async () => {
       if (!influencerProfile) return
-
-      const { data: wallet } = await supabase.from('wallets').select('*').eq('influenceur_id', influencerProfile.id).maybeSingle()
-      const { count: nbCommandes } = await supabase.from('commandes').select('*', { count: 'exact', head: true }).eq('influenceur_id', influencerProfile.id)
-      const { count: nbConversations } = await supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('influenceur_id', influencerProfile.id)
-      const { count: nbOffres } = await supabase.from('offres').select('*', { count: 'exact', head: true }).eq('influenceur_id', influencerProfile.id)
-
-      setStats({
-        revenusTotaux: wallet?.revenus_totaux || 0,
-        revenusDisponibles: wallet?.solde_disponible || 0,
-        revenusVerrouilles: wallet?.solde_verrouille || 0,
-        nbCommandes: nbCommandes || 0,
-        nbConversations: nbConversations || 0,
-        nbOffres: nbOffres || 0,
-      })
+      const result = await dashboardApi.fetchInfluencerDashboard(influencerProfile.id)
+      setStats(result)
     }
     load()
   }, [influencerProfile])

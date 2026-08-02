@@ -17,7 +17,7 @@ export default function AdminLogin() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const { error, data } = await signIn({ email, password })
+    const { error } = await signIn({ email, password })
     setLoading(false)
     if (error) {
       setError('Identifiants incorrects.')

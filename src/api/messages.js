@@ -15,6 +15,32 @@ import * as walletApi from './wallet'
 import * as feedApi from './feed'
 import * as authApi from './auth'
 
+// Contacts suggérés pour le partage d'un post : abonnements + abonnés
+// (follows) union utilisateurs avec qui une conversation sociale existe déjà.
+export async function fetchShareContacts(userId) {
+  const [{ data: following }, { data: followers }, { data: convos }] = await Promise.all([
+    supabase.from('follows').select('users:followed_id(id, nom_complet, photo_url)').eq('follower_id', userId),
+    supabase.from('follows').select('users:follower_id(id, nom_complet, photo_url)').eq('followed_id', userId),
+    supabase
+      .from('conversations_sociale')
+      .select('user_a:user_a_id(id, nom_complet, photo_url), user_b:user_b_id(id, nom_complet, photo_url)')
+      .or(`user_a_id.eq.${userId},user_b_id.eq.${userId}`),
+  ])
+
+  const byId = new Map()
+  const addContact = (u) => {
+    if (u && u.id !== userId && !byId.has(u.id)) byId.set(u.id, u)
+  }
+  following?.forEach((f) => addContact(f.users))
+  followers?.forEach((f) => addContact(f.users))
+  convos?.forEach((c) => {
+    addContact(c.user_a)
+    addContact(c.user_b)
+  })
+
+  return Array.from(byId.values())
+}
+
 // --- Commandes "biz" (client entreprise <-> client entreprise) ---
 //
 // ⚠️ POINT DE FRICTION MIGRATION : ce flux entier (création, paiement,
@@ -117,19 +143,21 @@ export async function touchConversationGeneric(table, conversationId) {
   return supabase.from(table).update({ updated_at: new Date().toISOString() }).eq('id', conversationId)
 }
 
-export async function sendMessageGeneric(table, conversationTable, { conversationId, senderId, contenu, fichierUrl = null, fichierType = null, isSystem = false }) {
-  const { data, error } = await supabase
-    .from(table)
-    .insert({
-      conversation_id: conversationId,
-      sender_id: senderId,
-      contenu,
-      fichier_url: fichierUrl,
-      fichier_type: fichierType,
-      is_system: isSystem,
-    })
-    .select()
-    .single()
+export async function sendMessageGeneric(table, conversationTable, { conversationId, senderId, contenu, fichierUrl = null, fichierType = null, isSystem = false, sharedPostId = null }) {
+  const payload = {
+    conversation_id: conversationId,
+    sender_id: senderId,
+    contenu,
+    fichier_url: fichierUrl,
+    fichier_type: fichierType,
+    is_system: isSystem,
+  }
+  // shared_post_id n'existe que sur messages_sociale : on ne l'ajoute au
+  // payload que si explicitement fourni, pour ne pas faire échouer l'insert
+  // sur les tables qui n'ont pas cette colonne (messages, _pro, _biz, _influenceur).
+  if (sharedPostId !== null) payload.shared_post_id = sharedPostId
+
+  const { data, error } = await supabase.from(table).insert(payload).select().single()
   if (!error) await touchConversationGeneric(conversationTable, conversationId)
   return { data, error }
 }

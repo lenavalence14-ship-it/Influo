@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, MoreHorizontal, Bookmark, Heart } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import * as templatesApi from '../../api/templates'
 import { useAuth } from '../../contexts/AuthContext'
 import BottomSheet from '../../components/ui/BottomSheet'
 
@@ -12,27 +12,6 @@ import BottomSheet from '../../components/ui/BottomSheet'
 // l'édition (changer texte/photos) sera construite dans une étape
 // ultérieure, pas ici. Onglets "Tout" / "Favoris" scopés à CETTE catégorie
 // (chaque bibliothèque a ses propres favoris, pas un espace global).
-async function fetchTemplates(categorie) {
-  const { data, error } = await supabase
-    .from('templates')
-    .select('id, image_url, ordre')
-    .eq('categorie', categorie)
-    .order('ordre', { ascending: true })
-    .order('created_at', { ascending: true })
-  if (error) throw error
-  return data || []
-}
-
-async function fetchFavoriteIds(userId, categorie) {
-  if (!userId) return []
-  const { data, error } = await supabase
-    .from('template_favoris')
-    .select('template_id, templates!inner(categorie)')
-    .eq('user_id', userId)
-    .eq('templates.categorie', categorie)
-  if (error) throw error
-  return (data || []).map((f) => f.template_id)
-}
 
 // Répartit les templates entre 2 colonnes en assignant toujours la carte
 // suivante à la colonne dont la hauteur cumulée est la plus faible à cet
@@ -60,13 +39,13 @@ export default function TemplateLibrary() {
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['templates', categorie],
-    queryFn: () => fetchTemplates(categorie),
+    queryFn: () => templatesApi.fetchTemplates(categorie),
     enabled: Boolean(categorie),
   })
 
   const { data: favoriteIds = [] } = useQuery({
     queryKey: ['template-favoris', user?.id, categorie],
-    queryFn: () => fetchFavoriteIds(user?.id, categorie),
+    queryFn: () => templatesApi.fetchFavoriteIds(user?.id, categorie),
     enabled: Boolean(user?.id && categorie),
   })
 
@@ -80,9 +59,9 @@ export default function TemplateLibrary() {
       isFav ? old.filter((id) => id !== templateId) : [...old, templateId]
     )
     if (isFav) {
-      await supabase.from('template_favoris').delete().match({ template_id: templateId, user_id: user.id })
+      await templatesApi.removeTemplateFavori(templateId, user.id)
     } else {
-      await supabase.from('template_favoris').insert({ template_id: templateId, user_id: user.id })
+      await templatesApi.addTemplateFavori(templateId, user.id)
     }
   }
 

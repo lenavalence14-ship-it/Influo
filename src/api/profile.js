@@ -117,6 +117,24 @@ export async function fetchClientCollabPosts(clientUserId, currentUserId) {
   }))
 }
 
+export async function fetchAllMediaKits() {
+  const { data: kits, error: kitsError } = await supabase.from('media_kits').select('*')
+  if (kitsError) throw kitsError
+  if (!kits || kits.length === 0) return []
+
+  const userIds = kits.map((k) => k.influenceur_id)
+  const { data: profils, error: profilsError } = await supabase
+    .from('profils_influenceur')
+    .select('id, user_id')
+    .in('user_id', userIds)
+  if (profilsError) throw profilsError
+
+  const profilIdByUserId = new Map((profils || []).map((p) => [p.user_id, p.id]))
+  return kits
+    .map((k) => ({ ...k, profilId: profilIdByUserId.get(k.influenceur_id) }))
+    .filter((k) => k.profilId)
+}
+
 export async function fetchReseauxSociaux(influenceurId) {
   const { data } = await supabase.from('reseaux_sociaux').select('*').eq('influenceur_id', influenceurId)
   return data || []

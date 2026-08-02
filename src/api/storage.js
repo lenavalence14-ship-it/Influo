@@ -7,8 +7,8 @@
 
 import { supabase } from '../lib/supabase'
 
-export async function uploadFile(bucket, path, file) {
-  return supabase.storage.from(bucket).upload(path, file)
+export async function uploadFile(bucket, path, file, options) {
+  return supabase.storage.from(bucket).upload(path, file, options)
 }
 
 export function getPublicUrl(bucket, path) {

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
-import { supabase } from '../lib/supabase'
+import * as notificationsApi from '../api/notifications'
 
 // Enregistre le token push FCM de l'appareil dans Supabase pour l'utilisateur connecté.
 // Ne fait rien sur le web (le plugin n'existe que sur Android/iOS natif) : la version web
@@ -26,15 +26,11 @@ export function usePushNotifications(userId) {
 
       registrationListener = await PushNotifications.addListener('registration', async (token) => {
         // upsert : un appareil ne doit avoir qu'une ligne, remplacée si le token change
-        await supabase.from('push_tokens').upsert(
-          {
-            user_id: userId,
-            token: token.value,
-            platform: Capacitor.getPlatform(),
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'token' }
-        )
+        await notificationsApi.upsertPushToken({
+          userId,
+          token: token.value,
+          platform: Capacitor.getPlatform(),
+        })
       })
 
       errorListener = await PushNotifications.addListener('registrationError', (err) => {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
-import { Users, TrendingUp, DollarSign, Percent, BadgeCheck, Image } from 'lucide-react'
+import * as dashboardApi from '../../api/dashboard'
+import { Users, TrendingUp, DollarSign, Percent, BadgeCheck } from 'lucide-react'
 
 const TABS = ['Statistiques', 'Utilisateurs', 'Offres', 'Paiements', 'Retraits']
 
@@ -16,25 +16,8 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const loadStats = async () => {
-      const { count: nbUsers } = await supabase.from('users').select('*', { count: 'exact', head: true })
-      const { count: nbInfluenceurs } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'influenceur')
-      const { count: nbClients } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'client')
-      const { data: paiementsData } = await supabase.from('paiements').select('montant, commission')
-      const { data: retraitsData } = await supabase.from('retraits').select('montant').eq('status', 'traite')
-
-      const chiffreAffaires = paiementsData?.reduce((s, p) => s + Number(p.montant), 0) || 0
-      const commissions = paiementsData?.reduce((s, p) => s + Number(p.commission), 0) || 0
-      const totalRetraits = retraitsData?.reduce((s, r) => s + Number(r.montant), 0) || 0
-
-      setStats({
-        nbUsers: nbUsers || 0,
-        nbInfluenceurs: nbInfluenceurs || 0,
-        nbClients: nbClients || 0,
-        nbPaiements: paiementsData?.length || 0,
-        chiffreAffaires,
-        commissions,
-        totalRetraits,
-      })
+      const result = await dashboardApi.fetchAdminStats()
+      setStats(result)
     }
     loadStats()
   }, [])
@@ -42,27 +25,20 @@ export default function AdminDashboard() {
   useEffect(() => {
     const loadTabData = async () => {
       if (tab === 'Utilisateurs') {
-        const { data } = await supabase
-          .from('users')
-          .select('*, profils_influenceur(id, verifie)')
-          .order('created_at', { ascending: false })
-        setUsers(data || [])
+        setUsers(await dashboardApi.fetchAdminUsers())
       } else if (tab === 'Offres') {
-        const { data } = await supabase.from('offres').select('*, profils_influenceur(users(nom_complet))').order('created_at', { ascending: false })
-        setOffres(data || [])
+        setOffres(await dashboardApi.fetchAdminOffres())
       } else if (tab === 'Paiements') {
-        const { data } = await supabase.from('paiements').select('*').order('created_at', { ascending: false })
-        setPaiements(data || [])
+        setPaiements(await dashboardApi.fetchAdminPaiements())
       } else if (tab === 'Retraits') {
-        const { data } = await supabase.from('retraits').select('*, profils_influenceur(users(nom_complet))').order('created_at', { ascending: false })
-        setRetraits(data || [])
+        setRetraits(await dashboardApi.fetchAdminRetraits())
       }
     }
     loadTabData()
   }, [tab])
 
   const handleRetraitStatus = async (retraitId, status) => {
-    await supabase.from('retraits').update({ status }).eq('id', retraitId)
+    await dashboardApi.updateRetraitStatus(retraitId, status)
     setRetraits((rs) => rs.map((r) => (r.id === retraitId ? { ...r, status } : r)))
   }
 
@@ -70,7 +46,7 @@ export default function AdminDashboard() {
     const profilId = u.profils_influenceur?.id
     if (!profilId) return
     const nextValue = !u.profils_influenceur?.verifie
-    await supabase.from('profils_influenceur').update({ verifie: nextValue }).eq('id', profilId)
+    await dashboardApi.toggleInfluencerVerified(profilId, nextValue)
     setUsers((us) =>
       us.map((x) =>
         x.id === u.id ? { ...x, profils_influenceur: { ...x.profils_influenceur, verifie: nextValue } } : x
@@ -82,14 +58,6 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] px-5 pt-8 pb-10">
       <h1 className="text-h1 mb-1">Administration</h1>
       <p className="text-caption mb-6">CEO Influo App</p>
-
-      <button
-        onClick={() => navigate('/admin/souvenirs')}
-        className="w-full flex items-center gap-2 justify-center rounded-2xl p-3 mb-4 glass-strong text-body-medium"
-      >
-        <Image size={16} />
-        Souvenirs
-      </button>
 
       <div className="flex gap-2 overflow-x-auto mb-6 pb-1">
         {TABS.map((t) => (

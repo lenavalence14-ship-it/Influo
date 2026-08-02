@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as dashboardApi from '../../api/dashboard'
 import { useAuth } from '../../contexts/AuthContext'
 import { ArrowLeft } from 'lucide-react'
 
@@ -13,15 +13,10 @@ export default function ClientDashboard() {
 
   useEffect(() => {
     const load = async () => {
-      const { count: nbConv } = await supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('client_id', user.id)
-      const { data: cmds } = await supabase.from('commandes').select('*').eq('client_id', user.id).order('created_at', { ascending: false })
-      setCommandes(cmds || [])
-      setConversations(nbConv || 0)
-
-      if (cmds?.length) {
-        const { data: pmts } = await supabase.from('paiements').select('*').in('commande_id', cmds.map((c) => c.id))
-        setPaiements(pmts || [])
-      }
+      const result = await dashboardApi.fetchClientDashboard(user.id)
+      setCommandes(result.commandes)
+      setConversations(result.conversations)
+      setPaiements(result.paiements)
     }
     if (user) load()
   }, [user])

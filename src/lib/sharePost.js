@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import * as messagesApi from '../api/messages'
 
 // Envoie un post en partage à un utilisateur donné, sans passer par l'écran
 // Chat (voir SharePostSheet.jsx -- "on sélectionne, on appuie sur Envoyer,
@@ -8,39 +8,23 @@ import { supabase } from './supabase'
 // NewConversationSociale.jsx (l'un ou l'autre peut être user_a/user_b) :
 // on réutilise la conversation si elle existe déjà, sinon on la crée.
 export async function sendPostToUser({ myId, otherUserId, postId }) {
-  const { data: existing } = await supabase
-    .from('conversations_sociale')
-    .select('id')
-    .or(
-      `and(user_a_id.eq.${myId},user_b_id.eq.${otherUserId}),and(user_a_id.eq.${otherUserId},user_b_id.eq.${myId})`
-    )
-    .maybeSingle()
+  const { conversationId, error } = await messagesApi.findOrCreateSymmetricConversation({
+    table: 'conversations_sociale',
+    sideAField: 'user_a_id',
+    sideBField: 'user_b_id',
+    myId,
+    otherId: otherUserId,
+    insertFields: { user_a_id: myId, user_b_id: otherUserId },
+  })
+  if (error) throw error || new Error('Échec création conversation')
 
-  let conversationId = existing?.id
-
-  if (!conversationId) {
-    const { data: created, error: createError } = await supabase
-      .from('conversations_sociale')
-      .insert({ user_a_id: myId, user_b_id: otherUserId })
-      .select('id')
-      .single()
-    if (createError || !created) throw createError || new Error('Échec création conversation')
-    conversationId = created.id
-  }
-
-  const { error: insertError } = await supabase.from('messages_sociale').insert({
-    conversation_id: conversationId,
-    sender_id: myId,
+  const { error: insertError } = await messagesApi.sendMessageGeneric('messages_sociale', 'conversations_sociale', {
+    conversationId,
+    senderId: myId,
     contenu: null,
-    shared_post_id: postId,
-    is_system: false,
+    sharedPostId: postId,
   })
   if (insertError) throw insertError
-
-  await supabase
-    .from('conversations_sociale')
-    .update({ updated_at: new Date().toISOString() })
-    .eq('id', conversationId)
 
   return conversationId
 }

@@ -3,13 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { X, Check, ImagePlus } from 'lucide-react'
 import html2canvas from 'html2canvas'
-import { supabase } from '../../lib/supabase'
+import * as templatesApi from '../../api/templates'
+import * as feedApi from '../../api/feed'
 import { useAuth } from '../../contexts/AuthContext'
 
 // ---------------------------------------------------------------------
 // Aperçu + édition d'un template choisi dans la bibliothèque, par un
 // utilisateur_simple. Il ne peut modifier QUE les blocs marqués
-// `editable: true` par l'admin (voir admin/souvenirs/ValidationBlocsEditables.jsx) :
+// `editable: true` sur la ligne `templates` en base (attribut posé lors de
+// la création du template, l'outil d'édition admin qui le posait a été retiré) :
 // - bloc texte -> tape dessus, le clavier s'ouvre, il écrit avec la police/
 //   taille déjà choisies par l'admin (non modifiables par lui)
 // - bloc photo -> tape dessus, la galerie s'ouvre, il importe une photo puis
@@ -50,16 +52,6 @@ const MASQUES_SVG = {
   ),
 }
 
-async function fetchTemplate(id) {
-  const { data, error } = await supabase
-    .from('templates')
-    .select('id, categorie, image_url, background_type, background_valeur, blocs')
-    .eq('id', id)
-    .single()
-  if (error) throw error
-  return data
-}
-
 const distanceBetween = (t1, t2) => Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY)
 
 export default function TemplatePreview() {
@@ -72,7 +64,7 @@ export default function TemplatePreview() {
 
   const { data: template, isLoading } = useQuery({
     queryKey: ['template', templateId],
-    queryFn: () => fetchTemplate(templateId),
+    queryFn: () => templatesApi.fetchTemplateFull(templateId),
     enabled: Boolean(templateId),
   })
 
@@ -215,11 +207,8 @@ export default function TemplatePreview() {
       // navigation suivante.
       const blocsUploades = await Promise.all(blocs.map(async (bloc) => {
         if (bloc.type !== 'photo' || !bloc.imageFichier) return bloc
-        const chemin = `souvenirs/${user.id}/${templateId}-${bloc.id}-${Date.now()}.jpg`
-        const { error: errUpload } = await supabase.storage.from('posts').upload(chemin, bloc.imageFichier, { contentType: bloc.imageFichier.type })
-        if (errUpload) throw errUpload
-        const { data: pub } = supabase.storage.from('posts').getPublicUrl(chemin)
-        return { ...bloc, imageValeur: pub.publicUrl, imageFichier: undefined }
+        const url = await feedApi.uploadSouvenirBlocPhoto(user.id, templateId, bloc.id, bloc.imageFichier)
+        return { ...bloc, imageValeur: url, imageFichier: undefined }
       }))
       setBlocsLocaux(blocsUploades)
       // Laisser le DOM re-render avec les nouvelles URLs (upload) avant capture.
@@ -243,21 +232,7 @@ export default function TemplatePreview() {
       // dans les blocs éditables, séparés par un retour à la ligne.
       const legende = blocsUploades.filter((b) => b.type === 'texte' && b.editable && b.contenu).map((b) => b.contenu).join('\n')
 
-      const { data: post, error: errPost } = await supabase
-        .from('posts')
-        .insert({ utilisateur_id: user.id, type: 'photo', legende: legende || null, crop_format: 'souvenir' })
-        .select().single()
-      if (errPost) throw errPost
-
-      const cheminFinal = `${user.id}/${post.id}/0-souvenir.jpg`
-      const { error: errUploadFinal } = await supabase.storage.from('posts').upload(cheminFinal, blob, { contentType: 'image/jpeg' })
-      if (errUploadFinal) throw errUploadFinal
-      const { data: pubFinal } = supabase.storage.from('posts').getPublicUrl(cheminFinal)
-
-      const { error: errMedia } = await supabase.from('post_medias').insert({
-        post_id: post.id, media_url: pubFinal.publicUrl, media_type: 'image', position: 0,
-      })
-      if (errMedia) throw errMedia
+      await feedApi.publishSouvenirPost({ userId: user.id, legende, imageBlob: blob })
 
       queryClient.invalidateQueries({ queryKey: ['feed'] })
       navigate('/')

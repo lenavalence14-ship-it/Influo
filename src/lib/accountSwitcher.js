@@ -1,5 +1,5 @@
 import { Preferences } from '@capacitor/preferences'
-import { supabase } from './supabase'
+import * as authApi from '../api/auth'
 
 // Liste des comptes déjà connectés sur cet appareil, façon "changer de profil" Facebook.
 // On stocke le refresh_token de chaque compte (jamais le mot de passe) pour pouvoir
@@ -110,9 +110,7 @@ export async function switchToAccount(userId) {
     // IMPORTANT : setSession({ access_token: '', refresh_token }) casse avec "Auth session
     // missing!" car un access_token vide n'est pas traité comme absent par le SDK. La méthode
     // correcte pour restaurer une session à partir d'un refresh_token seul est refreshSession.
-    const { data, error } = await supabase.auth.refreshSession({
-      refresh_token: account.refreshToken,
-    })
+    const { data, error } = await authApi.refreshSession(account.refreshToken)
 
     if (error) {
       // Uniquement si Supabase dit explicitement que le token est mort : on nettoie.

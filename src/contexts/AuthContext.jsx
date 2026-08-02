@@ -130,11 +130,11 @@ export function AuthProvider({ children }) {
   }
 
   const signIn = async ({ email, password }) => {
-    const { user, error } = await authApi.signIn({ email, password })
+    const { user, session, error } = await authApi.signIn({ email, password })
     if (!error && user) {
       await loadProfile(user.id)
     }
-    return { user, error }
+    return { user, session, error }
   }
 
   const signOut = async () => {

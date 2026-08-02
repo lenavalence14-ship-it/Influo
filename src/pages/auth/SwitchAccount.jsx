@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { supabase } from '../../lib/supabase'
+import * as authApi from '../../api/auth'
 import { saveAccount } from '../../lib/accountSwitcher'
 import { ArrowLeft } from 'lucide-react'
 import appIcon from '../../assets/app-icon.png'
@@ -24,27 +24,23 @@ export default function SwitchAccount() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const { data, error } = await signIn({ email, password })
+    const { user, session, error } = await signIn({ email, password })
     setLoading(false)
     if (error) {
       setError('Email ou mot de passe incorrect.')
       return
     }
-    if (data?.session?.refresh_token) {
+    if (session?.refresh_token) {
       // On va chercher le vrai nom et la vraie photo dans public.users : sans ça,
       // le sélecteur de profils affiche l'email à la place de l'avatar habituel.
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('nom_complet, photo_url')
-        .eq('id', data.user.id)
-        .maybeSingle()
+      const userRow = await authApi.fetchUserDisplayInfo(user.id)
 
       setPendingSession({
-        userId: data.user.id,
+        userId: user.id,
         email,
         nomComplet: userRow?.nom_complet || email,
         photoUrl: userRow?.photo_url || null,
-        refreshToken: data.session.refresh_token,
+        refreshToken: session.refresh_token,
       })
       setShowConsent(true)
       return
@@ -61,8 +57,8 @@ export default function SwitchAccount() {
       // écraserait alors une valeur plus récente et valide par une déjà morte,
       // provoquant "Refresh Token Not Found" au prochain switch. On relit donc
       // la session courante au moment même de l'écriture.
-      const { data: currentSessionData } = await supabase.auth.getSession()
-      const freshRefreshToken = currentSessionData?.session?.refresh_token || pendingSession.refreshToken
+      const currentSession = await authApi.getSession()
+      const freshRefreshToken = currentSession?.refresh_token || pendingSession.refreshToken
       await saveAccount({
         userId: pendingSession.userId,
         nomComplet: pendingSession.nomComplet,

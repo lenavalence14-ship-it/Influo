@@ -11,6 +11,7 @@
 // find-and-replace comme le reste de ce fichier.
 
 import { supabase } from '../lib/supabase'
+import * as storageApi from './storage'
 
 const PAGE_SIZE = 10
 
@@ -216,6 +217,40 @@ export async function fetchReels(userId) {
       repost_count: reposts?.filter((r) => r.post_id === p.id).length || 0,
       reposted_by_me: reposts?.some((r) => r.post_id === p.id && r.user_id === userId) || false,
     }))
+}
+
+// Publie un souvenir (template rempli par l'utilisateur) comme un post
+// standard dans le feed : upload de l'image finale, création du post, du
+// media associé.
+export async function publishSouvenirPost({ userId, legende, imageBlob }) {
+  const { data: post, error: errPost } = await supabase
+    .from('posts')
+    .insert({ utilisateur_id: userId, type: 'photo', legende: legende || null, crop_format: 'souvenir' })
+    .select()
+    .single()
+  if (errPost) throw errPost
+
+  const cheminFinal = `${userId}/${post.id}/0-souvenir.jpg`
+  const { error: errUploadFinal } = await storageApi.uploadFile('posts', cheminFinal, imageBlob, { contentType: 'image/jpeg' })
+  if (errUploadFinal) throw errUploadFinal
+  const mediaUrl = storageApi.getPublicUrl('posts', cheminFinal)
+
+  const { error: errMedia } = await supabase.from('post_medias').insert({
+    post_id: post.id,
+    media_url: mediaUrl,
+    media_type: 'image',
+    position: 0,
+  })
+  if (errMedia) throw errMedia
+
+  return post
+}
+
+export async function uploadSouvenirBlocPhoto(userId, templateId, blocId, file) {
+  const chemin = `souvenirs/${userId}/${templateId}-${blocId}-${Date.now()}.jpg`
+  const { error } = await storageApi.uploadFile('posts', chemin, file, { contentType: file.type })
+  if (error) throw error
+  return storageApi.getPublicUrl('posts', chemin)
 }
 
 export async function fetchPostForEdit(postId) {

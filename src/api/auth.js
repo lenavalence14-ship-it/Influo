@@ -109,6 +109,10 @@ export async function fetchClientProfileIdByUserId(userId) {
   return data
 }
 
+export async function refreshSession(refreshToken) {
+  return supabase.auth.refreshSession({ refresh_token: refreshToken })
+}
+
 export async function fetchUserDisplayInfo(userId) {
   const { data } = await supabase
     .from('users')

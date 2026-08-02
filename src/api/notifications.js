@@ -51,7 +51,7 @@ export async function markNotificationRead(notificationId) {
 
 export async function upsertPushToken({ userId, token, platform }) {
   return supabase.from('push_tokens').upsert(
-    { user_id: userId, token, platform },
+    { user_id: userId, token, platform, updated_at: new Date().toISOString() },
     { onConflict: 'token' }
   )
 }
