@@ -1,5 +1,6 @@
 import TemplateA from './TemplateA'
 import TemplateB from './TemplateB'
+import TemplateC from './TemplateC'
 
 // Registre des designs disponibles pour l'affichage aléatoire du Media Kit
 // dans le Feed (voir MediaKitSuggestion.jsx). Ajouter un design = ajouter une
@@ -7,7 +8,7 @@ import TemplateB from './TemplateB'
 // Chaque template reçoit { mediaKit, onOpenProfile } et affiche les champs
 // du media kit dont IL a besoin -- un champ pas encore rempli est simplement
 // ignoré par le template concerné.
-export const MEDIA_KIT_TEMPLATES = [TemplateA, TemplateB]
+export const MEDIA_KIT_TEMPLATES = [TemplateA, TemplateB, TemplateC]
 
 // Tire un template au hasard. Appelé à CHAQUE apparition d'un media kit dans
 // le feed (pas une fois par media kit) : deux apparitions du même media kit,
