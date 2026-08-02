@@ -102,8 +102,8 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
   const nationalites = mediaKit.c_audience_nationalites || [] // [{ pays, pct_tiktok, pct_instagram }]
 
   return (
-    <div className="w-full aspect-[2/3] relative overflow-hidden" style={{ backgroundColor: theme.bg, color: theme.text }}>
-      <div className="flex h-full">
+    <div className="w-full relative overflow-hidden" style={{ backgroundColor: theme.bg, color: theme.text }}>
+      <div className="flex items-stretch">
         {/* Colonne gauche : identité + tableau */}
         <div className="w-1/2 flex flex-col p-4 overflow-hidden">
           <div className="flex items-start gap-3">
@@ -157,12 +157,12 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
             <p className="text-[12px] font-bold uppercase" style={{ color: theme.accent, fontFamily: 'Georgia, "Times New Roman", serif' }}>
               Audience & Démographie
             </p>
-            <table className="w-full mt-1.5 border-collapse">
+            <table className="w-full mt-1.5 border-collapse table-fixed">
               <thead>
                 <tr style={{ backgroundColor: theme.tableHeader }}>
-                  <th className="py-1.5 px-2 text-[9px] text-left font-medium uppercase">Audience</th>
-                  <th className="py-1.5 px-2 text-[9px] font-medium uppercase">TikTok</th>
-                  <th className="py-1.5 px-2 text-[9px] font-medium uppercase">Instagram</th>
+                  <th className="py-1.5 px-1 text-[8px] text-left font-medium uppercase w-[40%]">Audience</th>
+                  <th className="py-1.5 px-1 text-[8px] font-medium uppercase w-[30%]">TikTok</th>
+                  <th className="py-1.5 px-1 text-[8px] font-medium uppercase w-[30%]">Instagram</th>
                 </tr>
               </thead>
               <tbody>
@@ -195,14 +195,23 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
             </table>
           </div>
 
-          {/* 2 photos "polaroid" sous le tableau, dans la colonne gauche -- conforme à la référence */}
-          <div className="mt-2 grid grid-cols-2 gap-2 flex-1 min-h-0">
-            <PhotoFrame {...grillePhotos[4]} cropFormat="media_kit_c_grille" onOpenProfile={onOpenProfile} className="w-full h-full" withBorder />
-            <PhotoFrame {...grillePhotos[5]} cropFormat="media_kit_c_grille" onOpenProfile={onOpenProfile} className="w-full h-full" withBorder />
+          {/* 2 photos "polaroid" sous le tableau, dans la colonne gauche -- conforme à la référence.
+              Hauteur fixe (pas flex-1) : le tableau au-dessus a une hauteur
+              variable selon le nombre de nationalités ajoutées, donc rien ici
+              ne doit dépendre de l'espace "restant" dans un cadre à hauteur
+              fixée -- ça écrasait ce bloc à zéro dès que le tableau dépassait
+              la hauteur du cadre (voir bug signalé : photos invisibles). */}
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <PhotoFrame {...grillePhotos[4]} cropFormat="media_kit_c_grille" onOpenProfile={onOpenProfile} className="aspect-[4/3] w-full" withBorder />
+            <PhotoFrame {...grillePhotos[5]} cropFormat="media_kit_c_grille" onOpenProfile={onOpenProfile} className="aspect-[4/3] w-full" withBorder />
           </div>
         </div>
 
-        {/* Colonne droite : 4 photos "polaroid" empilées */}
+        {/* Colonne droite : 4 photos "polaroid" empilées. Hauteur fixe par
+            photo (pas flex-1 sur une hauteur héritée) : chaque photo garde
+            son propre ratio 4:3, la colonne s'étire naturellement à la
+            hauteur totale de la colonne de gauche grâce à items-stretch sur
+            le parent flex, sans dépendre d'un cadre englobant à ratio figé. */}
         <div className="w-1/2 flex flex-col gap-2 p-2">
           {[0, 1, 2, 3].map((i) => (
             <PhotoFrame
@@ -210,7 +219,7 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
               {...grillePhotos[i]}
               cropFormat="media_kit_c_grille"
               onOpenProfile={onOpenProfile}
-              className="flex-1 w-full"
+              className="aspect-[4/3] w-full"
               withBorder
             />
           ))}
