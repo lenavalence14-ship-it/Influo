@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as offresApi from '../../api/offres'
 import { useAuth } from '../../contexts/AuthContext'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -28,7 +28,7 @@ export default function CreateOffer() {
   useEffect(() => {
     if (!isEdit) return
     const load = async () => {
-      const { data } = await supabase.from('offres').select('*').eq('id', id).maybeSingle()
+      const data = await offresApi.fetchOffre(id)
       if (data) {
         setTitre(data.titre || '')
         setDescription(data.description || '')
@@ -54,31 +54,28 @@ export default function CreateOffer() {
     setError('')
     setLoading(true)
 
-    let photoUrl = existingPhotoUrl
-    if (photoFile) {
-      const fileName = `${influencerProfile.id}/${Date.now()}-${photoFile.name}`
-      const { error: uploadError } = await supabase.storage.from('offres').upload(fileName, photoFile)
-      if (uploadError) {
-        setError("Erreur lors de l'upload de la photo.")
-        setLoading(false)
-        return
-      }
-      const { data: urlData } = supabase.storage.from('offres').getPublicUrl(fileName)
-      photoUrl = urlData.publicUrl
-    }
-
-    const payload = {
-      titre,
-      description,
-      prix: parseFloat(prix),
-      plateforme,
-      delai_jours: parseInt(delaiJours, 10),
-      photo_url: photoUrl,
-    }
-
     const { error: dbError } = isEdit
-      ? await supabase.from('offres').update(payload).eq('id', id)
-      : await supabase.from('offres').insert({ ...payload, influenceur_id: influencerProfile.id, actif: true })
+      ? await offresApi.updateOffre({
+          offreId: id,
+          influenceurId: influencerProfile.id,
+          titre,
+          description,
+          prix,
+          plateforme,
+          delaiJours,
+          photoFile,
+          existingPhotoUrl,
+        })
+      : await offresApi.createOffre({
+          influenceurId: influencerProfile.id,
+          titre,
+          description,
+          prix,
+          plateforme,
+          delaiJours,
+          photoFile,
+          existingPhotoUrl,
+        })
 
     setLoading(false)
     if (dbError) {

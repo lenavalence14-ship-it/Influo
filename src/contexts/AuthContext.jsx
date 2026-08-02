@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import * as authApi from '../api/auth'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import { saveAccount } from '../lib/accountSwitcher'
 
@@ -40,11 +40,7 @@ export function AuthProvider({ children }) {
     // renverra simplement null (elle est filtrée sur user_id, donc gratuite
     // en cas de mauvais rôle). Ça remplace 2 aller-retours séquentiels par 1
     // seul aller-retour (les 3 requêtes en vol en même temps).
-    const [{ data: userRow }, { data: infRow }, { data: cliRow }] = await Promise.all([
-      supabase.from('users').select('*').eq('id', userId).maybeSingle(),
-      supabase.from('profils_influenceur').select('*').eq('user_id', userId).maybeSingle(),
-      supabase.from('profils_client').select('*').eq('user_id', userId).maybeSingle(),
-    ])
+    const { userRow, infRow, cliRow } = await authApi.loadFullProfile(userId)
 
     setProfile(userRow || null)
 
@@ -63,7 +59,7 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    authApi.getSession().then((session) => {
       setSession(session)
       // `loading` tombe ici, dès que la session est connue -- ProtectedRoute
       // peut déjà décider "connecté ou pas" et afficher l'app. Le profil se
@@ -82,25 +78,20 @@ export function AuthProvider({ children }) {
     // (autoRefreshToken: true). Sans ça, ce token devient obsolète dès le premier rafraîchissement,
     // et le sélecteur de profils échoue en pensant que la session est morte alors qu'elle est
     // juste désynchronisée de son côté.
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+    const unsubscribe = authApi.onAuthStateChange((event, session) => {
       setSession(session)
       if (session?.user) {
         loadProfile(session.user.id)
         if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
-          supabase
-            .from('users')
-            .select('nom_complet, photo_url')
-            .eq('id', session.user.id)
-            .maybeSingle()
-            .then(({ data: userRow }) => {
-              saveAccount({
-                userId: session.user.id,
-                nomComplet: userRow?.nom_complet || session.user.email,
-                email: session.user.email,
-                photoUrl: userRow?.photo_url || null,
-                refreshToken: session.refresh_token,
-              })
+          authApi.fetchUserDisplayInfo(session.user.id).then((userRow) => {
+            saveAccount({
+              userId: session.user.id,
+              nomComplet: userRow?.nom_complet || session.user.email,
+              email: session.user.email,
+              photoUrl: userRow?.photo_url || null,
+              refreshToken: session.refresh_token,
             })
+          })
         }
       } else {
         setProfile(null)
@@ -109,56 +100,52 @@ export function AuthProvider({ children }) {
       }
     })
 
-    return () => listener.subscription.unsubscribe()
+    return unsubscribe
   }, [])
 
   const signUp = async ({ email, password, nomComplet, role }) => {
-    const { data, error } = await supabase.auth.signUp({ email, password })
+    const { user, error } = await authApi.signUp({ email, password })
     if (error) return { error }
 
-    if (data.user) {
-      const { error: insertError } = await supabase.from('users').insert({
-        id: data.user.id,
+    if (user) {
+      const { error: insertError } = await authApi.createUserRow({
+        id: user.id,
         role,
         email,
-        nom_complet: nomComplet,
+        nomComplet,
       })
       if (insertError) return { error: insertError }
 
       if (role === 'influenceur') {
-        await supabase.from('profils_influenceur').insert({
-          user_id: data.user.id,
-        })
+        await authApi.createInfluencerProfile(user.id)
         // le wallet est créé par un trigger côté DB idéalement ; sinon on le crée ici en secours
       } else if (role === 'client') {
-        await supabase.from('profils_client').insert({
-          user_id: data.user.id,
-        })
+        await authApi.createClientProfile(user.id)
       }
       // 'utilisateur_simple' n'a pas de table de profil dédiée : rien à insérer de plus,
       // la ligne dans public.users (nom_complet, photo_url) lui suffit.
-      await loadProfile(data.user.id)
+      await loadProfile(user.id)
     }
-    return { data, error: null }
+    return { user, error: null }
   }
 
   const signIn = async ({ email, password }) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (!error && data.user) {
-      await loadProfile(data.user.id)
+    const { user, error } = await authApi.signIn({ email, password })
+    if (!error && user) {
+      await loadProfile(user.id)
     }
-    return { data, error }
+    return { user, error }
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    await authApi.signOut()
     setProfile(null)
     setInfluencerProfile(null)
     setClientProfile(null)
   }
 
   const resetPassword = async (email) => {
-    return supabase.auth.resetPasswordForEmail(email)
+    return authApi.resetPasswordForEmail(email)
   }
 
   return (

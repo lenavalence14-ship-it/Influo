@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { X, Heart, Repeat2, Send, Eye, ArrowLeft, MoreVertical, Music } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import * as notesApi from '../../api/notes'
+import * as messagesApi from '../../api/messages'
 import { useAuth } from '../../contexts/AuthContext'
 import { timeAgo } from '../../lib/time'
 import { profileRoute } from '../../lib/profileRoute'
@@ -355,26 +356,13 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
     const isMine = note.user_id === user?.id
 
     const load = async () => {
-      const { count } = await supabase
-        .from('note_likes')
-        .select('id', { count: 'exact', head: true })
-        .eq('note_id', note.id)
-      const { data: mine } = await supabase
-        .from('note_likes')
-        .select('id')
-        .eq('note_id', note.id)
-        .eq('user_id', user?.id)
-        .maybeSingle()
-      const { data: myRepost } = await supabase
-        .from('note_reposts')
-        .select('id')
-        .eq('note_id', note.id)
-        .eq('user_id', user?.id)
-        .maybeSingle()
+      const count = await notesApi.fetchNoteLikeCount(note.id)
+      const mine = user?.id ? await notesApi.fetchMyNoteLike(note.id, user.id) : false
+      const myRepost = user?.id ? await notesApi.fetchMyNoteRepost(note.id, user.id) : false
       if (!cancelled) {
-        setLikeCount(count || 0)
-        setLiked(!!mine)
-        setReposted(!!myRepost)
+        setLikeCount(count)
+        setLiked(mine)
+        setReposted(myRepost)
       }
 
       if (isMine) {
@@ -382,22 +370,16 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
         // Sur une note originale -> ses vues + celles de tous ses reposts.
         let noteIds = [note.id]
         if (!note.repost_of) {
-          const { data: reposts } = await supabase.from('notes').select('id').eq('repost_of', note.id)
-          if (reposts?.length) noteIds = [note.id, ...reposts.map((r) => r.id)]
+          const repostIds = await notesApi.fetchNoteRepostIds(note.id)
+          if (repostIds.length) noteIds = [note.id, ...repostIds]
         }
-        const { data: views } = await supabase
-          .from('note_views')
-          .select('user_id, created_at, users(id, nom_complet, photo_url)')
-          .in('note_id', noteIds)
-          .order('created_at', { ascending: false })
+        const views = await notesApi.fetchNoteViewers(noteIds)
         if (!cancelled) {
-          setViewCount(views?.length || 0)
-          setViewersList(views || [])
+          setViewCount(views.length)
+          setViewersList(views)
         }
       } else if (user?.id) {
-        await supabase
-          .from('note_views')
-          .upsert({ note_id: note.id, user_id: user.id }, { onConflict: 'note_id,user_id', ignoreDuplicates: true })
+        await notesApi.recordNoteView(note.id, user.id)
       }
     }
     load()
@@ -422,19 +404,18 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
     if (liked) {
       setLiked(false)
       setLikeCount((c) => Math.max(0, c - 1))
-      await supabase.from('note_likes').delete().eq('note_id', note.id).eq('user_id', user.id)
+      await notesApi.unlikeNote(note.id, user.id)
       return
     }
     setLiked(true)
     setLikeCount((c) => c + 1)
-    await supabase.from('note_likes').insert({ note_id: note.id, user_id: user.id })
+    await notesApi.likeNote(note.id, user.id)
     if (!isMine) {
-      await supabase.from('notifications').insert({
-        user_id: note.user_id,
-        type: 'note_like',
-        contenu: `${profile?.nom_complet || 'Quelqu\u2019un'} a aimé ta note`,
-        lien_ref_id: note.id,
-        from_user_id: user.id,
+      await notesApi.notifyNoteLike({
+        noteAuthorId: note.user_id,
+        likerName: profile?.nom_complet,
+        noteId: note.id,
+        likerId: user.id,
       })
     }
   }
@@ -443,30 +424,27 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
     if (reposted || isMine) return
     setReposted(true)
     const originalId = current.original.id
-    const { error } = await supabase.from('notes').insert({
-      user_id: user.id,
-      contenu: current.original.contenu,
-      repost_of: originalId,
-      expire_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    const { error } = await notesApi.repostNote({
+      originalId,
+      originalContenu: current.original.contenu,
+      userId: user.id,
     })
     if (error) {
       setReposted(false)
       return
     }
-    await supabase.from('note_reposts').insert({ note_id: originalId, user_id: user.id })
-    await supabase.from('notifications').insert({
-      user_id: current.original.user_id,
-      type: 'note_repost',
-      contenu: `${profile?.nom_complet || 'Quelqu\u2019un'} a republié ta note`,
-      lien_ref_id: originalId,
-      from_user_id: user.id,
+    await notesApi.notifyNoteRepost({
+      originalAuthorId: current.original.user_id,
+      reposterName: profile?.nom_complet,
+      originalId,
+      reposterId: user.id,
     })
   }
 
   const handleDelete = async () => {
     if (!isMine) return
     clearTimer()
-    await supabase.from('notes').delete().eq('id', note.id)
+    await notesApi.deleteNote(note.id)
     // Retire l'item localement et avance ; si c'était le dernier segment du
     // dernier groupe, ferme le viewer.
     if (items.length > 1) {
@@ -488,183 +466,27 @@ export default function NoteViewer({ groups, startGroupIndex, onClose }) {
     const theirRole = author.role
     const otherUserId = note.user_id
 
-    let table, messagesTable, aField, bField, myId, otherId, conversationId
+    const { table, messagesTable, conversationId, error } = await messagesApi.resolveReplyToNoteConversation({
+      myRole,
+      theirRole,
+      myUserId: user.id,
+      otherUserId,
+    })
 
-    if (myRole === theirRole) {
-      myId = user.id
-      otherId = otherUserId
-      if (myRole === 'influenceur') {
-        table = 'conversations_influenceur'
-        messagesTable = 'messages_influenceur'
-        aField = 'user_a_id'
-        bField = 'user_b_id'
-      } else if (myRole === 'client') {
-        table = 'conversations_biz'
-        messagesTable = 'messages_biz'
-        aField = 'client_a_id'
-        bField = 'client_b_id'
-        const [{ data: mine }, { data: theirs }] = await Promise.all([
-          supabase.from('profils_client').select('id').eq('user_id', user.id).maybeSingle(),
-          supabase.from('profils_client').select('id').eq('user_id', otherUserId).maybeSingle(),
-        ])
-        if (!mine || !theirs) {
-          setSending(false)
-          return
-        }
-        myId = mine.id
-        otherId = theirs.id
-      } else {
-        table = 'conversations_sociale'
-        messagesTable = 'messages_sociale'
-        aField = 'user_a_id'
-        bField = 'user_b_id'
-      }
-
-      const { data: existing } = await supabase
-        .from(table)
-        .select('id')
-        .or(`and(${aField}.eq.${myId},${bField}.eq.${otherId}),and(${aField}.eq.${otherId},${bField}.eq.${myId})`)
-        .maybeSingle()
-
-      conversationId = existing?.id
-      if (!conversationId) {
-        const { data: created, error } = await supabase.from(table).insert({ [aField]: myId, [bField]: otherId }).select().single()
-        if (error || !created) {
-          setSending(false)
-          return
-        }
-        conversationId = created.id
-      }
-    } else if (myRole === 'client' && theirRole === 'influenceur') {
-      table = 'conversations'
-      messagesTable = 'messages'
-      const { data: theirInfluenceurProfile } = await supabase
-        .from('profils_influenceur')
-        .select('id')
-        .eq('user_id', otherUserId)
-        .maybeSingle()
-      if (!theirInfluenceurProfile) {
-        setSending(false)
-        return
-      }
-      const { data: existing } = await supabase
-        .from(table)
-        .select('id')
-        .eq('client_id', user.id)
-        .eq('influenceur_id', theirInfluenceurProfile.id)
-        .maybeSingle()
-      conversationId = existing?.id
-      if (!conversationId) {
-        const { data: created, error } = await supabase
-          .from(table)
-          .insert({ client_id: user.id, influenceur_id: theirInfluenceurProfile.id })
-          .select()
-          .single()
-        if (error || !created) {
-          setSending(false)
-          return
-        }
-        conversationId = created.id
-      }
-    } else if (myRole === 'influenceur' && theirRole === 'client') {
-      table = 'conversations'
-      messagesTable = 'messages'
-      const { data: myInfluenceurProfile } = await supabase
-        .from('profils_influenceur')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle()
-      if (!myInfluenceurProfile) {
-        setSending(false)
-        return
-      }
-      const { data: existing } = await supabase
-        .from(table)
-        .select('id')
-        .eq('client_id', otherUserId)
-        .eq('influenceur_id', myInfluenceurProfile.id)
-        .maybeSingle()
-      conversationId = existing?.id
-      if (!conversationId) {
-        const { data: created, error } = await supabase
-          .from(table)
-          .insert({ client_id: otherUserId, influenceur_id: myInfluenceurProfile.id })
-          .select()
-          .single()
-        if (error || !created) {
-          setSending(false)
-          return
-        }
-        conversationId = created.id
-      }
-    } else if (myRole === 'client' && theirRole === 'utilisateur_simple') {
-      table = 'conversations_pro'
-      messagesTable = 'messages_pro'
-      const { data: myClientProfile } = await supabase.from('profils_client').select('id').eq('user_id', user.id).maybeSingle()
-      if (!myClientProfile) {
-        setSending(false)
-        return
-      }
-      const { data: existing } = await supabase
-        .from(table)
-        .select('id')
-        .eq('client_id', myClientProfile.id)
-        .eq('utilisateur_id', otherUserId)
-        .maybeSingle()
-      conversationId = existing?.id
-      if (!conversationId) {
-        const { data: created, error } = await supabase
-          .from(table)
-          .insert({ client_id: myClientProfile.id, utilisateur_id: otherUserId })
-          .select()
-          .single()
-        if (error || !created) {
-          setSending(false)
-          return
-        }
-        conversationId = created.id
-      }
-    } else if (myRole === 'utilisateur_simple' && theirRole === 'client') {
-      table = 'conversations_pro'
-      messagesTable = 'messages_pro'
-      const { data: theirClientProfile } = await supabase.from('profils_client').select('id').eq('user_id', otherUserId).maybeSingle()
-      if (!theirClientProfile) {
-        setSending(false)
-        return
-      }
-      const { data: existing } = await supabase
-        .from(table)
-        .select('id')
-        .eq('client_id', theirClientProfile.id)
-        .eq('utilisateur_id', user.id)
-        .maybeSingle()
-      conversationId = existing?.id
-      if (!conversationId) {
-        const { data: created, error } = await supabase
-          .from(table)
-          .insert({ client_id: theirClientProfile.id, utilisateur_id: user.id })
-          .select()
-          .single()
-        if (error || !created) {
-          setSending(false)
-          return
-        }
-        conversationId = created.id
-      }
-    } else {
+    if (error || !conversationId) {
       setSending(false)
       return
     }
 
-    await supabase.from(messagesTable).insert({
-      conversation_id: conversationId,
-      sender_id: user.id,
+    await messagesApi.sendNoteReply({
+      messagesTable,
+      table,
+      conversationId,
+      senderId: user.id,
       contenu: messageText,
-      is_system: false,
-      reply_to_note_id: current.original.id,
-      reply_to_note_contenu: current.original.contenu,
+      replyToNoteId: current.original.id,
+      replyToNoteContenu: current.original.contenu,
     })
-    await supabase.from(table).update({ updated_at: new Date().toISOString() }).eq('id', conversationId)
 
     setSending(false)
     setReplyText('')

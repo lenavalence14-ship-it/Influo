@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as walletApi from '../../api/wallet'
 import { useAuth } from '../../contexts/AuthContext'
 import { ArrowLeft, Lock, Unlock, TrendingUp } from 'lucide-react'
 import Button from '../../components/ui/Button'
@@ -26,35 +26,26 @@ export default function Wallet() {
 
   const loadAll = async () => {
     if (!influencerProfile) return
-    const { data: w } = await supabase.from('wallets').select('*').eq('influenceur_id', influencerProfile.id).maybeSingle()
+    const w = await walletApi.fetchWallet(influencerProfile.id)
     setWallet(w)
 
     if (w) {
-      const { data: tx } = await supabase
-        .from('wallet_transactions')
-        .select('*')
-        .eq('wallet_id', w.id)
-        .order('created_at', { ascending: false })
-        .limit(20)
-      setTransactions(tx || [])
+      const tx = await walletApi.fetchWalletTransactions(w.id, 20)
+      setTransactions(tx)
     }
 
-    const { data: r } = await supabase
-      .from('retraits')
-      .select('*')
-      .eq('influenceur_id', influencerProfile.id)
-      .order('created_at', { ascending: false })
-    setRetraits(r || [])
+    const r = await walletApi.fetchRetraits(influencerProfile.id)
+    setRetraits(r)
 
-    const { data: m } = await supabase.from('moyens_paiement').select('*').eq('influenceur_id', influencerProfile.id)
-    setMoyens(m || [])
+    const m = await walletApi.fetchMoyensPaiement(influencerProfile.id)
+    setMoyens(m)
   }
 
   useEffect(() => { loadAll() }, [influencerProfile])
 
   const handleAddMethod = async () => {
     if (!numero) return
-    await supabase.from('moyens_paiement').insert({ influenceur_id: influencerProfile.id, provider, numero })
+    await walletApi.addMoyenPaiement({ influenceurId: influencerProfile.id, provider, numero })
     setShowAddMethod(false)
     setNumero('')
     loadAll()
@@ -65,16 +56,13 @@ export default function Wallet() {
     const montant = parseFloat(amount)
     if (montant > wallet.solde_disponible) return
 
-    await supabase.from('retraits').insert({
-      influenceur_id: influencerProfile.id,
-      moyen_paiement_id: moyens[0].id,
+    await walletApi.withdrawFunds({
+      influenceurId: influencerProfile.id,
+      walletId: wallet.id,
+      moyenPaiementId: moyens[0].id,
       montant,
-      status: 'en_attente',
+      soldeDisponibleActuel: wallet.solde_disponible,
     })
-
-    await supabase.from('wallets').update({
-      solde_disponible: +(wallet.solde_disponible - montant).toFixed(2),
-    }).eq('id', wallet.id)
 
     setShowWithdraw(false)
     setAmount('')

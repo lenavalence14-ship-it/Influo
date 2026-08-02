@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { X, Image as ImageIcon } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import * as notesApi from '../../api/notes'
 import { useAuth } from '../../contexts/AuthContext'
 import { compressImage, trimAudio } from '../../lib/mediaCompression'
 import PhotoNoteEditor from './PhotoNoteEditor'
@@ -46,16 +46,11 @@ export default function CreateNote() {
     if (!editId) return
     let cancelled = false
     setLoading(true)
-    supabase
-      .from('notes')
-      .select('id, contenu, user_id')
-      .eq('id', editId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (cancelled) return
-        if (data && data.user_id === user?.id) setText(data.contenu || '')
-        setLoading(false)
-      })
+    notesApi.fetchNoteForEdit(editId).then((data) => {
+      if (cancelled) return
+      if (data && data.user_id === user?.id) setText(data.contenu || '')
+      setLoading(false)
+    })
     return () => {
       cancelled = true
     }
@@ -94,15 +89,13 @@ export default function CreateNote() {
     startUpload(userId)
     try {
       const compressed = await compressImage(editedResult.file)
-      const fileName = `${userId}/note-${Date.now()}.jpg`
-      const { error: uploadError } = await supabase.storage.from('posts').upload(fileName, compressed)
+      const { url: photoUrl, error: uploadError } = await notesApi.uploadNotePhoto(userId, compressed)
       if (uploadError) {
         console.error('Échec upload photo de note :', uploadError)
         alert('DEBUG - échec upload photo : ' + (uploadError.message || JSON.stringify(uploadError)))
         window.dispatchEvent(new CustomEvent('note-publish-failed', { detail: { reason: 'photo' } }))
         return
       }
-      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
 
       // Musique (optionnelle) : on ne garde QUE le passage choisi par
       // l'utilisateur (15 ou 20s, via MusicPicker) — le fichier est
@@ -114,17 +107,13 @@ export default function CreateNote() {
       if (musique?.file) {
         try {
           const trimmed = await trimAudio(musique.file, musique.start, musique.duration)
-          const audioFileName = `${userId}/note-audio-${Date.now()}.wav`
-          const { error: audioUploadError } = await supabase.storage
-            .from('posts')
-            .upload(audioFileName, trimmed)
+          const { url: uploadedAudioUrl, error: audioUploadError } = await notesApi.uploadNoteAudio(userId, trimmed)
           if (audioUploadError) {
             console.error('Échec upload musique de note :', audioUploadError)
             alert('DEBUG - échec upload audio : ' + (audioUploadError.message || JSON.stringify(audioUploadError)))
             window.dispatchEvent(new CustomEvent('note-publish-failed', { detail: { reason: 'audio-upload' } }))
           } else {
-            const { data: audioUrlData } = supabase.storage.from('posts').getPublicUrl(audioFileName)
-            audioUrl = audioUrlData.publicUrl
+            audioUrl = uploadedAudioUrl
           }
         } catch (trimError) {
           // Le découpage a échoué (fichier corrompu, format non décodable) :
@@ -137,22 +126,15 @@ export default function CreateNote() {
         }
       }
 
-      const { error: insertError } = await supabase.from('notes').insert({
-        user_id: userId,
-        contenu: editedResult.texte?.contenu || ' ',
-        photo_url: urlData.publicUrl,
+      const { error: insertError } = await notesApi.insertPhotoNote({
+        userId,
+        photoUrl,
         filtre: editedResult.filtre,
         crop: editedResult.crop,
-        zoom: editedResult.zoom ?? 1,
-        texte_overlay: editedResult.texte?.contenu || null,
-        texte_x: editedResult.texte?.x ?? 50,
-        texte_y: editedResult.texte?.y ?? 50,
-        texte_couleur: editedResult.texte?.couleur || '#ffffff',
-        texte_police: editedResult.texte?.police || 'Inter',
-        audio_url: audioUrl,
-        audio_start: audioUrl ? 0 : null,
-        audio_duration: audioUrl ? musique.duration : null,
-        expire_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        zoom: editedResult.zoom,
+        texte: editedResult.texte,
+        audioUrl,
+        audioDuration: musique?.duration,
       })
       if (insertError) {
         console.error('Échec publication note :', insertError)
@@ -188,12 +170,8 @@ export default function CreateNote() {
     if (!text.trim()) return
     setSending(true)
     const { error } = editId
-      ? await supabase.from('notes').update({ contenu: text.trim() }).eq('id', editId).eq('user_id', user.id)
-      : await supabase.from('notes').insert({
-          user_id: user.id,
-          contenu: text.trim(),
-          expire_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        })
+      ? await notesApi.updateNoteText(editId, user.id, text.trim())
+      : await notesApi.createTextNote({ userId: user.id, contenu: text.trim() })
     setSending(false)
     if (!error) navigate(-1)
   }

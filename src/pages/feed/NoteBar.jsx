@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence } from 'framer-motion'
-import { supabase } from '../../lib/supabase'
+import * as notesApi from '../../api/notes'
 import { useAuth } from '../../contexts/AuthContext'
 import { Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -36,19 +36,6 @@ import { useIsUploadingNote } from '../../contexts/NoteUploadContext'
 // - TOUT LE MONDE inscrit sur l'app apparaît dans la barre, y compris ceux
 //   qui n'ont jamais posté de note ou dont la note a expiré depuis longtemps
 //   — simplement sans anneau coloré autour (anneau neutre).
-async function fetchAllUsers() {
-  const { data } = await supabase.from('users').select('id, nom_complet, photo_url, role').neq('role', 'admin')
-  return data || []
-}
-
-async function fetchNotes() {
-  const { data } = await supabase
-    .from('notes')
-    .select('id, user_id, contenu, created_at, expire_at, repost_of, photo_url, filtre, crop, zoom, texte_overlay, texte_x, texte_y, texte_couleur, texte_police, audio_url, audio_start, audio_duration, users(id, nom_complet, photo_url, role)')
-    .order('created_at', { ascending: true }) // ascendant : dans un groupe, les segments défilent du plus ancien au plus récent
-  return data || []
-}
-
 function isExpired(note) {
   return new Date(note.expire_at).getTime() <= Date.now()
 }
@@ -65,12 +52,12 @@ export default function NoteBar() {
 
   const { data: rawNotes = [] } = useQuery({
     queryKey: ['notes'],
-    queryFn: fetchNotes,
+    queryFn: notesApi.fetchActiveNotes,
     staleTime: 15_000,
   })
   const { data: allUsers = [] } = useQuery({
     queryKey: ['all-users-notebar'],
-    queryFn: fetchAllUsers,
+    queryFn: notesApi.fetchAllUsersForNoteBar,
     staleTime: 60_000,
   })
 

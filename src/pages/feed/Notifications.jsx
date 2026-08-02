@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as notificationsApi from '../../api/notifications'
+import * as feedApi from '../../api/feed'
 import { useAuth } from '../../contexts/AuthContext'
 import { Heart, MessageCircle, ShoppingBag, Wallet, ArrowLeft, UserPlus, Repeat2 } from 'lucide-react'
 import Avatar from '../../components/ui/Avatar'
@@ -62,42 +63,6 @@ const TABS = [
 
 const SECTION_ORDER = ["Aujourd'hui", 'Hier', '7 derniers jours', '30 derniers jours', 'Plus ancien']
 
-async function fetchNotifications(userId) {
-  const { data } = await supabase
-    .from('notifications')
-    .select('*, from_user:from_user_id(nom_complet, photo_url, role, profils_influenceur(id, verifie))')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(100)
-
-  const postIds = (data || [])
-    .filter((n) => POST_TYPES.includes(n.type) && n.lien_ref_id)
-    .map((n) => n.lien_ref_id)
-
-  let mediaByPostId = {}
-  if (postIds.length > 0) {
-    const { data: medias } = await supabase
-      .from('post_medias')
-      .select('post_id, media_url, media_type, thumbnail_url, position')
-      .in('post_id', postIds)
-      .order('position', { ascending: true })
-    mediaByPostId = (medias || []).reduce((acc, m) => {
-      if (!acc[m.post_id]) acc[m.post_id] = { url: m.media_url, type: m.media_type, thumbnailUrl: m.thumbnail_url }
-      return acc
-    }, {})
-  }
-
-  return (data || []).map((n) => ({
-    ...n,
-    post_thumbnail: POST_TYPES.includes(n.type) ? mediaByPostId[n.lien_ref_id] : null,
-  }))
-}
-
-async function fetchMyFollowing(userId) {
-  const { data } = await supabase.from('follows').select('followed_id').eq('follower_id', userId)
-  return new Set((data || []).map((r) => r.followed_id))
-}
-
 const COMMENT_TAB_TYPES = ['comment', 'comment_collab', 'reply', 'reply_content']
 
 export default function Notifications() {
@@ -109,7 +74,7 @@ export default function Notifications() {
 
   const { data: notifications = [], isLoading: loading } = useQuery({
     queryKey: ['notifications', user?.id],
-    queryFn: () => fetchNotifications(user.id),
+    queryFn: () => notificationsApi.fetchNotifications(user.id),
     enabled: !!user,
   })
 
@@ -117,7 +82,7 @@ export default function Notifications() {
   // sur une notification de type "follow" (façon Instagram).
   const { data: myFollowing = new Set() } = useQuery({
     queryKey: ['my-following', user?.id],
-    queryFn: () => fetchMyFollowing(user.id),
+    queryFn: () => feedApi.fetchFollowingIds(user.id),
     enabled: !!user,
   })
 
@@ -126,7 +91,7 @@ export default function Notifications() {
       queryClient.setQueryData(['notifications', user?.id], (old) =>
         (old || []).map((item) => (item.id === n.id ? { ...item, lu: true } : item))
       )
-      await supabase.from('notifications').update({ lu: true }).eq('id', n.id)
+      await notificationsApi.markNotificationRead(n.id)
     }
 
     if (n.type === 'follow') {
@@ -154,7 +119,7 @@ export default function Notifications() {
       next.add(n.from_user_id)
       return next
     })
-    await supabase.from('follows').insert({ follower_id: user.id, followed_id: n.from_user_id })
+    await feedApi.followUser(user.id, n.from_user_id)
   }
 
   const filtered = notifications.filter((n) => {

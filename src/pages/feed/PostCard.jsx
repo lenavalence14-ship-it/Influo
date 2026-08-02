@@ -4,7 +4,7 @@ import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { InstagramIcon, TikTokIcon } from '../../components/ui/SocialIcons'
 import Avatar from '../../components/ui/Avatar'
 import BottomSheet from '../../components/ui/BottomSheet'
-import { supabase } from '../../lib/supabase'
+import * as feedApi from '../../api/feed'
 import { useAuth } from '../../contexts/AuthContext'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import CommentsSheet from './CommentsSheet'
@@ -320,28 +320,23 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
     if (liked) {
       setLiked(false)
       setLikeCount((c) => c - 1)
-      await supabase.from('post_likes').delete().match({ post_id: post.id, user_id: user.id })
+      await feedApi.unlikePost(post.id, user.id)
       // après suppression, il faut connaître le vrai dernier liker restant
       // (pas "quelqu'un" -- afficher un nom générique alors qu'un vrai nom
       // existe serait trompeur, surtout visible juste à côté de "et d'autres
       // personnes"). Un seul aller-retour, ciblé sur ce post uniquement.
-      const { data: remaining } = await supabase
-        .from('post_likes')
-        .select('created_at, users(nom_complet)')
-        .eq('post_id', post.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-      setLastLikerName(remaining?.[0]?.users?.nom_complet || null)
+      const lastLikerName = await feedApi.fetchLastLiker(post.id)
+      setLastLikerName(lastLikerName)
     } else {
       setLiked(true)
       setLikeCount((c) => c + 1)
-      await supabase.from('post_likes').insert({ post_id: post.id, user_id: user.id })
+      await feedApi.likePost(post.id, user.id)
       // Va chercher le nom directement en base plutôt que de dépendre de
       // profile (contexte Auth), qui peut ne pas être encore chargé/à jour
       // au moment du clic -- c'est ce qui causait l'affichage de "quelqu'un"
       // jusqu'à ce qu'un refresh complet recharge tout depuis la base.
-      const { data: me } = await supabase.from('users').select('nom_complet').eq('id', user.id).single()
-      setLastLikerName(me?.nom_complet || null)
+      const displayName = await feedApi.fetchUserDisplayName(user.id)
+      setLastLikerName(displayName)
     }
   }
 
@@ -349,11 +344,11 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
     if (reposted) {
       setReposted(false)
       setRepostCount((c) => c - 1)
-      await supabase.from('post_reposts').delete().match({ post_id: post.id, user_id: user.id })
+      await feedApi.unrepostPost(post.id, user.id)
     } else {
       setReposted(true)
       setRepostCount((c) => c + 1)
-      await supabase.from('post_reposts').insert({ post_id: post.id, user_id: user.id })
+      await feedApi.repostPost(post.id, user.id)
       // Le repost fait remonter le post dans le feed (via sort_date calculé côté
       // serveur), mais SEULEMENT au prochain refresh -- pas de retri en temps réel
       // ici, même logique que l'apparition d'un nouveau post après CreatePost.jsx.
@@ -363,7 +358,7 @@ function PostCard({ post, onDeleted, autoOpenComments = false, priority = false,
   const handleDelete = async () => {
     if (!window.confirm('Supprimer définitivement cette publication ?')) return
     setShowMenu(false)
-    await supabase.from('posts').delete().eq('id', post.id)
+    await feedApi.deletePost(post.id)
     setDeleted(true)
     onDeleted?.(post.id)
   }

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as messagesApi from '../../api/messages'
+import * as authApi from '../../api/auth'
 import { useAuth } from '../../contexts/AuthContext'
 
 // Contrairement à NewConversation.jsx (influenceur↔client, avec écran de sélection
@@ -24,40 +25,23 @@ export default function NewConversationPro() {
         return
       }
 
-      const { data: clientProfile } = await supabase
-        .from('profils_client')
-        .select('id')
-        .eq('user_id', entrepriseUserId)
-        .maybeSingle()
+      const clientProfile = await authApi.fetchClientProfileIdByUserId(entrepriseUserId)
 
       if (!clientProfile) {
         navigate('/messages')
         return
       }
 
-      const { data: existing } = await supabase
-        .from('conversations_pro')
-        .select('id')
-        .eq('utilisateur_id', user.id)
-        .eq('client_id', clientProfile.id)
-        .maybeSingle()
+      const { conversationId, error } = await messagesApi.findOrCreateConversationPro({
+        userId: user.id,
+        clientId: clientProfile.id,
+      })
 
-      if (existing) {
-        navigate(`/messages/pro/${existing.id}`, { replace: true })
-        return
-      }
-
-      const { data: created, error } = await supabase
-        .from('conversations_pro')
-        .insert({ utilisateur_id: user.id, client_id: clientProfile.id })
-        .select()
-        .single()
-
-      if (error || !created) {
+      if (error) {
         navigate('/messages')
         return
       }
-      navigate(`/messages/pro/${created.id}`, { replace: true })
+      navigate(`/messages/pro/${conversationId}`, { replace: true })
     }
     run()
   }, [user?.id, entrepriseUserId, navigate])

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as profileApi from '../../api/profile'
 import { useAuth } from '../../contexts/AuthContext'
 import Button from '../../components/ui/Button'
 import { LogOut, X, Grid3x3, Video, ArrowLeft } from 'lucide-react'
@@ -25,34 +25,8 @@ export default function SimpleUserProfile() {
     let cancelled = false
 
     const load = async () => {
-      // Un utilisateur normal ne publie pas via profils_influenceur : ses posts sont
-      // rattachés directement à son user_id via client_id (même colonne que pour les
-      // entreprises, réutilisée ici faute de colonne dédiée "auteur simple").
-      const { data: postsData } = await supabase
-        .from('posts')
-        .select(`
-          id, legende, crop_format, created_at, type, filtre,
-          post_medias(media_url, media_type, thumbnail_url, position)
-        `)
-        .eq('client_id', user.id)
-        .in('type', ['photo', 'carrousel', 'video'])
-        .order('created_at', { ascending: false })
-        .limit(60)
-
+      const enrichedPosts = await profileApi.fetchSimpleUserPosts(user.id, user?.id)
       if (cancelled) return
-
-      const postIds = (postsData || []).map((p) => p.id)
-      const { data: likes } = postIds.length
-        ? await supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds)
-        : { data: [] }
-
-      if (cancelled) return
-
-      const enrichedPosts = (postsData || []).map((p) => ({
-        ...p,
-        like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
-        liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === user?.id) || false,
-      }))
 
       setPosts(enrichedPosts)
       setLoading(false)

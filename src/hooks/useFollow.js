@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
+import * as feedApi from '../api/feed'
 import { useAuth } from '../contexts/AuthContext'
 
 // Un seul fetch pour TOUS les comptes suivis par l'utilisateur courant, mis
@@ -12,18 +12,6 @@ import { useAuth } from '../contexts/AuthContext'
 // s'abonner depuis le feed ne mettait pas à jour le bouton affiché sur
 // l'écran de profil (et inversement) tant que le composant n'était pas
 // entièrement remonté (d'où "il faut actualiser").
-async function fetchFollowingIds(userId) {
-  const { data } = await supabase.from('follows').select('followed_id').eq('follower_id', userId)
-  return new Set((data || []).map((f) => f.followed_id))
-}
-
-async function fetchFollowCounts(targetUserId) {
-  const [{ count: followersCount }, { count: followingCount }] = await Promise.all([
-    supabase.from('follows').select('id', { count: 'exact', head: true }).eq('followed_id', targetUserId),
-    supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', targetUserId),
-  ])
-  return { followersCount: followersCount || 0, followingCount: followingCount || 0 }
-}
 
 /**
  * Gère le bouton "Suivre" pour n'importe quel profil visité (influenceur, entreprise,
@@ -48,14 +36,14 @@ export function useFollow(targetUserId) {
 
   const { data: followingIds, isLoading: followingIdsLoading } = useQuery({
     queryKey: ['following-ids', user?.id],
-    queryFn: () => fetchFollowingIds(user.id),
+    queryFn: () => feedApi.fetchFollowingIds(user.id),
     enabled: !!user?.id,
     staleTime: 60_000,
   })
 
   const { data: counts, isLoading: countsLoading } = useQuery({
     queryKey: ['follow-counts', targetUserId],
-    queryFn: () => fetchFollowCounts(targetUserId),
+    queryFn: () => feedApi.fetchFollowCounts(targetUserId),
     enabled: !!targetUserId,
     staleTime: 30_000,
   })
@@ -87,11 +75,7 @@ export function useFollow(targetUserId) {
     })
 
     if (currentlyFollowing) {
-      const { error } = await supabase
-        .from('follows')
-        .delete()
-        .eq('follower_id', user.id)
-        .eq('followed_id', targetUserId)
+      const { error } = await feedApi.unfollowUser(user.id, targetUserId)
       if (error) {
         // Échec réseau : on annule l'optimisme en réinvalidant depuis la base,
         // plutôt que de laisser un état local désynchronisé de la vérité serveur.
@@ -99,9 +83,7 @@ export function useFollow(targetUserId) {
         queryClient.invalidateQueries({ queryKey: ['follow-counts', targetUserId] })
       }
     } else {
-      const { error } = await supabase
-        .from('follows')
-        .insert({ follower_id: user.id, followed_id: targetUserId })
+      const { error } = await feedApi.followUser(user.id, targetUserId)
       if (error) {
         queryClient.invalidateQueries({ queryKey: ['following-ids', user.id] })
         queryClient.invalidateQueries({ queryKey: ['follow-counts', targetUserId] })

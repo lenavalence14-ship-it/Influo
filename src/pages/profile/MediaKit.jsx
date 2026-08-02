@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Camera, Pencil } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import * as profileApi from '../../api/profile'
 import { useAuth } from '../../contexts/AuthContext'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -63,35 +63,27 @@ export default function MediaKit() {
     let cancelled = false
     const load = async () => {
       setLoading(true)
-      const requests = [
-        supabase.from('media_kits').select('*').eq('influenceur_id', user.id).maybeSingle(),
-      ]
-      // Si l'appelant (InfluencerProfile) n'a pas déjà transmis les réseaux
-      // sociaux via location.state, on va les chercher nous-mêmes.
-      if (!location.state?.reseaux) {
-        requests.push(supabase.from('reseaux_sociaux').select('*').eq('influenceur_id', user.id))
-      }
-      const results = await Promise.all(requests)
+      const needReseaux = !location.state?.reseaux
+      const { kit, reseaux: fetchedReseaux } = await profileApi.fetchMediaKitPage(user.id, needReseaux)
       if (cancelled) return
 
-      const kitResult = results[0]
-      if (kitResult.data) {
-        setExistingKit(kitResult.data)
-        setPrenom(kitResult.data.prenom)
-        setNom(kitResult.data.nom)
-        setSelectedCategories(kitResult.data.categories || [])
-        setPhotoPreview(kitResult.data.photo_url || '')
-        if (kitResult.data.photo_zoom != null) {
+      if (kit) {
+        setExistingKit(kit)
+        setPrenom(kit.prenom)
+        setNom(kit.nom)
+        setSelectedCategories(kit.categories || [])
+        setPhotoPreview(kit.photo_url || '')
+        if (kit.photo_zoom != null) {
           setPhotoCrop({
-            zoom: kitResult.data.photo_zoom,
-            offsetX: kitResult.data.photo_offset_x ?? 0,
-            offsetY: kitResult.data.photo_offset_y ?? 0,
-            naturalWidth: kitResult.data.photo_natural_width,
-            naturalHeight: kitResult.data.photo_natural_height,
+            zoom: kit.photo_zoom,
+            offsetX: kit.photo_offset_x ?? 0,
+            offsetY: kit.photo_offset_y ?? 0,
+            naturalWidth: kit.photo_natural_width,
+            naturalHeight: kit.photo_natural_height,
           })
         }
-        setAbonnesInstagram(kitResult.data.abonnes_instagram != null ? String(kitResult.data.abonnes_instagram) : '')
-        setAbonnesTiktok(kitResult.data.abonnes_tiktok != null ? String(kitResult.data.abonnes_tiktok) : '')
+        setAbonnesInstagram(kit.abonnes_instagram != null ? String(kit.abonnes_instagram) : '')
+        setAbonnesTiktok(kit.abonnes_tiktok != null ? String(kit.abonnes_tiktok) : '')
       } else {
         // Pas encore de media kit : on pré-remplit avec les infos du profil,
         // mais l'influenceur doit valider/compléter (mode édition d'office).
@@ -101,7 +93,7 @@ export default function MediaKit() {
         setEditing(true)
       }
 
-      if (results[1]) setReseaux(results[1].data || [])
+      if (fetchedReseaux) setReseaux(fetchedReseaux)
       setLoading(false)
     }
     load()
@@ -142,14 +134,9 @@ export default function MediaKit() {
       let photoUrl = existingKit?.photo_url || null
       if (photoFile) {
         const compressed = await compressImage(photoFile, { maxDimension: 1024, quality: 0.85 })
-        const ext = compressed.name.split('.').pop()
-        const fileName = `${user.id}/media-kit-${Date.now()}.${ext}`
-        const { error: uploadError } = await supabase.storage.from('media-kits').upload(fileName, compressed, {
-          upsert: true,
-        })
+        const { url, error: uploadError } = await profileApi.uploadMediaKitPhoto(user.id, compressed)
         if (uploadError) throw new Error("Échec de l'envoi de la photo : " + uploadError.message)
-        const { data: urlData } = supabase.storage.from('media-kits').getPublicUrl(fileName)
-        photoUrl = urlData.publicUrl
+        photoUrl = url
       }
 
       // Champ manuel prioritaire ; sinon on retombe sur les chiffres réels du profil.
@@ -172,11 +159,7 @@ export default function MediaKit() {
         updated_at: new Date().toISOString(),
       }
 
-      const { data, error } = await supabase
-        .from('media_kits')
-        .upsert(payload, { onConflict: 'influenceur_id' })
-        .select()
-        .single()
+      const { data, error } = await profileApi.upsertMediaKit(payload)
 
       if (error) throw new Error("Échec de l'enregistrement : " + error.message)
 

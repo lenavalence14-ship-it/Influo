@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as profileApi from '../../api/profile'
 import { useAuth } from '../../contexts/AuthContext'
 import Button from '../../components/ui/Button'
 import { X, Grid3x3, Video, ArrowLeft } from 'lucide-react'
@@ -32,29 +32,11 @@ export default function SimpleUserProfileView() {
     let cancelled = false
 
     const load = async () => {
-      const [{ data: userRow }, { data: postsData }] = await Promise.all([
-        supabase.from('users').select('id, nom_complet, photo_url').eq('id', id).maybeSingle(),
-        supabase
-          .from('posts')
-          .select(`
-            id, legende, crop_format, created_at, type, filtre, commande_id,
-            post_medias(media_url, media_type, thumbnail_url, position),
-            profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
-            client:client_id(id, nom_complet, photo_url),
-            commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)
-          `)
-          .eq('client_id', id)
-          .in('type', ['photo', 'carrousel', 'video'])
-          .order('created_at', { ascending: false })
-          .limit(60),
-      ])
-
+      const { utilisateur: userRow, posts: postsData } = await profileApi.fetchSimpleUserProfileViewPage(id)
       if (cancelled) return
 
-      setUtilisateur(userRow || null)
-      setPosts(
-        (postsData || []).map((p) => ({ ...p, like_count: 0, liked_by_me: false }))
-      )
+      setUtilisateur(userRow)
+      setPosts(postsData)
       setLoading(false)
     }
     load()

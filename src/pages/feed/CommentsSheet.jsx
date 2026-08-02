@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Heart } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import * as feedApi from '../../api/feed'
 import { useAuth } from '../../contexts/AuthContext'
 import Avatar from '../../components/ui/Avatar'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
@@ -65,24 +65,7 @@ export default function CommentsSheet({ postId, onClose, onCommentAdded }) {
   const inputRef = useRef(null)
 
   const loadComments = async () => {
-    const { data } = await supabase
-      .from('post_comments')
-      .select('id, contenu, created_at, parent_comment_id, user_id, users(nom_complet, photo_url, profils_influenceur(id, verifie))')
-      .eq('post_id', postId)
-      .order('created_at', { ascending: true })
-
-    const list = data || []
-    const commentIds = list.map((c) => c.id)
-    const { data: likes } = commentIds.length
-      ? await supabase.from('comment_likes').select('comment_id, user_id').in('comment_id', commentIds)
-      : { data: [] }
-
-    const enriched = list.map((c) => ({
-      ...c,
-      like_count: likes?.filter((l) => l.comment_id === c.id).length || 0,
-      liked_by_me: likes?.some((l) => l.comment_id === c.id && l.user_id === user?.id) || false,
-    }))
-
+    const enriched = await feedApi.fetchPostComments(postId, user?.id)
     setComments(enriched)
     setLoading(false)
   }
@@ -99,11 +82,11 @@ export default function CommentsSheet({ postId, onClose, onCommentAdded }) {
     setText('')
     const activeReply = replyTo
     setReplyTo(null)
-    const { error } = await supabase.from('post_comments').insert({
-      post_id: postId,
-      user_id: user.id,
+    const { error } = await feedApi.createComment({
+      postId,
+      userId: user.id,
       contenu,
-      parent_comment_id: activeReply?.id || null,
+      parentCommentId: activeReply?.id || null,
     })
     if (error) {
       console.error('Erreur insertion commentaire:', error)
@@ -123,9 +106,9 @@ export default function CommentsSheet({ postId, onClose, onCommentAdded }) {
       )
     )
     if (wasLiked) {
-      await supabase.from('comment_likes').delete().match({ comment_id: c.id, user_id: user.id })
+      await feedApi.unlikeComment(c.id, user.id)
     } else {
-      await supabase.from('comment_likes').insert({ comment_id: c.id, user_id: user.id })
+      await feedApi.likeComment(c.id, user.id)
     }
   }
 

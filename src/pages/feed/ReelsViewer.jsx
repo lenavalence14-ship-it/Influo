@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft, Plus, Volume2, VolumeX, Play, Repeat2, Bookmark, Music2 } from 'lucide-react'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import * as feedApi from '../../api/feed'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import CommentsSheet from './CommentsSheet'
@@ -42,7 +42,6 @@ function TextOverlay({ media }) {
   )
 }
 
-const REELS_PAGE_SIZE = 20
 
 // Fond noir + spinner violet (couleur de marque), affiché à la place de l'icône
 // play grise moche que le navigateur montre par défaut quand une vidéo n'a pas
@@ -55,59 +54,6 @@ function ReelLoadingOverlay() {
   )
 }
 
-async function fetchReels(userId) {
-  // Même principe que le Feed : le tri n'est pas created_at brut, un repost fait
-  // remonter la vidéo comme si elle venait d'être publiée, sans jamais toucher
-  // created_at. Calculé côté SQL (get_reels_ids) pour rester cohérent avec la
-  // pagination, comme pour get_feed_post_ids dans Feed.jsx.
-  const { data: ordered, error: orderError } = await supabase.rpc('get_reels_ids', {
-    p_limit: REELS_PAGE_SIZE,
-    p_offset: 0,
-  })
-  if (orderError) console.error('Erreur tri reels:', orderError)
-  if (!ordered || ordered.length === 0) return []
-
-  const orderedIds = ordered.map((o) => o.post_id)
-
-  const { data } = await supabase
-    .from('posts')
-    .select(`
-      id, legende, created_at, filtre, client_id, crop_format,
-      post_medias(media_url, media_type, thumbnail_url, position, hls_status, hls_playlist_url, zoom, offset_x, offset_y, natural_width, natural_height),
-      profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
-      client:client_id(id, nom_complet, photo_url)
-    `)
-    .in('id', orderedIds)
-
-  const postIds = (data || []).map((p) => p.id)
-  const [{ data: likes }, { data: commentCounts }, { data: reposts }] = await Promise.all([
-    postIds.length
-      ? supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds)
-      : Promise.resolve({ data: [] }),
-    postIds.length
-      ? supabase.from('post_comments').select('post_id').in('post_id', postIds)
-      : Promise.resolve({ data: [] }),
-    postIds.length
-      ? supabase.from('post_reposts').select('post_id, user_id').in('post_id', postIds)
-      : Promise.resolve({ data: [] }),
-  ])
-
-  // .in('id', orderedIds) ne garantit pas l'ordre de retour -- on remet les
-  // reels dans l'ordre exact décidé par get_reels_ids.
-  const byId = new Map((data || []).map((p) => [p.id, p]))
-
-  return orderedIds
-    .map((id) => byId.get(id))
-    .filter(Boolean)
-    .map((p) => ({
-    ...p,
-    like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
-    liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === userId) || false,
-    comment_count: commentCounts?.filter((c) => c.post_id === p.id).length || 0,
-    repost_count: reposts?.filter((r) => r.post_id === p.id).length || 0,
-    reposted_by_me: reposts?.some((r) => r.post_id === p.id && r.user_id === userId) || false,
-  }))
-}
 
 export default function ReelsViewer() {
   const { user } = useAuth()
@@ -132,7 +78,7 @@ export default function ReelsViewer() {
 
   const { data: reels = [], isLoading: loading } = useQuery({
     queryKey: ['reels', user?.id],
-    queryFn: () => fetchReels(user?.id),
+    queryFn: () => feedApi.fetchReels(user?.id),
     enabled: !!user,
   })
 
@@ -370,11 +316,11 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
     if (liked) {
       setLiked(false)
       setLikeCount((c) => c - 1)
-      await supabase.from('post_likes').delete().match({ post_id: reel.id, user_id: user.id })
+      await feedApi.unlikePost(reel.id, user.id)
     } else {
       setLiked(true)
       setLikeCount((c) => c + 1)
-      await supabase.from('post_likes').insert({ post_id: reel.id, user_id: user.id })
+      await feedApi.likePost(reel.id, user.id)
     }
   }
 
@@ -383,11 +329,11 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
     if (reposted) {
       setReposted(false)
       setRepostCount((c) => c - 1)
-      await supabase.from('post_reposts').delete().match({ post_id: reel.id, user_id: user.id })
+      await feedApi.unrepostPost(reel.id, user.id)
     } else {
       setReposted(true)
       setRepostCount((c) => c + 1)
-      await supabase.from('post_reposts').insert({ post_id: reel.id, user_id: user.id })
+      await feedApi.repostPost(reel.id, user.id)
     }
   }
 
@@ -395,7 +341,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
     if (!user || liked) return
     setLiked(true)
     setLikeCount((c) => c + 1)
-    await supabase.from('post_likes').insert({ post_id: reel.id, user_id: user.id })
+    await feedApi.likePost(reel.id, user.id)
   }
 
   const triggerBigHeart = () => {

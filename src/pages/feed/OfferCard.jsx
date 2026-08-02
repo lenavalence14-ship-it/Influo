@@ -3,7 +3,7 @@ import { ChevronRight, MoreHorizontal, Pencil, Trash2, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import Avatar from '../../components/ui/Avatar'
 import BottomSheet from '../../components/ui/BottomSheet'
-import { supabase } from '../../lib/supabase'
+import * as offresApi from '../../api/offres'
 import { useAuth } from '../../contexts/AuthContext'
 import { timeAgo } from '../../lib/time'
 import { getContrastTextColor } from '../../lib/offerColors'
@@ -38,7 +38,7 @@ export default function OfferCard({ offer, onDeleted }) {
   const handleDelete = async () => {
     if (!window.confirm("Supprimer définitivement cet appel d'offre ?")) return
     setShowMenu(false)
-    await supabase.from('appels_offre').delete().eq('id', offer.id)
+    await offresApi.deleteAppelOffre(offer.id)
     setDeleted(true)
     onDeleted?.(offer.id)
   }

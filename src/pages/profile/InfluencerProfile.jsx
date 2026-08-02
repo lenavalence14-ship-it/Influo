@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as profileApi from '../../api/profile'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import Button from '../../components/ui/Button'
@@ -50,9 +50,8 @@ export default function InfluencerProfile() {
   const { followersCount, followingCount, isFollowing, toggleFollow, pending: followPending } = useFollow(target?.user_id)
 
   const reloadOffres = async () => {
-    const offresQuery = supabase.from('offres').select('*').eq('influenceur_id', targetId).order('created_at', { ascending: false })
-    const { data } = isMe ? await offresQuery : await offresQuery.eq('actif', true)
-    setOffres(data || [])
+    const data = await profileApi.fetchInfluencerOffres(targetId, !isMe)
+    setOffres(data)
   }
 
   const offresAffichees = isMe ? offres : offres.filter((o) => o.actif)
@@ -62,98 +61,17 @@ export default function InfluencerProfile() {
     let cancelled = false
 
     const load = async () => {
-      // Toutes les requêtes indépendantes (profil, posts, offres, réseaux) partent
-      // en parallèle plutôt qu'en chaîne séquentielle : le temps total d'ouverture
-      // du profil devient le max des requêtes, pas leur somme.
-      const offresQuery = supabase.from('offres').select('*').eq('influenceur_id', targetId).order('created_at', { ascending: false })
-
-      const [{ data: prof }, { data: postsData }, { data: offresData }, { data: reseauxData }] = await Promise.all([
-        supabase
-          .from('profils_influenceur')
-          .select('*, users(nom_complet, photo_url, email)')
-          .eq('id', targetId)
-          .maybeSingle(),
-        supabase
-          .from('posts')
-          .select(`
-            id, legende, crop_format, created_at, type, filtre, client_id, audio_url,
-            post_medias(media_url, media_type, thumbnail_url, position, filtre, zoom, offset_x, offset_y, natural_width, natural_height),
-            profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
-            client:client_id(id, nom_complet, photo_url)
-          `)
-          .eq('influenceur_id', targetId)
-          .in('type', ['photo', 'carrousel', 'video', 'texte'])
-          .order('created_at', { ascending: false })
-          .limit(60),
-        isMe ? offresQuery : offresQuery.eq('actif', true),
-        supabase.from('reseaux_sociaux').select('*').eq('influenceur_id', targetId),
-      ])
-
+      const result = await profileApi.fetchInfluencerProfilePage({ targetId, isMe, currentUserId: user?.id })
       if (cancelled) return
 
-      const postIds = (postsData || []).map((p) => p.id)
-      const { data: likes } = postIds.length
-        ? await supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds)
-        : { data: [] }
-
-      if (cancelled) return
-
-      const enrichedPosts = (postsData || []).map((p) => ({
-        ...p,
-        like_count: likes?.filter((l) => l.post_id === p.id).length || 0,
-        liked_by_me: likes?.some((l) => l.post_id === p.id && l.user_id === user?.id) || false,
-      }))
-
-      // Classement des marques par nombre de collaborations (posts liés à ce client),
-      // la marque la plus fréquente en premier, pour affichage en cercles sous les boutons.
-      const clientCounts = new Map()
-      for (const p of enrichedPosts) {
-        if (!p.client) continue
-        const existing = clientCounts.get(p.client.id)
-        if (existing) existing.count += 1
-        else clientCounts.set(p.client.id, { ...p.client, count: 1 })
-      }
-      const topClients = Array.from(clientCounts.values()).sort((a, b) => b.count - a.count)
-      setBrandCircles(topClients)
-
-      setTarget(prof)
-      setPosts(enrichedPosts)
-      setOffres(offresData || [])
-      setReseaux(reseauxData || [])
-
-      // Une "collaboration vérifiée" = un post de cet influenceur qui a plus d'un
-      // auteur dans post_auteurs (influenceur + entreprise), créé automatiquement
-      // à la validation d'une prestation côté chat. On compte parmi les posts déjà
-      // chargés plutôt que de refaire une requête séparée.
-      if (postIds.length > 0) {
-        const { data: auteurs } = await supabase
-          .from('post_auteurs')
-          .select('post_id')
-          .in('post_id', postIds)
-        if (!cancelled) {
-          const countByPost = {}
-          for (const a of auteurs || []) {
-            countByPost[a.post_id] = (countByPost[a.post_id] || 0) + 1
-          }
-          const collabPostIds = Object.keys(countByPost).filter((pid) => countByPost[pid] > 1)
-          const typeByPostId = {}
-          for (const p of enrichedPosts) typeByPostId[p.id] = p.type
-
-          let photoN = 0
-          let videoN = 0
-          for (const pid of collabPostIds) {
-            if (typeByPostId[pid] === 'video') videoN++
-            else photoN++
-          }
-          setCollabCount(collabPostIds.length)
-          setCollabPhotoCount(photoN)
-          setCollabVideoCount(videoN)
-        }
-      } else if (!cancelled) {
-        setCollabCount(0)
-        setCollabPhotoCount(0)
-        setCollabVideoCount(0)
-      }
+      setBrandCircles(result.brandCircles)
+      setTarget(result.target)
+      setPosts(result.posts)
+      setOffres(result.offres)
+      setReseaux(result.reseaux)
+      setCollabCount(result.collabCount)
+      setCollabPhotoCount(result.collabPhotoCount)
+      setCollabVideoCount(result.collabVideoCount)
       setLoading(false)
     }
     load()
@@ -478,7 +396,7 @@ function OfferCard({ offre, editable, onChange }) {
 
   const handleToggleActive = async (e) => {
     e.stopPropagation()
-    await supabase.from('offres').update({ actif: !offre.actif }).eq('id', offre.id)
+    await profileApi.toggleOffreActive(offre.id, !offre.actif)
     setMenuOpen(false)
     onChange?.()
   }
@@ -486,7 +404,7 @@ function OfferCard({ offre, editable, onChange }) {
   const handleDelete = async (e) => {
     e.stopPropagation()
     if (!window.confirm('Supprimer cette offre définitivement ?')) return
-    await supabase.from('offres').delete().eq('id', offre.id)
+    await profileApi.deleteOffreFromProfile(offre.id)
     setMenuOpen(false)
     onChange?.()
   }

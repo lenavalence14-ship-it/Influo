@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as messagesApi from '../../api/messages'
+import * as storageApi from '../../api/storage'
+import * as realtimeApi from '../../api/realtime'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   ArrowLeft, Send, Camera, Image as ImageIcon,
@@ -11,6 +13,9 @@ import Button from '../../components/ui/Button'
 import BottomSheet from '../../components/ui/BottomSheet'
 import { generateReceipt } from '../../lib/receipt'
 import MessageBubble from '../../components/messages/MessageBubble'
+
+const TABLE = 'messages_biz'
+const CONV_TABLE = 'conversations_biz'
 
 // Chat entreprise <-> entreprise. Repris fidèlement de Chat.jsx (mêmes pièces jointes,
 // header, style de boutons), avec la différence validée : n'importe laquelle des deux
@@ -38,36 +43,22 @@ export default function ChatBiz() {
   const isSideA = conversation?.client_a_id === myClientId
 
   const loadAll = async () => {
-    const { data: conv } = await supabase
-      .from('conversations_biz')
-      .select(`
-        *,
-        client_a:client_a_id(id, user_id, users(nom_complet, photo_url)),
-        client_b:client_b_id(id, user_id, users(nom_complet, photo_url))
-      `)
-      .eq('id', id)
-      .maybeSingle()
+    const conv = await messagesApi.fetchConversationGeneric(
+      CONV_TABLE,
+      id,
+      `*, client_a:client_a_id(id, user_id, users(nom_complet, photo_url)), client_b:client_b_id(id, user_id, users(nom_complet, photo_url))`
+    )
     setConversation(conv)
 
-    const { data: cmd } = await supabase
-      .from('commandes_biz')
-      .select('*')
-      .eq('conversation_id', id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const cmd = await messagesApi.fetchLatestCommandeGeneric('commandes_biz', id)
     setCommande(cmd)
 
-    const { data: msgs } = await supabase
-      .from('messages_biz')
-      .select('*')
-      .eq('conversation_id', id)
-      .order('created_at', { ascending: true })
-    setMessages(msgs || [])
+    const msgs = await messagesApi.fetchMessagesGeneric(TABLE, id)
+    setMessages(msgs)
 
     if (conv) {
       const readField = conv.client_a_id === myClientId ? 'client_a_last_read_at' : 'client_b_last_read_at'
-      await supabase.from('conversations_biz').update({ [readField]: new Date().toISOString() }).eq('id', id)
+      await messagesApi.markConversationReadGeneric(CONV_TABLE, id, readField)
     }
   }
 
@@ -75,34 +66,58 @@ export default function ChatBiz() {
     if (!myClientId) return
     loadAll()
 
-    const channel = supabase
-      .channel(`chat-biz-${id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages_biz', filter: `conversation_id=eq.${id}` }, (payload) => {
-        setMessages((prev) => {
-          const tempIndex = prev.findIndex((m) => m._optimisticId && m.sender_id === payload.new.sender_id && m.contenu === payload.new.contenu && !prev.some((mm) => mm.id === payload.new.id))
-          if (tempIndex !== -1) {
-            const next = [...prev]
-            next[tempIndex] = payload.new
-            return next
-          }
-          if (prev.some((m) => m.id === payload.new.id)) return prev
-          return [...prev, payload.new]
-        })
-        const readField = isSideA ? 'client_a_last_read_at' : 'client_b_last_read_at'
-        supabase.from('conversations_biz').update({ [readField]: new Date().toISOString() }).eq('id', id)
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations_biz', filter: `id=eq.${id}` }, (payload) => {
-        setConversation((c) => (c ? { ...c, ...payload.new } : c))
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages_biz', filter: `conversation_id=eq.${id}` }, (payload) => {
-        setMessages((prev) => prev.map((m) => (m.id === payload.new.id ? payload.new : m)))
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'commandes_biz', filter: `conversation_id=eq.${id}` }, (payload) => {
-        setCommande(payload.new || null)
-      })
-      .subscribe()
+    const unsubscribeMessages = realtimeApi.subscribeToTable({
+      channelName: `chat-biz-messages-${id}`,
+      table: TABLE,
+      filter: `conversation_id=eq.${id}`,
+      handlers: {
+        INSERT: (payload) => {
+          setMessages((prev) => {
+            const tempIndex = prev.findIndex((m) => m._optimisticId && m.sender_id === payload.new.sender_id && m.contenu === payload.new.contenu && !prev.some((mm) => mm.id === payload.new.id))
+            if (tempIndex !== -1) {
+              const next = [...prev]
+              next[tempIndex] = payload.new
+              return next
+            }
+            if (prev.some((m) => m.id === payload.new.id)) return prev
+            return [...prev, payload.new]
+          })
+          const readField = isSideA ? 'client_a_last_read_at' : 'client_b_last_read_at'
+          messagesApi.markConversationReadGeneric(CONV_TABLE, id, readField)
+        },
+        UPDATE: (payload) => {
+          setMessages((prev) => prev.map((m) => (m.id === payload.new.id ? payload.new : m)))
+        },
+      },
+    })
 
-    return () => supabase.removeChannel(channel)
+    const unsubscribeConversation = realtimeApi.subscribeToTable({
+      channelName: `chat-biz-conversation-${id}`,
+      table: CONV_TABLE,
+      filter: `id=eq.${id}`,
+      handlers: {
+        UPDATE: (payload) => {
+          setConversation((c) => (c ? { ...c, ...payload.new } : c))
+        },
+      },
+    })
+
+    const unsubscribeCommande = realtimeApi.subscribeToTable({
+      channelName: `chat-biz-commande-${id}`,
+      table: 'commandes_biz',
+      filter: `conversation_id=eq.${id}`,
+      handlers: {
+        '*': (payload) => {
+          setCommande(payload.new || null)
+        },
+      },
+    })
+
+    return () => {
+      unsubscribeMessages()
+      unsubscribeConversation()
+      unsubscribeCommande()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, myClientId])
 
@@ -128,61 +143,38 @@ export default function ChatBiz() {
     }
     setMessages((prev) => [...prev, optimisticMsg])
 
-    const { data: inserted, error } = await supabase
-      .from('messages_biz')
-      .insert({
-        conversation_id: id,
-        sender_id: myClientId,
-        contenu: content,
-        fichier_url: fichierUrl,
-        fichier_type: fichierType,
-        is_system: false,
-      })
-      .select()
-      .single()
+    const { data: inserted, error } = await messagesApi.sendMessageGeneric(TABLE, CONV_TABLE, {
+      conversationId: id,
+      senderId: myClientId,
+      contenu: content,
+      fichierUrl,
+      fichierType,
+    })
 
     if (error) {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
       return
     }
     setMessages((prev) => prev.map((m) => (m.id === optimisticId ? inserted : m)))
-    await supabase.from('conversations_biz').update({ updated_at: new Date().toISOString() }).eq('id', id)
   }
 
   const handleEditMessage = async (message, newContent) => {
-    const { data } = await supabase
-      .from('messages_biz')
-      .update({ contenu: newContent, edited_at: new Date().toISOString() })
-      .eq('id', message.id)
-      .select()
-      .single()
+    const data = await messagesApi.editMessageGeneric(TABLE, message.id, newContent)
     if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
   }
 
   const handleDeleteForMe = async (message) => {
-    const nextDeletedFor = [...(message.deleted_for || []), myClientId]
-    const { data } = await supabase
-      .from('messages_biz')
-      .update({ deleted_for: nextDeletedFor })
-      .eq('id', message.id)
-      .select()
-      .single()
+    const data = await messagesApi.deleteMessageForMeGeneric(TABLE, message, myClientId)
     if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
   }
 
   const handleDeleteForEveryone = async (message) => {
-    const { data } = await supabase
-      .from('messages_biz')
-      .update({ is_deleted_for_all: true, contenu: null, fichier_url: null })
-      .eq('id', message.id)
-      .select()
-      .single()
+    const data = await messagesApi.deleteMessageForEveryoneGeneric(TABLE, message.id)
     if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
   }
 
   const sendSystemMessage = async (content) => {
-    await supabase.from('messages_biz').insert({ conversation_id: id, sender_id: null, contenu: content, is_system: true })
-    await supabase.from('conversations_biz').update({ updated_at: new Date().toISOString() }).eq('id', id)
+    await messagesApi.sendMessageGeneric(TABLE, CONV_TABLE, { conversationId: id, senderId: null, contenu: content, isSystem: true })
   }
 
   const handleSend = async () => {
@@ -196,20 +188,20 @@ export default function ChatBiz() {
     const file = e.target.files?.[0]
     if (!file) return
     const fileName = `${id}/${Date.now()}-${file.name}`
-    const { error } = await supabase.storage.from('messagerie').upload(fileName, file)
+    const { error } = await storageApi.uploadFile('messagerie', fileName, file)
     if (error) return
-    const { data: signedUrl } = await supabase.storage.from('messagerie').createSignedUrl(fileName, 60 * 60 * 24 * 7)
-    await sendMessage(null, signedUrl?.signedUrl, file.type.startsWith('image/') ? 'image' : 'fichier')
+    const signedUrl = await storageApi.getSignedUrl('messagerie', fileName, 60 * 60 * 24 * 7)
+    await sendMessage(null, signedUrl, file.type.startsWith('image/') ? 'image' : 'fichier')
   }
 
   const handleRequestPayment = async () => {
     if (!paymentAmount) return
     setErrorMsg('')
 
-    const { data, error } = await supabase.rpc('create_commande_biz', {
-      p_conversation_id: id,
-      p_montant: parseFloat(paymentAmount),
-      p_delai_livraison: paymentDelai || null,
+    const { data, error } = await messagesApi.createCommandeBiz({
+      conversationId: id,
+      montant: parseFloat(paymentAmount),
+      delaiLivraison: paymentDelai,
     })
 
     if (error) {
@@ -227,7 +219,7 @@ export default function ChatBiz() {
   }
 
   const handlePay = async () => {
-    const { error } = await supabase.rpc('pay_commande_biz', { p_commande_id: commande.id })
+    const { error } = await messagesApi.payCommandeBiz(commande.id)
     if (error) {
       await sendSystemMessage('⚠️ Le paiement a échoué : ' + error.message)
       return
@@ -237,7 +229,7 @@ export default function ChatBiz() {
   }
 
   const handleMarkDelivered = async () => {
-    const { error } = await supabase.rpc('mark_delivered_commande_biz', { p_commande_id: commande.id })
+    const { error } = await messagesApi.markDeliveredCommandeBiz(commande.id)
     if (error) {
       await sendSystemMessage('⚠️ Échec : ' + error.message)
       return
@@ -247,7 +239,7 @@ export default function ChatBiz() {
   }
 
   const handleConfirmReception = async () => {
-    const { error } = await supabase.rpc('confirm_reception_commande_biz', { p_commande_id: commande.id })
+    const { error } = await messagesApi.confirmReceptionCommandeBiz(commande.id)
     if (error) {
       await sendSystemMessage('⚠️ Échec : ' + error.message)
       return

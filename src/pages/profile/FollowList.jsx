@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import * as feedApi from '../../api/feed'
 import { useAuth } from '../../contexts/AuthContext'
 import Avatar from '../../components/ui/Avatar'
 import Button from '../../components/ui/Button'
@@ -31,45 +31,17 @@ export default function FollowList() {
     const load = async () => {
       setLoading(true)
 
-      const { data: targetUser } = await supabase
-        .from('users')
-        .select('nom_complet')
-        .eq('id', id)
-        .maybeSingle()
-      if (!cancelled) setHeaderName(targetUser?.nom_complet || '')
+      const headerNameResult = await feedApi.fetchUserHeaderName(id)
+      if (!cancelled) setHeaderName(headerNameResult)
 
-      // La liste elle-même : selon l'onglet, on lit follower_id (abonnés de `id`)
-      // ou followed_id (comptes que `id` suit).
-      const query =
-        tab === 'followers'
-          ? supabase
-              .from('follows')
-              .select('follower_id, users:follower_id(id, nom_complet, photo_url, role, profils_influenceur(verifie))')
-              .eq('followed_id', id)
-              .order('created_at', { ascending: false })
-          : supabase
-              .from('follows')
-              .select('followed_id, users:followed_id(id, nom_complet, photo_url, role, profils_influenceur(verifie))')
-              .eq('follower_id', id)
-              .order('created_at', { ascending: false })
-
-      const { data } = await query
+      const people = await feedApi.fetchFollowRows(id, tab)
       if (cancelled) return
-
-      const people = (data || [])
-        .map((r) => r.users)
-        .filter(Boolean)
 
       setRows(people)
 
-      // Pour afficher le bon état de bouton (Suivre / Abonné) sur chaque ligne, on a
-      // besoin de savoir qui *moi* (utilisateur connecté) je suis déjà.
       if (user?.id) {
-        const { data: mine } = await supabase
-          .from('follows')
-          .select('followed_id')
-          .eq('follower_id', user.id)
-        if (!cancelled) setMyFollowingIds(new Set((mine || []).map((r) => r.followed_id)))
+        const myIds = await feedApi.fetchFollowingIds(user.id)
+        if (!cancelled) setMyFollowingIds(myIds)
       }
 
       if (!cancelled) setLoading(false)
@@ -90,9 +62,9 @@ export default function FollowList() {
     })
 
     if (alreadyFollowing) {
-      await supabase.from('follows').delete().eq('follower_id', user.id).eq('followed_id', targetId)
+      await feedApi.unfollowUser(user.id, targetId)
     } else {
-      await supabase.from('follows').insert({ follower_id: user.id, followed_id: targetId })
+      await feedApi.followUser(user.id, targetId)
     }
   }
 

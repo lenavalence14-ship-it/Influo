@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import * as feedApi from '../../api/feed'
 import { useAuth } from '../../contexts/AuthContext'
 import PostCard from './PostCard'
 import MediaKitSuggestion from './MediaKitSuggestion'
@@ -15,111 +15,6 @@ import { usePullToRefresh } from '../../hooks/usePullToRefresh'
 import Logo from '../../components/ui/Logo'
 
 const PAGE_SIZE = 10
-
-// Un seul fetch pour TOUS les comptes suivis par l'utilisateur, réutilisé par
-// chaque PostCard (voir followingIds plus bas) -- avant ce correctif, chaque
-// carte affichée appelait individuellement useFollow, donc une requête
-// réseau par post visible dans le feed au lieu d'une requête pour tout le feed.
-async function fetchFollowingIds(userId) {
-  const { data } = await supabase.from('follows').select('followed_id').eq('follower_id', userId)
-  return new Set((data || []).map((f) => f.followed_id))
-}
-
-// Récupère une page de posts, puis les compteurs (likes/commentaires) uniquement pour
-// ces posts, en parallèle plutôt qu'en série. La pagination (10 posts par page au lieu
-// de 30 d'un coup) réduit le poids de la première réponse réseau et le nombre de
-// médias montés en même temps dans le DOM.
-async function fetchFeedPage({ userId, pageParam = 0 }) {
-  const from = pageParam * PAGE_SIZE
-
-  // Le feed mélange deux sources différentes (posts d'influenceurs et appels
-  // d'offre de clients), triées ENSEMBLE sur une même sort_date (repost-aware
-  // pour les posts, created_at brut pour les offres -- pas de notion de repost
-  // pour elles). get_feed_items calcule ce tri fusionné côté SQL et pagine
-  // dessus directement, pour les mêmes raisons que get_feed_post_ids
-  // auparavant : impossible de retrier fiablement après-coup en JS une fois
-  // que range() a déjà découpé les pages sur le mauvais critère.
-  const { data: ordered, error: orderError } = await supabase.rpc('get_feed_items', {
-    p_limit: PAGE_SIZE,
-    p_offset: from,
-  })
-
-  if (orderError) console.error('Erreur tri feed:', orderError)
-  if (!ordered || ordered.length === 0) return { posts: [], nextPage: null }
-
-  const postIds = ordered.filter((o) => o.item_type === 'post').map((o) => o.item_id)
-  const offerIds = ordered.filter((o) => o.item_type === 'offre').map((o) => o.item_id)
-
-  const [postsResult, offersResult] = await Promise.all([
-    postIds.length
-      ? supabase
-          .from('posts')
-          .select(`
-            id, legende, crop_format, type, created_at, commande_id, filtre,
-            audio_url, audio_start, audio_duration,
-            post_medias(media_url, media_type, thumbnail_url, position, filtre, zoom, offset_x, offset_y, natural_width, natural_height),
-            profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
-            utilisateur:utilisateur_id(id, nom_complet, photo_url),
-            client:client_id(id, nom_complet, photo_url),
-            commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)
-          `)
-          .in('id', postIds)
-      : Promise.resolve({ data: [] }),
-    offerIds.length
-      ? supabase
-          .from('appels_offre')
-          .select('id, contenu, couleur, created_at, profils_client(id, user_id, users(nom_complet, photo_url))')
-          .in('id', offerIds)
-      : Promise.resolve({ data: [] }),
-  ])
-
-  const { data, error } = postsResult
-  if (error) console.error('Erreur chargement feed:', error)
-  if (offersResult.error) console.error('Erreur chargement appels offre:', offersResult.error)
-
-  const [{ data: likes }, { data: comments }, { data: reposts }] = postIds.length
-    ? await Promise.all([
-        supabase.from('post_likes').select('post_id, user_id, created_at, users(nom_complet)').in('post_id', postIds),
-        supabase.from('post_comments').select('post_id').in('post_id', postIds),
-        supabase.from('post_reposts').select('post_id, user_id').in('post_id', postIds),
-      ])
-    : [{ data: [] }, { data: [] }, { data: [] }]
-
-  // .in('id', ids) ne garantit pas l'ordre de retour -- on remet chaque item
-  // dans l'ordre exact décidé par get_feed_items, tous types confondus.
-  const postById = new Map((data || []).map((p) => [p.id, p]))
-  const offerById = new Map((offersResult.data || []).map((o) => [o.id, o]))
-
-  const posts = ordered
-    .map((o) => {
-      if (o.item_type === 'offre') {
-        const offer = offerById.get(o.item_id)
-        if (!offer) return null
-        return { item_type: 'offre', ...offer }
-      }
-      const p = postById.get(o.item_id)
-      if (!p) return null
-      const postLikes = likes?.filter((l) => l.post_id === p.id) || []
-      const postReposts = reposts?.filter((r) => r.post_id === p.id) || []
-      // dernier like = created_at le plus récent, pour "Aimé par {nom} et d'autres personnes"
-      const lastLike = postLikes.length
-        ? postLikes.reduce((latest, l) => (new Date(l.created_at) > new Date(latest.created_at) ? l : latest))
-        : null
-      return {
-        item_type: 'post',
-        ...p,
-        like_count: postLikes.length,
-        liked_by_me: postLikes.some((l) => l.user_id === userId),
-        comment_count: comments?.filter((c) => c.post_id === p.id).length || 0,
-        last_liker_name: lastLike?.users?.nom_complet || null,
-        repost_count: postReposts.length,
-        reposted_by_me: postReposts.some((r) => r.user_id === userId),
-      }
-    })
-    .filter(Boolean)
-
-  return { posts, nextPage: ordered.length === PAGE_SIZE ? pageParam + 1 : null }
-}
 
 export default function Feed() {
   const { user, profile, influencerProfile } = useAuth()
@@ -142,7 +37,7 @@ export default function Feed() {
     refetch,
   } = useInfiniteQuery({
     queryKey: ['feed', user?.id],
-    queryFn: ({ pageParam }) => fetchFeedPage({ userId: user.id, pageParam }),
+    queryFn: ({ pageParam }) => feedApi.fetchFeedPage({ userId: user.id, pageParam }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextPage,
     enabled: !!user,
@@ -212,7 +107,7 @@ export default function Feed() {
   // reinterroger la base à chaque scroll.
   const { data: followingIds = new Set() } = useQuery({
     queryKey: ['following-ids', user?.id],
-    queryFn: () => fetchFollowingIds(user.id),
+    queryFn: () => feedApi.fetchFollowingIds(user.id),
     enabled: !!user,
     staleTime: 60_000,
   })
@@ -231,9 +126,9 @@ export default function Feed() {
       return next
     })
     if (isFollowing) {
-      await supabase.from('follows').delete().eq('follower_id', user.id).eq('followed_id', targetUserId)
+      await feedApi.unfollowUser(user.id, targetUserId)
     } else {
-      await supabase.from('follows').insert({ follower_id: user.id, followed_id: targetUserId })
+      await feedApi.followUser(user.id, targetUserId)
     }
   }, [user?.id, followingIds, queryClient])
 

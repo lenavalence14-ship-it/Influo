@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as messagesApi from '../../api/messages'
+import * as storageApi from '../../api/storage'
+import * as realtimeApi from '../../api/realtime'
 import { useAuth } from '../../contexts/AuthContext'
 import { ArrowLeft, Send, Camera, Image as ImageIcon, ThumbsUp, Plus, Mic } from 'lucide-react'
 import MessageBubble from '../../components/messages/MessageBubble'
+
+const TABLE = 'messages_influenceur'
+const CONV_TABLE = 'conversations_influenceur'
 
 // Chat influenceur <-> influenceur. Copie conforme de ChatSociale.jsx, adaptée
 // aux tables conversations_influenceur / messages_influenceur. Ajouté pour
@@ -27,27 +32,19 @@ export default function ChatInfluenceur() {
   const other = isSideA ? conversation?.user_b : conversation?.user_a
 
   const loadAll = async () => {
-    const { data: conv } = await supabase
-      .from('conversations_influenceur')
-      .select(`
-        *,
-        user_a:user_a_id(id, nom_complet, photo_url),
-        user_b:user_b_id(id, nom_complet, photo_url)
-      `)
-      .eq('id', id)
-      .maybeSingle()
+    const conv = await messagesApi.fetchConversationGeneric(
+      CONV_TABLE,
+      id,
+      `*, user_a:user_a_id(id, nom_complet, photo_url), user_b:user_b_id(id, nom_complet, photo_url)`
+    )
     setConversation(conv)
 
-    const { data: msgs } = await supabase
-      .from('messages_influenceur')
-      .select('*')
-      .eq('conversation_id', id)
-      .order('created_at', { ascending: true })
-    setMessages(msgs || [])
+    const msgs = await messagesApi.fetchMessagesGeneric(TABLE, id)
+    setMessages(msgs)
 
     if (conv) {
       const readField = conv.user_a_id === myId ? 'user_a_last_read_at' : 'user_b_last_read_at'
-      await supabase.from('conversations_influenceur').update({ [readField]: new Date().toISOString() }).eq('id', id)
+      await messagesApi.markConversationReadGeneric(CONV_TABLE, id, readField)
     }
   }
 
@@ -55,31 +52,46 @@ export default function ChatInfluenceur() {
     if (!myId) return
     loadAll()
 
-    const channel = supabase
-      .channel(`chat-influenceur-${id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages_influenceur', filter: `conversation_id=eq.${id}` }, (payload) => {
-        setMessages((prev) => {
-          const tempIndex = prev.findIndex((m) => m._optimisticId && m.sender_id === payload.new.sender_id && m.contenu === payload.new.contenu && !prev.some((mm) => mm.id === payload.new.id))
-          if (tempIndex !== -1) {
-            const next = [...prev]
-            next[tempIndex] = payload.new
-            return next
-          }
-          if (prev.some((m) => m.id === payload.new.id)) return prev
-          return [...prev, payload.new]
-        })
-        const readField = isSideA ? 'user_a_last_read_at' : 'user_b_last_read_at'
-        supabase.from('conversations_influenceur').update({ [readField]: new Date().toISOString() }).eq('id', id)
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations_influenceur', filter: `id=eq.${id}` }, (payload) => {
-        setConversation((c) => (c ? { ...c, ...payload.new } : c))
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages_influenceur', filter: `conversation_id=eq.${id}` }, (payload) => {
-        setMessages((prev) => prev.map((m) => (m.id === payload.new.id ? payload.new : m)))
-      })
-      .subscribe()
+    const unsubscribeMessages = realtimeApi.subscribeToTable({
+      channelName: `chat-influenceur-messages-${id}`,
+      table: TABLE,
+      filter: `conversation_id=eq.${id}`,
+      handlers: {
+        INSERT: (payload) => {
+          setMessages((prev) => {
+            const tempIndex = prev.findIndex((m) => m._optimisticId && m.sender_id === payload.new.sender_id && m.contenu === payload.new.contenu && !prev.some((mm) => mm.id === payload.new.id))
+            if (tempIndex !== -1) {
+              const next = [...prev]
+              next[tempIndex] = payload.new
+              return next
+            }
+            if (prev.some((m) => m.id === payload.new.id)) return prev
+            return [...prev, payload.new]
+          })
+          const readField = isSideA ? 'user_a_last_read_at' : 'user_b_last_read_at'
+          messagesApi.markConversationReadGeneric(CONV_TABLE, id, readField)
+        },
+        UPDATE: (payload) => {
+          setMessages((prev) => prev.map((m) => (m.id === payload.new.id ? payload.new : m)))
+        },
+      },
+    })
 
-    return () => supabase.removeChannel(channel)
+    const unsubscribeConversation = realtimeApi.subscribeToTable({
+      channelName: `chat-influenceur-conversation-${id}`,
+      table: CONV_TABLE,
+      filter: `id=eq.${id}`,
+      handlers: {
+        UPDATE: (payload) => {
+          setConversation((c) => (c ? { ...c, ...payload.new } : c))
+        },
+      },
+    })
+
+    return () => {
+      unsubscribeMessages()
+      unsubscribeConversation()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, myId])
 
@@ -105,55 +117,33 @@ export default function ChatInfluenceur() {
     }
     setMessages((prev) => [...prev, optimisticMsg])
 
-    const { data: inserted, error } = await supabase
-      .from('messages_influenceur')
-      .insert({
-        conversation_id: id,
-        sender_id: myId,
-        contenu: content,
-        fichier_url: fichierUrl,
-        fichier_type: fichierType,
-        is_system: false,
-      })
-      .select()
-      .single()
+    const { data: inserted, error } = await messagesApi.sendMessageGeneric(TABLE, CONV_TABLE, {
+      conversationId: id,
+      senderId: myId,
+      contenu: content,
+      fichierUrl,
+      fichierType,
+    })
 
     if (error) {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
       return
     }
     setMessages((prev) => prev.map((m) => (m.id === optimisticId ? inserted : m)))
-    await supabase.from('conversations_influenceur').update({ updated_at: new Date().toISOString() }).eq('id', id)
   }
 
   const handleEditMessage = async (message, newContent) => {
-    const { data } = await supabase
-      .from('messages_influenceur')
-      .update({ contenu: newContent, edited_at: new Date().toISOString() })
-      .eq('id', message.id)
-      .select()
-      .single()
+    const data = await messagesApi.editMessageGeneric(TABLE, message.id, newContent)
     if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
   }
 
   const handleDeleteForMe = async (message) => {
-    const nextDeletedFor = [...(message.deleted_for || []), myId]
-    const { data } = await supabase
-      .from('messages_influenceur')
-      .update({ deleted_for: nextDeletedFor })
-      .eq('id', message.id)
-      .select()
-      .single()
+    const data = await messagesApi.deleteMessageForMeGeneric(TABLE, message, myId)
     if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
   }
 
   const handleDeleteForEveryone = async (message) => {
-    const { data } = await supabase
-      .from('messages_influenceur')
-      .update({ is_deleted_for_all: true, contenu: null, fichier_url: null })
-      .eq('id', message.id)
-      .select()
-      .single()
+    const data = await messagesApi.deleteMessageForEveryoneGeneric(TABLE, message.id)
     if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
   }
 
@@ -168,10 +158,10 @@ export default function ChatInfluenceur() {
     const file = e.target.files?.[0]
     if (!file) return
     const fileName = `${id}/${Date.now()}-${file.name}`
-    const { error } = await supabase.storage.from('messagerie').upload(fileName, file)
+    const { error } = await storageApi.uploadFile('messagerie', fileName, file)
     if (error) return
-    const { data: signedUrl } = await supabase.storage.from('messagerie').createSignedUrl(fileName, 60 * 60 * 24 * 7)
-    await sendMessage(null, signedUrl?.signedUrl, file.type.startsWith('image/') ? 'image' : 'fichier')
+    const signedUrl = await storageApi.getSignedUrl('messagerie', fileName, 60 * 60 * 24 * 7)
+    await sendMessage(null, signedUrl, file.type.startsWith('image/') ? 'image' : 'fichier')
   }
 
   return (

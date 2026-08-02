@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as messagesApi from '../../api/messages'
 import { useAuth } from '../../contexts/AuthContext'
 import Button from '../../components/ui/Button'
 import { ArrowLeft } from 'lucide-react'
@@ -21,21 +21,13 @@ export default function NewConversation() {
   useEffect(() => {
     const load = async () => {
       if (offreId) {
-        const { data } = await supabase
-          .from('offres')
-          .select('*, profils_influenceur(id, verifie, users(nom_complet))')
-          .eq('id', offreId)
-          .maybeSingle()
+        const data = await messagesApi.fetchOffreWithInfluencer(offreId)
         setOffre(data)
         setMessage(
           `Bonjour ! Je suis intéressé(e) par votre offre "${data?.titre}" à ${data?.prix} € (délai ${data?.delai_jours} jours). Pouvons-nous en discuter ?`
         )
       } else if (influenceurIdParam) {
-        const { data } = await supabase
-          .from('profils_influenceur')
-          .select('id, verifie, users(nom_complet)')
-          .eq('id', influenceurIdParam)
-          .maybeSingle()
+        const data = await messagesApi.fetchInfluencerBasic(influenceurIdParam)
         setInfluenceurDirect(data)
         setMessage('Bonjour ! Je souhaiterais discuter d\'une collaboration avec vous.')
       } else {
@@ -50,42 +42,15 @@ export default function NewConversation() {
     setSending(true)
     const influenceurId = offre?.profils_influenceur?.id || influenceurIdParam
 
-    // vérifier si une conversation existe déjà entre ce client et cet influenceur
-    // (une conversation = un couple client/influenceur, quelle que soit l'offre d'origine)
-    const { data: existing } = await supabase
-      .from('conversations')
-      .select('id')
-      .eq('client_id', user.id)
-      .eq('influenceur_id', influenceurId)
-      .maybeSingle()
-
-    let conversationId = existing?.id
-
-    if (!conversationId) {
-      const { data: conv, error } = await supabase
-        .from('conversations')
-        .insert({
-          client_id: user.id,
-          influenceur_id: influenceurId,
-          offre_id: offreId || null,
-        })
-        .select('id')
-        .single()
-
-      if (error) {
-        setSending(false)
-        return
-      }
-      conversationId = conv.id
-    }
-
-    await supabase.from('messages').insert({
-      conversation_id: conversationId,
-      sender_id: user.id,
-      contenu: message,
+    const { conversationId, error } = await messagesApi.findOrCreateConversation({
+      userId: user.id,
+      influenceurId,
+      offreId,
+      firstMessage: message,
     })
 
     setSending(false)
+    if (error) return
     navigate(`/messages/${conversationId}`)
   }
 

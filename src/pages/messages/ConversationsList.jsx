@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import * as messagesApi from '../../api/messages'
 import { useAuth } from '../../contexts/AuthContext'
 import VerifiedBadge from '../../components/ui/VerifiedBadge'
 import { timeShort } from '../../lib/time'
@@ -28,117 +28,7 @@ export default function ConversationsList() {
   useEffect(() => {
     const load = async () => {
       try {
-        let normalQuery = supabase
-          .from('conversations')
-          .select(`
-            id, updated_at, client_last_read_at, influenceur_last_read_at,
-            client:client_id(nom_complet, photo_url),
-            profils_influenceur(id, verifie, users(nom_complet, photo_url)),
-            offres(titre),
-            messages(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all)
-          `)
-          .order('updated_at', { ascending: false })
-
-        if (profile?.role === 'influenceur' && influencerProfile) {
-          normalQuery = normalQuery.eq('influenceur_id', influencerProfile.id)
-        } else {
-          normalQuery = normalQuery.eq('client_id', user.id)
-        }
-
-        let proQuery = null
-        if (profile?.role === 'utilisateur_simple') {
-          proQuery = supabase
-            .from('conversations_pro')
-            .select(`
-              id, updated_at, utilisateur_last_read_at, client_last_read_at,
-              client:client_id(id, users(nom_complet, photo_url)),
-              messages_pro(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all)
-            `)
-            .eq('utilisateur_id', user.id)
-            .order('updated_at', { ascending: false })
-        } else if (profile?.role === 'client' && clientProfile?.id) {
-          proQuery = supabase
-            .from('conversations_pro')
-            .select(`
-              id, updated_at, utilisateur_last_read_at, client_last_read_at,
-              utilisateur:utilisateur_id(nom_complet, photo_url),
-              messages_pro(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all)
-            `)
-            .eq('client_id', clientProfile.id)
-            .order('updated_at', { ascending: false })
-        }
-
-        // conversations_biz = entreprise ↔ entreprise (nouveau système, symétrique :
-        // le compte peut être client_a ou client_b selon qui a démarré la conversation).
-        let bizQuery = null
-        if (profile?.role === 'client' && clientProfile?.id) {
-          bizQuery = supabase
-            .from('conversations_biz')
-            .select(`
-              id, updated_at, client_a_id, client_b_id, client_a_last_read_at, client_b_last_read_at,
-              client_a:client_a_id(id, users(nom_complet, photo_url)),
-              client_b:client_b_id(id, users(nom_complet, photo_url)),
-              messages_biz(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all)
-            `)
-            .or(`client_a_id.eq.${clientProfile.id},client_b_id.eq.${clientProfile.id}`)
-            .order('updated_at', { ascending: false })
-        }
-
-        // conversations_sociale = utilisateur_simple ↔ utilisateur_simple, même logique
-        // symétrique que conversations_biz mais référence users.id directement.
-        let socialeQuery = null
-        if (profile?.role === 'utilisateur_simple') {
-          socialeQuery = supabase
-            .from('conversations_sociale')
-            .select(`
-              id, updated_at, user_a_id, user_b_id, user_a_last_read_at, user_b_last_read_at,
-              user_a:user_a_id(id, nom_complet, photo_url),
-              user_b:user_b_id(id, nom_complet, photo_url),
-              messages_sociale(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all, shared_post_id)
-            `)
-            .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
-            .order('updated_at', { ascending: false })
-        }
-
-        // conversations_influenceur = influenceur ↔ influenceur, même logique symétrique
-        // que conversations_sociale, référence users.id directement.
-        let influenceurQuery = null
-        if (profile?.role === 'influenceur') {
-          influenceurQuery = supabase
-            .from('conversations_influenceur')
-            .select(`
-              id, updated_at, user_a_id, user_b_id, user_a_last_read_at, user_b_last_read_at,
-              user_a:user_a_id(id, nom_complet, photo_url),
-              user_b:user_b_id(id, nom_complet, photo_url),
-              messages_influenceur(id, contenu, created_at, is_system, sender_id, deleted_for, is_deleted_for_all)
-            `)
-            .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
-            .order('updated_at', { ascending: false })
-        }
-
-        const [normalResult, proResult, bizResult, socialeResult, influenceurResult] = await Promise.all([
-          normalQuery,
-          proQuery ? proQuery : Promise.resolve({ data: [] }),
-          bizQuery ? bizQuery : Promise.resolve({ data: [] }),
-          socialeQuery ? socialeQuery : Promise.resolve({ data: [] }),
-          influenceurQuery ? influenceurQuery : Promise.resolve({ data: [] }),
-        ])
-
-        // Chaque requête Supabase peut échouer sans throw (elle renvoie { error }) :
-        // avant, une erreur ici passait inaperçue et laissait le spinner tourner
-        // indéfiniment puisque rien ne le signalait ni ne redonnait la main au rendu.
-        for (const r of [normalResult, proResult, bizResult, socialeResult, influenceurResult]) {
-          if (r?.error) console.error('Erreur chargement conversations :', r.error)
-        }
-
-        const normalized = [
-          ...(normalResult?.data || []).map((c) => ({ ...c, kind: 'normal' })),
-          ...((proResult?.data) || []).map((c) => ({ ...c, kind: 'pro' })),
-          ...((bizResult?.data) || []).map((c) => ({ ...c, kind: 'biz' })),
-          ...((socialeResult?.data) || []).map((c) => ({ ...c, kind: 'sociale' })),
-          ...((influenceurResult?.data) || []).map((c) => ({ ...c, kind: 'influenceur' })),
-        ].sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
-
+        const normalized = await messagesApi.fetchAllConversations({ user, profile, influencerProfile, clientProfile })
         setConversations(normalized)
       } catch (err) {
         // Une exception JS (réseau, timeout...) ne doit plus laisser le spinner

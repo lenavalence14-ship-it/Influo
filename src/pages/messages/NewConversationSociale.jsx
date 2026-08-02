@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as messagesApi from '../../api/messages'
 import { useAuth } from '../../contexts/AuthContext'
 
 // Même logique que NewConversationBiz.jsx, mais entre deux utilisateur_simple :
@@ -22,32 +22,20 @@ export default function NewConversationSociale() {
         return
       }
 
-      // La conversation peut avoir été créée avec ce compte comme a ou comme b :
-      // on vérifie les deux ordres avant de conclure qu'elle n'existe pas encore.
-      const { data: existing } = await supabase
-        .from('conversations_sociale')
-        .select('id')
-        .or(
-          `and(user_a_id.eq.${user.id},user_b_id.eq.${otherUserId}),and(user_a_id.eq.${otherUserId},user_b_id.eq.${user.id})`
-        )
-        .maybeSingle()
+      const { conversationId, error } = await messagesApi.findOrCreateSymmetricConversation({
+        table: 'conversations_sociale',
+        sideAField: 'user_a_id',
+        sideBField: 'user_b_id',
+        myId: user.id,
+        otherId: otherUserId,
+        insertFields: { user_a_id: user.id, user_b_id: otherUserId },
+      })
 
-      if (existing) {
-        navigate(`/messages/sociale/${existing.id}`, { replace: true })
-        return
-      }
-
-      const { data: created, error } = await supabase
-        .from('conversations_sociale')
-        .insert({ user_a_id: user.id, user_b_id: otherUserId })
-        .select()
-        .single()
-
-      if (error || !created) {
+      if (error) {
         navigate('/messages')
         return
       }
-      navigate(`/messages/sociale/${created.id}`, { replace: true })
+      navigate(`/messages/sociale/${conversationId}`, { replace: true })
     }
     run()
   }, [user?.id, otherUserId, navigate])

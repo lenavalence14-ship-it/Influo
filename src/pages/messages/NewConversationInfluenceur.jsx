@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as messagesApi from '../../api/messages'
 import { useAuth } from '../../contexts/AuthContext'
 
 // Même logique que NewConversationSociale.jsx, mais entre deux influenceurs.
@@ -22,30 +22,20 @@ export default function NewConversationInfluenceur() {
         return
       }
 
-      const { data: existing } = await supabase
-        .from('conversations_influenceur')
-        .select('id')
-        .or(
-          `and(user_a_id.eq.${user.id},user_b_id.eq.${otherUserId}),and(user_a_id.eq.${otherUserId},user_b_id.eq.${user.id})`
-        )
-        .maybeSingle()
+      const { conversationId, error } = await messagesApi.findOrCreateSymmetricConversation({
+        table: 'conversations_influenceur',
+        sideAField: 'user_a_id',
+        sideBField: 'user_b_id',
+        myId: user.id,
+        otherId: otherUserId,
+        insertFields: { user_a_id: user.id, user_b_id: otherUserId },
+      })
 
-      if (existing) {
-        navigate(`/messages/influenceur/${existing.id}`, { replace: true })
-        return
-      }
-
-      const { data: created, error } = await supabase
-        .from('conversations_influenceur')
-        .insert({ user_a_id: user.id, user_b_id: otherUserId })
-        .select()
-        .single()
-
-      if (error || !created) {
+      if (error) {
         navigate('/messages')
         return
       }
-      navigate(`/messages/influenceur/${created.id}`, { replace: true })
+      navigate(`/messages/influenceur/${conversationId}`, { replace: true })
     }
     run()
   }, [user?.id, otherUserId, navigate])

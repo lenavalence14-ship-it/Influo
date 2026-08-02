@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import * as feedApi from '../../api/feed'
+import * as storageApi from '../../api/storage'
 import { useAuth } from '../../contexts/AuthContext'
 import { Image as ImageIcon, X, RotateCcw, Check, Music } from 'lucide-react'
 import { compressImage, compressVideo, generateVideoThumbnail, getMediaDimensions, trimAudio } from '../../lib/mediaCompression'
@@ -122,11 +123,7 @@ export default function CreatePost() {
   useEffect(() => {
     if (!isEditing) return
     const loadPost = async () => {
-      const { data } = await supabase
-        .from('posts')
-        .select('*, post_medias(id, media_url, media_type, position, hls_status, hls_playlist_url, thumbnail_url, filtre, crop_format, zoom, offset_x, offset_y, natural_width, natural_height, texte_overlay, texte_x, texte_y, texte_couleur, texte_police)')
-        .eq('id', postId)
-        .maybeSingle()
+      const data = await feedApi.fetchPostForEdit(postId)
 
       if (data) {
         setLegende(data.legende || '')
@@ -258,9 +255,8 @@ export default function CreatePost() {
       if (!textePostDraft.trim()) return
       setLoading(true)
       setPublishError(null)
-      const { error: texteError } = await supabase.from('posts').insert({
-        influenceur_id: influencerProfile.id,
-        type: 'texte',
+      const { error: texteError } = await feedApi.createTextPost({
+        influenceurId: influencerProfile.id,
         legende: textePostDraft.trim(),
       })
       setLoading(false)
@@ -289,14 +285,13 @@ export default function CreatePost() {
       try {
         const trimmed = await trimAudio(musique.file, musique.start, musique.duration)
         const audioFileName = `${(influencerProfile?.id || user.id)}/post-audio-${Date.now()}.wav`
-        const { error: audioUploadError } = await supabase.storage.from('posts').upload(audioFileName, trimmed)
+        const { error: audioUploadError } = await storageApi.uploadFile('posts', audioFileName, trimmed)
         if (audioUploadError) {
           setLoading(false)
           setPublishError(audioUploadError.message)
           return
         }
-        const { data: audioUrlData } = supabase.storage.from('posts').getPublicUrl(audioFileName)
-        audioUrl = audioUrlData.publicUrl
+        audioUrl = storageApi.getPublicUrl('posts', audioFileName)
         audioDuration = musique.duration
       } catch (trimError) {
         // Le découpage a échoué (fichier corrompu, format non décodable) : on
@@ -322,7 +317,7 @@ export default function CreatePost() {
     }
 
     if (isEditing) {
-      const { error: updateError } = await supabase.from('posts').update(commonFields).eq('id', postId)
+      const { error: updateError } = await feedApi.updatePostCommonFields(postId, commonFields)
       if (updateError) {
         setLoading(false)
         setPublishError(updateError.message)
@@ -339,24 +334,20 @@ export default function CreatePost() {
           if (!mediaId) return Promise.resolve(null)
           const t = textesParMedia[i]
           const c = cropsParMedia[i] ?? { zoom: 1, offsetX: 0, offsetY: 0 }
-          return supabase
-            .from('post_medias')
-            .update({
-              filtre: filtresParMedia[i] ?? null,
-              texte_overlay: t?.contenu || null,
-              texte_x: t?.x ?? null,
-              texte_y: t?.y ?? null,
-              texte_couleur: t?.couleur || null,
-              texte_police: t?.police || null,
-              crop_format: format,
-              zoom: c.zoom,
-              offset_x: c.offsetX,
-              offset_y: c.offsetY,
-              natural_width: c.naturalWidth ?? null,
-              natural_height: c.naturalHeight ?? null,
-            })
-            .eq('id', mediaId)
-            .then(({ error: mediaError }) => mediaError)
+          return feedApi.updatePostMedia(mediaId, {
+            filtre: filtresParMedia[i] ?? null,
+            texte_overlay: t?.contenu || null,
+            texte_x: t?.x ?? null,
+            texte_y: t?.y ?? null,
+            texte_couleur: t?.couleur || null,
+            texte_police: t?.police || null,
+            crop_format: format,
+            zoom: c.zoom,
+            offset_x: c.offsetX,
+            offset_y: c.offsetY,
+            natural_width: c.naturalWidth ?? null,
+            natural_height: c.naturalHeight ?? null,
+          })
         })
       )).filter(Boolean)
 
@@ -371,21 +362,11 @@ export default function CreatePost() {
     }
 
     const hasVideo = files.some(isVideoFile)
-    const { data: post, error } = await supabase
-      .from('posts')
-      .insert({
-        influenceur_id: influencerProfile.id,
-        // Priorité au carrousel dès qu'il y a plusieurs fichiers, même si l'un
-        // d'eux est une vidéo : sinon 'video' l'emportait toujours sur
-        // 'carrousel' (hasVideo testé en premier), et PostCard n'affichait
-        // alors QUE le premier média (allMedias[0]) au lieu du carrousel
-        // complet — la vidéo mélangée dans un carrousel de plusieurs fichiers
-        // faisait disparaître les autres photos du post publié.
-        type: files.length > 1 ? 'carrousel' : hasVideo ? 'video' : 'photo',
-        ...commonFields,
-      })
-      .select()
-      .single()
+    const { data: post, error } = await feedApi.createPost({
+      influenceurId: influencerProfile.id,
+      type: files.length > 1 ? 'carrousel' : hasVideo ? 'video' : 'photo',
+      ...commonFields,
+    })
 
     if (error) {
       setLoading(false)
@@ -439,47 +420,41 @@ export default function CreatePost() {
       const fileName = `${influencerProfile.id}/${post.id}/${i}-${file.name}`
 
       const uploadTasks = [
-        supabase.storage.from('posts').upload(fileName, file),
+        storageApi.uploadFile('posts', fileName, file),
       ]
 
       let thumbName = null
       if (isVideo && thumbFile) {
         thumbName = `${influencerProfile.id}/${post.id}/${i}-thumb.jpg`
-        uploadTasks.push(supabase.storage.from('posts').upload(thumbName, thumbFile))
+        uploadTasks.push(storageApi.uploadFile('posts', thumbName, thumbFile))
       }
 
       await Promise.all(uploadTasks)
       bumpProgress()
 
-      const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
-      const thumbnailUrl = thumbName
-        ? supabase.storage.from('posts').getPublicUrl(thumbName).data.publicUrl
-        : null
+      const mediaUrl = storageApi.getPublicUrl('posts', fileName)
+      const thumbnailUrl = thumbName ? storageApi.getPublicUrl('posts', thumbName) : null
 
       const c = cropsParMedia[i] ?? { zoom: 1, offsetX: 0, offsetY: 0 }
-      const { data: mediaRow } = await supabase
-        .from('post_medias')
-        .insert({
-          post_id: post.id,
-          media_url: urlData.publicUrl,
-          media_type: isVideo ? 'video' : 'image',
-          thumbnail_url: thumbnailUrl,
-          position: i,
-          filtre: filtresParMedia[i] ?? null,
-          texte_overlay: textesParMedia[i]?.contenu || null,
-          texte_x: textesParMedia[i]?.x ?? null,
-          texte_y: textesParMedia[i]?.y ?? null,
-          texte_couleur: textesParMedia[i]?.couleur || null,
-          texte_police: textesParMedia[i]?.police || null,
-          crop_format: format,
-          zoom: c.zoom,
-          offset_x: c.offsetX,
-          offset_y: c.offsetY,
-          natural_width: naturalWidth,
-          natural_height: naturalHeight,
-        })
-        .select('id')
-        .single()
+      const { data: mediaRow } = await feedApi.insertPostMedia({
+        post_id: post.id,
+        media_url: mediaUrl,
+        media_type: isVideo ? 'video' : 'image',
+        thumbnail_url: thumbnailUrl,
+        position: i,
+        filtre: filtresParMedia[i] ?? null,
+        texte_overlay: textesParMedia[i]?.contenu || null,
+        texte_x: textesParMedia[i]?.x ?? null,
+        texte_y: textesParMedia[i]?.y ?? null,
+        texte_couleur: textesParMedia[i]?.couleur || null,
+        texte_police: textesParMedia[i]?.police || null,
+        crop_format: format,
+        zoom: c.zoom,
+        offset_x: c.offsetX,
+        offset_y: c.offsetY,
+        natural_width: naturalWidth,
+        natural_height: naturalHeight,
+      })
 
       // Déclenche le transcodage HLS en arrière-plan, sans bloquer la publication :
       // le post part tout de suite avec le MP4 (media_url) en lecture immédiate,
@@ -490,7 +465,7 @@ export default function CreatePost() {
       if (isVideo && mediaRow?.id) {
         triggerHlsTranscode({
           postMediaId: mediaRow.id,
-          sourceUrl: urlData.publicUrl,
+          sourceUrl: mediaUrl,
           storagePrefix: `${influencerProfile.id}/${post.id}/${i}-hls`,
         })
       }
@@ -509,12 +484,7 @@ export default function CreatePost() {
     // notification push système (téléphone verrouillé, app fermée) suivra le même
     // principe côté serveur (fonction send-push), pas encore branché ici.
     if (user?.id) {
-      await supabase.from('notifications').insert({
-        user_id: user.id,
-        type: 'nouveau_post',
-        contenu: 'Votre publication est en ligne.',
-        lien_ref_id: post.id,
-      })
+      await feedApi.notifyNewPost({ userId: user.id, postId: post.id })
     }
   }
 

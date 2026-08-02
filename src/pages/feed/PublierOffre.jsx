@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { X, Check, ArrowLeft } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import * as offresApi from '../../api/offres'
 import { useAuth } from '../../contexts/AuthContext'
 import { OFFER_COLOR_PALETTE, getContrastTextColor } from '../../lib/offerColors'
 
@@ -33,22 +33,17 @@ export default function PublierOffre() {
 
   useEffect(() => {
     if (!isEditing) return
-    supabase
-      .from('appels_offre')
-      .select('id, contenu, couleur, client_id')
-      .eq('id', offerId)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data || data.client_id !== clientProfile?.id) {
-          // pas trouvé ou pas propriétaire : retour au feed plutôt que de
-          // laisser un écran vide/incohérent
-          navigate('/')
-          return
-        }
-        setContenu(data.contenu)
-        setCouleur(data.couleur || null)
-        setLoadingOffer(false)
-      })
+    offresApi.fetchAppelOffre(offerId).then(({ data, error }) => {
+      if (error || !data || data.client_id !== clientProfile?.id) {
+        // pas trouvé ou pas propriétaire : retour au feed plutôt que de
+        // laisser un écran vide/incohérent
+        navigate('/')
+        return
+      }
+      setContenu(data.contenu)
+      setCouleur(data.couleur || null)
+      setLoadingOffer(false)
+    })
   }, [isEditing, offerId, clientProfile?.id, navigate])
 
   const handlePublish = async () => {
@@ -57,8 +52,8 @@ export default function PublierOffre() {
     setPublishError(null)
 
     const { error } = isEditing
-      ? await supabase.from('appels_offre').update({ contenu: contenu.trim(), couleur }).eq('id', offerId)
-      : await supabase.from('appels_offre').insert({ client_id: clientProfile.id, contenu: contenu.trim(), couleur })
+      ? await offresApi.updateAppelOffre(offerId, { contenu: contenu.trim(), couleur })
+      : await offresApi.createAppelOffre({ clientId: clientProfile.id, contenu: contenu.trim(), couleur })
 
     setLoading(false)
     if (error) {

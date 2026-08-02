@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as feedApi from '../../api/feed'
 import { useAuth } from '../../contexts/AuthContext'
 import { ArrowLeft } from 'lucide-react'
 import PostCard from './PostCard'
@@ -17,35 +17,13 @@ export default function PostDetail() {
 
   useEffect(() => {
     const load = async () => {
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          id, legende, crop_format, type, created_at, commande_id, filtre,
-          post_medias(media_url, media_type, thumbnail_url, position, filtre, zoom, offset_x, offset_y, natural_width, natural_height),
-          profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)),
-          client:client_id(id, nom_complet, photo_url),
-          commandes!posts_commande_id_fkey(lien_instagram, lien_tiktok)
-        `)
-        .eq('id', id)
-        .maybeSingle()
-
-      if (error || !data) {
+      const { post: fetchedPost, notFound: isNotFound } = await feedApi.fetchSinglePost(id, user.id)
+      if (isNotFound) {
         setNotFound(true)
         setLoading(false)
         return
       }
-
-      const [{ data: likes }, { data: comments }] = await Promise.all([
-        supabase.from('post_likes').select('post_id, user_id').eq('post_id', data.id),
-        supabase.from('post_comments').select('post_id').eq('post_id', data.id),
-      ])
-
-      setPost({
-        ...data,
-        like_count: likes?.length || 0,
-        liked_by_me: likes?.some((l) => l.user_id === user.id) || false,
-        comment_count: comments?.length || 0,
-      })
+      setPost(fetchedPost)
       setLoading(false)
     }
     if (user) load()

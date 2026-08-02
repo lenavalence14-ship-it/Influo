@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import * as messagesApi from '../../api/messages'
+import * as storageApi from '../../api/storage'
+import * as realtimeApi from '../../api/realtime'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   ArrowLeft, Send, Camera, Image as ImageIcon,
@@ -50,63 +52,66 @@ export default function Chat() {
   const isInfluencer = profile?.role === 'influenceur'
 
   const loadAll = async () => {
-    const { data: conv } = await supabase
-      .from('conversations')
-      .select('*, client:client_id(nom_complet, photo_url), profils_influenceur(id, verifie, user_id, users(nom_complet, photo_url)), offres(*)')
-      .eq('id', id)
-      .maybeSingle()
+    const conv = await messagesApi.fetchConversation(id)
     setConversation(conv)
 
-    const { data: cmd } = await supabase
-      .from('commandes')
-      .select('*')
-      .eq('conversation_id', id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const cmd = await messagesApi.fetchLatestCommande(id)
     setCommande(cmd)
 
-    const { data: msgs } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('conversation_id', id)
-      .order('created_at', { ascending: true })
-    setMessages(msgs || [])
+    const msgs = await messagesApi.fetchMessages(id)
+    setMessages(msgs)
 
     const readField = isInfluencer ? 'influenceur_last_read_at' : 'client_last_read_at'
-    await supabase.from('conversations').update({ [readField]: new Date().toISOString() }).eq('id', id)
+    await messagesApi.markConversationRead(id, readField)
   }
 
   useEffect(() => {
     loadAll()
 
-    const channel = supabase
-      .channel(`chat-${id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
-        // Si ce message vient de moi, il a déjà été affiché en optimiste (voir sendMessage) :
-        // on remplace juste la version temporaire par la vraie ligne DB plutôt que de dupliquer.
-        setMessages((prev) => {
-          const tempIndex = prev.findIndex((m) => m._optimisticId && m.sender_id === payload.new.sender_id && m.contenu === payload.new.contenu && !prev.some((mm) => mm.id === payload.new.id))
-          if (tempIndex !== -1) {
-            const next = [...prev]
-            next[tempIndex] = payload.new
-            return next
-          }
-          if (prev.some((m) => m.id === payload.new.id)) return prev
-          return [...prev, payload.new]
-        })
-        const readField = isInfluencer ? 'influenceur_last_read_at' : 'client_last_read_at'
-        supabase.from('conversations').update({ [readField]: new Date().toISOString() }).eq('id', id)
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
-        setMessages((prev) => prev.map((m) => (m.id === payload.new.id ? payload.new : m)))
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `id=eq.${id}` }, (payload) => {
-        setConversation((c) => (c ? { ...c, ...payload.new } : c))
-      })
-      .subscribe()
+    // Deux tables suivies (messages, conversations) => deux salons distincts,
+    // chacun avec ses propres handlers d'événements postgres_changes.
+    const unsubscribeMessages = realtimeApi.subscribeToTable({
+      channelName: `chat-messages-${id}`,
+      table: 'messages',
+      filter: `conversation_id=eq.${id}`,
+      handlers: {
+        INSERT: (payload) => {
+          // Si ce message vient de moi, il a déjà été affiché en optimiste (voir sendMessage) :
+          // on remplace juste la version temporaire par la vraie ligne DB plutôt que de dupliquer.
+          setMessages((prev) => {
+            const tempIndex = prev.findIndex((m) => m._optimisticId && m.sender_id === payload.new.sender_id && m.contenu === payload.new.contenu && !prev.some((mm) => mm.id === payload.new.id))
+            if (tempIndex !== -1) {
+              const next = [...prev]
+              next[tempIndex] = payload.new
+              return next
+            }
+            if (prev.some((m) => m.id === payload.new.id)) return prev
+            return [...prev, payload.new]
+          })
+          const readField = isInfluencer ? 'influenceur_last_read_at' : 'client_last_read_at'
+          messagesApi.markConversationRead(id, readField)
+        },
+        UPDATE: (payload) => {
+          setMessages((prev) => prev.map((m) => (m.id === payload.new.id ? payload.new : m)))
+        },
+      },
+    })
 
-    return () => supabase.removeChannel(channel)
+    const unsubscribeConversation = realtimeApi.subscribeToTable({
+      channelName: `chat-conversation-${id}`,
+      table: 'conversations',
+      filter: `id=eq.${id}`,
+      handlers: {
+        UPDATE: (payload) => {
+          setConversation((c) => (c ? { ...c, ...payload.new } : c))
+        },
+      },
+    })
+
+    return () => {
+      unsubscribeMessages()
+      unsubscribeConversation()
+    }
   }, [id])
 
   useEffect(() => {
@@ -134,18 +139,13 @@ export default function Chat() {
     }
     setMessages((prev) => [...prev, optimisticMsg])
 
-    const { data: inserted, error } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id: id,
-        sender_id: user.id,
-        contenu: content,
-        fichier_url: fichierUrl,
-        fichier_type: fichierType,
-        is_system: false,
-      })
-      .select()
-      .single()
+    const { data: inserted, error } = await messagesApi.sendMessage({
+      conversationId: id,
+      senderId: user.id,
+      contenu: content,
+      fichierUrl,
+      fichierType,
+    })
 
     if (error) {
       // L'envoi a échoué : on retire la bulle optimiste plutôt que de mentir sur l'état.
@@ -155,49 +155,25 @@ export default function Chat() {
 
     // On remplace la bulle temporaire par la vraie ligne DB (id réel notamment).
     setMessages((prev) => prev.map((m) => (m.id === optimisticId ? inserted : m)))
-    await supabase.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', id)
   }
 
   const handleEditMessage = async (message, newContent) => {
-    const { data } = await supabase
-      .from('messages')
-      .update({ contenu: newContent, edited_at: new Date().toISOString() })
-      .eq('id', message.id)
-      .select()
-      .single()
+    const data = await messagesApi.editMessage(message.id, newContent)
     if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
   }
 
   const handleDeleteForMe = async (message) => {
-    const nextDeletedFor = [...(message.deleted_for || []), user.id]
-    const { data } = await supabase
-      .from('messages')
-      .update({ deleted_for: nextDeletedFor })
-      .eq('id', message.id)
-      .select()
-      .single()
+    const data = await messagesApi.deleteMessageForMe(message, user.id)
     if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
   }
 
   const handleDeleteForEveryone = async (message) => {
-    const { data } = await supabase
-      .from('messages')
-      .update({ is_deleted_for_all: true, contenu: null, fichier_url: null })
-      .eq('id', message.id)
-      .select()
-      .single()
+    const data = await messagesApi.deleteMessageForEveryone(message.id)
     if (data) setMessages((prev) => prev.map((m) => (m.id === message.id ? data : m)))
   }
 
   const sendSystemMessage = async (content, fichierUrl = null) => {
-    await supabase.from('messages').insert({
-      conversation_id: id,
-      sender_id: null,
-      contenu: content,
-      fichier_url: fichierUrl,
-      is_system: true,
-    })
-    await supabase.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', id)
+    await messagesApi.sendSystemMessage({ conversationId: id, contenu: content, fichierUrl })
   }
 
   const handleSend = async () => {
@@ -211,32 +187,23 @@ export default function Chat() {
     const file = e.target.files?.[0]
     if (!file) return
     const fileName = `${id}/${Date.now()}-${file.name}`
-    const { error } = await supabase.storage.from('messagerie').upload(fileName, file)
+    const { error } = await storageApi.uploadFile('messagerie', fileName, file)
     if (error) return
-    const { data: signedUrl } = await supabase.storage.from('messagerie').createSignedUrl(fileName, 60 * 60 * 24 * 7)
-    await sendMessage(null, signedUrl?.signedUrl, file.type.startsWith('image/') ? 'image' : 'fichier')
+    const signedUrl = await storageApi.getSignedUrl('messagerie', fileName, 60 * 60 * 24 * 7)
+    await sendMessage(null, signedUrl, file.type.startsWith('image/') ? 'image' : 'fichier')
   }
 
   const handleRequestPayment = async () => {
     if (!paymentAmount) return
     const montant = parseFloat(paymentAmount)
-    const commission = +(montant * 0.1).toFixed(2)
-    const montantNet = +(montant - commission).toFixed(2)
 
-    const { data: newCommande } = await supabase
-      .from('commandes')
-      .insert({
-        conversation_id: id,
-        client_id: conversation.client_id,
-        influenceur_id: conversation.influenceur_id,
-        offre_id: conversation.offre_id,
-        montant,
-        commission,
-        montant_net: montantNet,
-        status: 'paiement_demande',
-      })
-      .select()
-      .single()
+    const newCommande = await messagesApi.requestPayment({
+      conversationId: id,
+      clientId: conversation.client_id,
+      influenceurId: conversation.influenceur_id,
+      offreId: conversation.offre_id,
+      montant,
+    })
 
     setCommande(newCommande)
     await sendSystemMessage(
@@ -249,36 +216,7 @@ export default function Chat() {
   const handlePay = async () => {
     if (!commande) return
 
-    const { data: paiement } = await supabase.from('paiements').insert({
-      commande_id: commande.id,
-      montant: commande.montant,
-      commission: commande.commission,
-      provider_simule: 'mock',
-      reussi: true,
-    }).select().single()
-
-    await supabase.from('commandes').update({ status: 'paiement_effectue' }).eq('id', commande.id)
-
-    // créditer le wallet en verrouillé
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('influenceur_id', commande.influenceur_id)
-      .maybeSingle()
-
-    if (wallet) {
-      await supabase.from('wallets').update({
-        solde_verrouille: +(wallet.solde_verrouille + commande.montant_net).toFixed(2),
-        revenus_totaux: +(wallet.revenus_totaux + commande.montant_net).toFixed(2),
-      }).eq('id', wallet.id)
-
-      await supabase.from('wallet_transactions').insert({
-        wallet_id: wallet.id,
-        commande_id: commande.id,
-        type: 'paiement_verrouille',
-        montant: commande.montant_net,
-      })
-    }
+    const paiement = await messagesApi.payCommande(commande)
 
     await sendSystemMessage('✅ Paiement effectué. Les fonds sont verrouillés jusqu\'à validation de la prestation.')
     setCommande((c) => ({ ...c, status: 'paiement_effectue', paiement_reference: paiement?.reference || paiement?.id }))
@@ -308,29 +246,6 @@ export default function Chat() {
     setDeliverPreview(URL.createObjectURL(file))
   }
 
-  // Génère une image (frame) à partir d'une vidéo, pour servir de miniature en base.
-  const generateVideoThumbnail = (file) =>
-    new Promise((resolve, reject) => {
-      const video = document.createElement('video')
-      video.preload = 'metadata'
-      video.muted = true
-      video.playsInline = true
-      video.src = URL.createObjectURL(file)
-      video.onloadeddata = () => {
-        video.currentTime = Math.min(0.5, (video.duration || 1) / 2)
-      }
-      video.onseeked = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-        URL.revokeObjectURL(video.src)
-        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('thumbnail vide'))), 'image/jpeg', 0.8)
-      }
-      video.onerror = () => reject(new Error('lecture vidéo impossible'))
-    })
-
   const handleDeliverSubmit = async () => {
     if (!deliverLienInstagram && !deliverLienTiktok) return
     if (!deliverFile) return
@@ -338,35 +253,32 @@ export default function Chat() {
 
     // upload du média dans le bucket "posts" (lecture publique, nécessaire pour le feed)
     const fileName = `${influencerProfile.id}/livraisons/${commande.id}-${Date.now()}-${deliverFile.name}`
-    const { error: uploadError } = await supabase.storage.from('posts').upload(fileName, deliverFile)
+    const { error: uploadError } = await storageApi.uploadFile('posts', fileName, deliverFile)
     if (uploadError) {
       setDeliverLoading(false)
       return
     }
-    const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
-    const mediaUrl = urlData.publicUrl
+    const mediaUrl = storageApi.getPublicUrl('posts', fileName)
 
     // si c'est une vidéo, on génère et on upload aussi une miniature (nécessaire pour l'affichage
     // en grille côté profils, une vidéo ne peut pas être posée directement dans une balise <img>)
     let thumbnailUrl = null
     if (deliverMediaType === 'video') {
       try {
-        const thumbBlob = await generateVideoThumbnail(deliverFile)
+        const thumbBlob = await storageApi.generateVideoThumbnail(deliverFile)
         const thumbName = `${influencerProfile.id}/livraisons/${commande.id}-${Date.now()}-thumb.jpg`
-        const { error: thumbError } = await supabase.storage.from('posts').upload(thumbName, thumbBlob)
+        const { error: thumbError } = await storageApi.uploadFile('posts', thumbName, thumbBlob)
         if (!thumbError) {
-          const { data: thumbUrlData } = supabase.storage.from('posts').getPublicUrl(thumbName)
-          thumbnailUrl = thumbUrlData.publicUrl
+          thumbnailUrl = storageApi.getPublicUrl('posts', thumbName)
         }
       } catch {
         // pas bloquant : sans miniature, la vidéo reste livrée mais s'affichera sans aperçu en grille
       }
     }
 
-    await supabase
-      .from('commandes')
-      .update({
-        status: 'en_attente_validation',
+    await messagesApi.markCommandeDelivered({
+      commandeId: commande.id,
+      fields: {
         lien_livraison: deliverLienInstagram || deliverLienTiktok,
         lien_instagram: deliverLienInstagram || null,
         lien_tiktok: deliverLienTiktok || null,
@@ -374,8 +286,8 @@ export default function Chat() {
         media_crop_format: deliverFormat,
         media_type: deliverMediaType,
         media_thumbnail_url: thumbnailUrl,
-      })
-      .eq('id', commande.id)
+      },
+    })
 
     await sendSystemMessage(
       `📎 Prestation livrée${deliverLienInstagram ? ` — Instagram : ${deliverLienInstagram}` : ''}${deliverLienTiktok ? ` — TikTok : ${deliverLienTiktok}` : ''}`,
@@ -405,67 +317,7 @@ export default function Chat() {
 
   // --- Validation client : crée automatiquement le post "collaboration vérifiée" dans le feed ---
   const handleConfirmReception = async () => {
-    await supabase.from('commandes').update({ status: 'terminee' }).eq('id', commande.id)
-
-    // création automatique du post de collaboration vérifiée dans le feed
-    if (commande.media_livraison_url) {
-      const { data: newPost } = await supabase
-        .from('posts')
-        .insert({
-          influenceur_id: commande.influenceur_id,
-          type: commande.media_type === 'video' ? 'video' : 'photo',
-          crop_format: commande.media_crop_format || 'carre',
-          commande_id: commande.id,
-          client_id: commande.client_id,
-        })
-        .select()
-        .single()
-
-      if (newPost) {
-        await supabase.from('post_medias').insert({
-          post_id: newPost.id,
-          media_url: commande.media_livraison_url,
-          media_type: commande.media_type || 'image',
-          thumbnail_url: commande.media_thumbnail_url || null,
-          position: 0,
-        })
-        await supabase.from('commandes').update({ post_id: newPost.id }).eq('id', commande.id)
-
-        // Deux auteurs (influenceur + entreprise) => le trigger notify_on_new_post
-        // détecte automatiquement une "collaboration" (ou "réel collaboratif" si vidéo)
-        // et notifie tous les abonnés de l'un ou l'autre. Sans cette ligne, post_auteurs
-        // reste vide et aucune notification de collab n'est jamais envoyée.
-        const influenceurUserId = conversation?.profils_influenceur?.user_id
-        const auteurs = [
-          influenceurUserId ? { post_id: newPost.id, user_id: influenceurUserId, role: 'influenceur' } : null,
-          commande.client_id ? { post_id: newPost.id, user_id: commande.client_id, role: 'entreprise' } : null,
-        ].filter(Boolean)
-        if (auteurs.length > 0) {
-          await supabase.from('post_auteurs').insert(auteurs)
-        }
-      }
-    }
-
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('influenceur_id', commande.influenceur_id)
-      .maybeSingle()
-
-    if (wallet) {
-      await supabase.from('wallets').update({
-        solde_verrouille: +(wallet.solde_verrouille - commande.montant_net).toFixed(2),
-        solde_disponible: +(wallet.solde_disponible + commande.montant_net).toFixed(2),
-      }).eq('id', wallet.id)
-
-      await supabase.from('wallet_transactions').insert({
-        wallet_id: wallet.id,
-        commande_id: commande.id,
-        type: 'deverrouillage',
-        montant: commande.montant_net,
-      })
-    }
-
+    await messagesApi.confirmCommandeReception(commande, conversation)
     await sendSystemMessage('🎉 Prestation validée. Les fonds sont maintenant disponibles pour l\'influenceur.')
     setCommande((c) => ({ ...c, status: 'terminee' }))
   }
