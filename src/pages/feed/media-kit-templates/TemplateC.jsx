@@ -102,7 +102,7 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
   const nationalites = mediaKit.c_audience_nationalites || [] // [{ pays, pct_tiktok, pct_instagram }]
 
   return (
-    <div className="w-full aspect-[4/5] relative overflow-hidden" style={{ backgroundColor: theme.bg, color: theme.text }}>
+    <div className="w-full aspect-[2/3] relative overflow-hidden" style={{ backgroundColor: theme.bg, color: theme.text }}>
       <div className="flex h-full">
         {/* Colonne gauche : identité + tableau */}
         <div className="w-1/2 flex flex-col p-4 overflow-hidden">
