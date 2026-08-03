@@ -99,7 +99,7 @@ export default function ClientProfileView() {
             className={`w-20 h-20 rounded-full object-cover shrink-0 ${
               activeNoteUserIds.has(id) ? 'cursor-pointer ring-2 ring-offset-2 ring-offset-[var(--bg-primary)]' : ''
             }`}
-            style={activeNoteUserIds.has(id) ? { '--tw-ring-color': '#7a1240' } : undefined}
+            style={activeNoteUserIds.has(id) ? { '--tw-ring-color': 'var(--accent)' } : undefined}
           />
           <div className="flex-1 pt-1">
             <h1 className="text-h2 font-bold mb-2">{entreprise.nom_complet}</h1>

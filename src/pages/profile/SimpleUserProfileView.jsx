@@ -80,7 +80,7 @@ export default function SimpleUserProfileView() {
           className={`w-20 h-20 rounded-full object-cover mb-3 ${
             activeNoteUserIds.has(id) ? 'cursor-pointer ring-2 ring-offset-2 ring-offset-[var(--bg-primary)]' : ''
           }`}
-          style={activeNoteUserIds.has(id) ? { '--tw-ring-color': '#7a1240' } : undefined}
+          style={activeNoteUserIds.has(id) ? { '--tw-ring-color': 'var(--accent)' } : undefined}
         />
         <h1 className="text-h2 font-bold mb-1">{utilisateur.nom_complet}</h1>
         <div className="flex gap-4 justify-center mb-4">
