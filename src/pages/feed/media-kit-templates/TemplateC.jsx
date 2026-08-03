@@ -44,11 +44,12 @@ function paysVersEmoji(pays) {
 // rendue que si au moins une des deux valeurs est renseignée.
 function LigneTableau({ label, tiktok, instagram, suffix = '', theme }) {
   if (tiktok == null && instagram == null) return null
+  const cell = { borderColor: theme.accent, borderWidth: '0 1px 1px 0', borderStyle: 'solid' }
   return (
     <tr>
-      <td className="py-2 px-3 text-left" style={{ borderColor: theme.accent }}>{label}</td>
-      <td className="py-2 px-3 text-center" style={{ borderColor: theme.accent }}>{tiktok != null ? `${tiktok}${suffix}` : '—'}</td>
-      <td className="py-2 px-3 text-center" style={{ borderColor: theme.accent }}>{instagram != null ? `${instagram}${suffix}` : '—'}</td>
+      <td className="py-1.5 px-1.5 text-left truncate" style={{ ...cell, borderLeftWidth: '1px' }}>{label}</td>
+      <td className="py-1.5 px-1.5 text-center truncate" style={cell}>{tiktok != null ? `${tiktok}${suffix}` : '—'}</td>
+      <td className="py-1.5 px-1.5 text-center truncate" style={cell}>{instagram != null ? `${instagram}${suffix}` : '—'}</td>
     </tr>
   )
 }
@@ -98,8 +99,9 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
   const nationalites = mediaKit.c_audience_nationalites || [] // [{ pays, pct_tiktok, pct_instagram }]
 
   return (
-    <div className="w-full relative overflow-hidden p-4" style={{ backgroundColor: theme.bg, color: theme.text, fontFamily: '"Barlow", system-ui, sans-serif' }}>
-      <div className="flex items-stretch gap-3">
+    <div className="w-full aspect-[2/3] relative overflow-hidden" style={{ backgroundColor: theme.bg, color: theme.text, fontFamily: '"Barlow", system-ui, sans-serif' }}>
+      <div className="w-full h-full overflow-y-auto p-3">
+      <div className="flex items-stretch gap-2">
 
         {/* Colonne gauche : header, bio, tableau, 2 photos du bas */}
         <div className="flex-[1] min-w-0 flex flex-col">
@@ -176,14 +178,19 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
           </div>
 
           <table
-            className="w-full mt-3 border-collapse table-fixed text-[10px]"
+            className="w-full mt-3 border-collapse table-fixed text-[8px]"
             style={{ border: `1px solid ${theme.accent}`, backgroundColor: theme.polaroidBg, color: theme.polaroidFg }}
           >
+            <colgroup>
+              <col style={{ width: '40%' }} />
+              <col style={{ width: '30%' }} />
+              <col style={{ width: '30%' }} />
+            </colgroup>
             <thead>
               <tr style={{ backgroundColor: theme.accentSoft, color: theme.text }}>
-                <th className="py-2 px-3 text-left font-semibold uppercase tracking-wide" style={{ border: `1px solid ${theme.accent}` }}>Audience</th>
-                <th className="py-2 px-3 font-semibold uppercase tracking-wide text-center" style={{ border: `1px solid ${theme.accent}` }}>TikTok</th>
-                <th className="py-2 px-3 font-semibold uppercase tracking-wide text-center" style={{ border: `1px solid ${theme.accent}` }}>Instagram</th>
+                <th className="py-1.5 px-1.5 text-left font-semibold uppercase tracking-wide truncate" style={{ border: `1px solid ${theme.accent}` }}>Audience</th>
+                <th className="py-1.5 px-1.5 font-semibold uppercase tracking-wide text-center truncate" style={{ border: `1px solid ${theme.accent}` }}>TikTok</th>
+                <th className="py-1.5 px-1.5 font-semibold uppercase tracking-wide text-center truncate" style={{ border: `1px solid ${theme.accent}` }}>Instagram</th>
               </tr>
             </thead>
             <tbody>
@@ -233,6 +240,7 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
             </figure>
           ))}
         </div>
+      </div>
       </div>
     </div>
   )
