@@ -167,8 +167,13 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
             </div>
           )}
 
-          {/* Audience & démographie */}
-          <div className="mt-10 text-center">
+          {/* Audience & démographie -- mt-auto pousse ce bloc ENTIER (titre +
+              tableau + 2 photos du bas, qui le suivent naturellement dans le
+              flux) collé en bas de la colonne gauche, alignée avec le bas de
+              la colonne droite (items-stretch égalise les 2 hauteurs). Si le
+              texte "à propos" est court, l'espace au-dessus reste vide --
+              pas de comblement automatique. */}
+          <div className="mt-auto text-center">
             <h2
               className="inline-block font-semibold uppercase border-b-2 pb-0.5"
               style={{ fontFamily: '"Oswald", "Arial Narrow", sans-serif', color: theme.accent, borderColor: theme.accent, fontSize: 'clamp(.75rem, 2.4vw, 1.05rem)', letterSpacing: '.04em' }}
@@ -222,8 +227,10 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
             </tbody>
           </table>
 
-          {/* 2 photos polaroid côte à côte sous le tableau */}
-          <div className="mt-6 flex gap-2">
+          {/* 2 photos polaroid côte à côte sous le tableau -- distance
+              inchangée par rapport au tableau, elles suivent le bloc
+              Audience (mt-auto) dans le flux normal. */}
+          <div className="mt-3 flex gap-2">
             {[4, 5].map((idx) => (
               <figure key={idx} className="flex-1 p-1.5 pb-4 shadow-md" style={{ backgroundColor: theme.polaroidBg }}>
                 <PhotoFrame {...grillePhotos[idx]} cropFormat="media_kit_c_grille" onOpenProfile={onOpenProfile} className="w-full aspect-[4/3.4]" />
