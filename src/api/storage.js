@@ -7,13 +7,23 @@
 
 import { supabase } from '../lib/supabase'
 
+// Domaine du Worker Cloudflare qui fait proxy + cache vers Supabase Storage
+// (voir le code du Worker : réduit la latence pour les utilisateurs loin de
+// la région Supabase eu-west-1, en servant les fichiers déjà vus depuis le
+// cache Cloudflare réparti dans le monde plutôt que de repasser par Supabase
+// à chaque fois). Uniquement pour les buckets publics -- 'messagerie' est
+// privé (signed URLs, jamais public), donc jamais concerné par ce proxy.
+const CDN_WORKER_URL = 'https://influo.ged-green14.workers.dev'
+
 export async function uploadFile(bucket, path, file, options) {
   return supabase.storage.from(bucket).upload(path, file, options)
 }
 
 export function getPublicUrl(bucket, path) {
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path)
-  return data.publicUrl
+  // Sert directement depuis le CDN Worker : même chemin que Supabase
+  // Storage public (/<bucket>/<path>), le Worker se charge d'aller chercher
+  // et mettre en cache derrière.
+  return `${CDN_WORKER_URL}/${bucket}/${path}`
 }
 
 export async function getSignedUrl(bucket, path, expiresInSeconds) {
