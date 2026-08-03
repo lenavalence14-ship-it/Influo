@@ -2,24 +2,22 @@ import { Camera } from 'lucide-react'
 import { getCropTransformStyle } from '../../../lib/mediaCrop'
 import { InstagramIcon, TikTokIcon } from '../../../components/ui/SocialIcons'
 
-// Template C -- design "tableau magazine" validé sur référence image par
-// l'utilisateur : nom + logos réseaux en haut gauche sur photo de profil
-// sans bordure, catégorie + pays, bloc "À propos de moi", un SEUL tableau
-// "Audience & Démographie" avec 2 colonnes (TikTok / Instagram) qui empile
-// Followers, Vues moyennes, Hommes/Femmes/Autres %, 4 tranches d'âge %, puis
-// les nationalités ajoutées librement par l'utilisateur (chacune avec sa
-// propre valeur TikTok + Instagram). 6 photos "polaroid" (bordure blanche
-// épaisse) à droite/bas. Fond : une couleur au choix parmi 3 fixes
-// (bordeaux / vert sauge foncé / blanc cassé) -- pas de color picker libre,
-// pas de fond photo.
+// Template C -- design "magazine polaroid" : structure calquée exactement
+// sur la référence HTML fournie par l'utilisateur (media-kit-filled-1.html).
+// Header pleine largeur (photo profil polaroid verticale avec logos réseaux
+// DANS le cadre + nom/catégorie/pays à droite), bio centrée, tableau
+// Audience & Démographie pleine largeur, puis à droite du bloc gauche une
+// colonne de 4 photos polaroid empilées et sous le tableau 2 photos polaroid
+// côte à côte. Fond : une couleur au choix parmi 3 fixes (bordeaux / vert
+// sauge foncé / blanc cassé) -- pas de color picker libre, pas de fond photo.
 //
 // Contrat identique à A/B : { mediaKit, onOpenProfile }. Un champ absent est
 // simplement ignoré (ligne du tableau non affichée), jamais une erreur.
 
 const FONDS = {
-  bordeaux: { bg: '#5c1a2e', text: '#ffffff', accent: '#e8a3bb', tableHeader: '#7a2540', tableBorder: '#8a3a52' },
-  vert_sauge: { bg: '#3a4a3f', text: '#ffffff', accent: '#c9d4c0', tableHeader: '#4d5f52', tableBorder: '#5c6f60' },
-  blanc_casse: { bg: '#f5f1ea', text: '#1a1a1a', accent: '#b8574f', tableHeader: '#e8dfd0', tableBorder: '#d9cbb5' },
+  bordeaux: { bg: '#4a0714', text: '#fbf9f7', accent: '#e0234a', accentSoft: '#a4123a', polaroidBg: '#f7f5f2', polaroidFg: '#2b2320', polaroidIcon: '#161314' },
+  vert_sauge: { bg: '#2f3b32', text: '#fbf9f7', accent: '#8fae7c', accentSoft: '#4d5f52', polaroidBg: '#f7f5f2', polaroidFg: '#2b2320', polaroidIcon: '#161314' },
+  blanc_casse: { bg: '#f5f1ea', text: '#1a1a1a', accent: '#b8574f', accentSoft: '#e8dfd0', polaroidBg: '#ffffff', polaroidFg: '#2b2320', polaroidIcon: '#161314' },
 }
 
 const TRANCHES_AGE = [
@@ -44,45 +42,43 @@ function paysVersEmoji(pays) {
 
 // Une ligne du tableau : label + valeur TikTok + valeur Instagram. N'est
 // rendue que si au moins une des deux valeurs est renseignée.
-function LigneTableau({ label, tiktok, instagram, suffix = '', theme, isHeader }) {
-  if (!isHeader && tiktok == null && instagram == null) return null
+function LigneTableau({ label, tiktok, instagram, suffix = '', theme }) {
+  if (tiktok == null && instagram == null) return null
   return (
-    <tr style={{ borderBottom: `1px solid ${theme.tableBorder}` }}>
-      <td className="py-1.5 px-2 text-[10px]">{label}</td>
-      <td className="py-1.5 px-2 text-[10px] text-center">{tiktok != null ? `${tiktok}${suffix}` : '—'}</td>
-      <td className="py-1.5 px-2 text-[10px] text-center">{instagram != null ? `${instagram}${suffix}` : '—'}</td>
+    <tr>
+      <td className="py-2 px-3 text-left" style={{ borderColor: theme.accent }}>{label}</td>
+      <td className="py-2 px-3 text-center" style={{ borderColor: theme.accent }}>{tiktok != null ? `${tiktok}${suffix}` : '—'}</td>
+      <td className="py-2 px-3 text-center" style={{ borderColor: theme.accent }}>{instagram != null ? `${instagram}${suffix}` : '—'}</td>
     </tr>
   )
 }
 
-function PhotoFrame({ url, natural_width, natural_height, zoom, offset_x, offset_y, cropFormat, onOpenProfile, className, withBorder }) {
+function PhotoFrame({ url, natural_width, natural_height, zoom, offset_x, offset_y, cropFormat, onOpenProfile, className, iconSize = 20 }) {
   return (
     <button
       type="button"
       onClick={onOpenProfile}
-      className={`overflow-hidden bg-black/10 ${withBorder ? 'p-1.5 bg-white' : ''} ${className || ''}`}
+      className={`overflow-hidden bg-black/10 flex items-center justify-center ${className || ''}`}
       aria-label="Voir le profil"
     >
-      <div className="w-full h-full overflow-hidden">
-        {url ? (
-          <img
-            src={url}
-            alt=""
-            style={getCropTransformStyle({
-              naturalWidth: natural_width,
-              naturalHeight: natural_height,
-              cropFormat,
-              zoom,
-              offsetX: offset_x,
-              offsetY: offset_y,
-            })}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-black/20">
-            <Camera size={20} />
-          </div>
-        )}
-      </div>
+      {url ? (
+        <img
+          src={url}
+          alt=""
+          style={getCropTransformStyle({
+            naturalWidth: natural_width,
+            naturalHeight: natural_height,
+            cropFormat,
+            zoom,
+            offsetX: offset_x,
+            offsetY: offset_y,
+          })}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-black/20">
+          <Camera size={iconSize} />
+        </div>
+      )}
     </button>
   )
 }
@@ -102,126 +98,139 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
   const nationalites = mediaKit.c_audience_nationalites || [] // [{ pays, pct_tiktok, pct_instagram }]
 
   return (
-    <div className="w-full relative overflow-hidden" style={{ backgroundColor: theme.bg, color: theme.text }}>
-      <div className="flex items-stretch">
-        {/* Colonne gauche : identité + tableau */}
-        <div className="w-1/2 flex flex-col p-4 overflow-hidden">
-          <div className="flex items-start gap-3">
-            <PhotoFrame
-              url={mediaKit.photo_url}
-              natural_width={mediaKit.photo_natural_width}
-              natural_height={mediaKit.photo_natural_height}
-              zoom={mediaKit.photo_zoom}
-              offset_x={mediaKit.photo_offset_x}
-              offset_y={mediaKit.photo_offset_y}
-              cropFormat="media_kit_c_profil"
-              onOpenProfile={onOpenProfile}
-              className="w-16 h-16 rounded-md shrink-0"
-              withBorder={false}
-            />
-            <div className="min-w-0">
-              <div className="text-[18px] font-black uppercase leading-[0.95] truncate" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+    <div className="w-full relative overflow-hidden p-4" style={{ backgroundColor: theme.bg, color: theme.text, fontFamily: '"Barlow", system-ui, sans-serif' }}>
+      <div className="flex items-stretch gap-3">
+
+        {/* Colonne gauche : header, bio, tableau, 2 photos du bas */}
+        <div className="flex-[1] min-w-0 flex flex-col">
+
+          {/* Header : photo profil polaroid verticale + nom/meta */}
+          <div className="grid grid-cols-[.62fr_1fr] gap-3 items-start">
+            <figure className="flex flex-col p-1.5 shadow-md" style={{ backgroundColor: theme.polaroidBg }}>
+              <PhotoFrame
+                url={mediaKit.photo_url}
+                natural_width={mediaKit.photo_natural_width}
+                natural_height={mediaKit.photo_natural_height}
+                zoom={mediaKit.photo_zoom}
+                offset_x={mediaKit.photo_offset_x}
+                offset_y={mediaKit.photo_offset_y}
+                cropFormat="media_kit_c_profil"
+                onOpenProfile={onOpenProfile}
+                className="w-full aspect-[3/3.4]"
+                iconSize={22}
+              />
+              <div className="flex items-center justify-around mt-2 pb-1">
+                <span className="w-7 h-7 rounded-[22%] flex items-center justify-center shrink-0" style={{ backgroundColor: theme.polaroidIcon, color: theme.polaroidBg }}>
+                  <TikTokIcon size={14} />
+                </span>
+                <span className="w-7 h-7 rounded-[22%] flex items-center justify-center shrink-0" style={{ backgroundColor: theme.polaroidIcon, color: theme.polaroidBg }}>
+                  <InstagramIcon size={14} />
+                </span>
+              </div>
+            </figure>
+
+            <div className="min-w-0 pt-1">
+              <div
+                className="uppercase font-bold leading-none break-words"
+                style={{ fontFamily: '"Oswald", "Arial Narrow", sans-serif', fontSize: 'clamp(1.1rem, 5vw, 1.9rem)', letterSpacing: '.06em' }}
+              >
                 {mediaKit.prenom} {mediaKit.nom}
               </div>
-              <div className="flex gap-1.5 mt-2">
-                <span className="w-6 h-6 rounded-full bg-black flex items-center justify-center text-white shrink-0">
-                  <TikTokIcon size={13} />
-                </span>
-                <span className="w-6 h-6 rounded-full bg-black flex items-center justify-center text-white shrink-0">
-                  <InstagramIcon size={13} />
-                </span>
-              </div>
+              <ul className="list-none mt-3 space-y-1.5 uppercase font-semibold text-[11px] tracking-wide">
+                {mediaKit.categories?.length > 0 && (
+                  <li className="flex items-center gap-2">
+                    <span>&bull;</span><span>{mediaKit.categories.join(' • ')}</span>
+                  </li>
+                )}
+                {mediaKit.c_pays ? (
+                  <li className="flex items-center gap-2">
+                    <span>&bull;</span><span>{mediaKit.c_pays.toUpperCase()}</span>
+                    {paysVersEmoji(mediaKit.c_pays) ? <span className="text-[1.1em] normal-case">{paysVersEmoji(mediaKit.c_pays)}</span> : null}
+                  </li>
+                ) : null}
+              </ul>
             </div>
           </div>
 
-          <div className="mt-3 space-y-0.5 text-[11px]">
-            {mediaKit.categories?.length > 0 && <p>• {mediaKit.categories.join(' • ')}</p>}
-            {mediaKit.c_pays ? (
-              <p className="flex items-center gap-1.5">
-                • {mediaKit.c_pays.toUpperCase()}
-                {paysVersEmoji(mediaKit.c_pays) ? <span>{paysVersEmoji(mediaKit.c_pays)}</span> : null}
-              </p>
-            ) : null}
-          </div>
-
+          {/* À propos de moi */}
           {mediaKit.c_a_propos && (
-            <div className="mt-3">
-              <p className="text-[12px] font-bold uppercase underline underline-offset-4" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+            <div className="mt-5 text-center">
+              <h2
+                className="inline-block font-semibold uppercase border-b-2 pb-0.5"
+                style={{ fontFamily: '"Oswald", "Arial Narrow", sans-serif', borderColor: theme.text, fontSize: 'clamp(.8rem, 2.6vw, 1.1rem)', letterSpacing: '.03em' }}
+              >
                 À propos de moi
-              </p>
-              <p className="text-[10px] leading-snug mt-1.5 line-clamp-4">{mediaKit.c_a_propos}</p>
+              </h2>
+              <p className="mt-2 px-2 text-[11px] leading-relaxed">{mediaKit.c_a_propos}</p>
             </div>
           )}
 
-          <div className="mt-3">
-            <p className="text-[12px] font-bold uppercase" style={{ color: theme.accent, fontFamily: 'Georgia, "Times New Roman", serif' }}>
-              Audience & Démographie
-            </p>
-            <table className="w-full mt-1.5 border-collapse table-fixed">
-              <thead>
-                <tr style={{ backgroundColor: theme.tableHeader }}>
-                  <th className="py-1.5 px-1 text-[8px] text-left font-medium uppercase w-[40%]">Audience</th>
-                  <th className="py-1.5 px-1 text-[8px] font-medium uppercase w-[30%]">TikTok</th>
-                  <th className="py-1.5 px-1 text-[8px] font-medium uppercase w-[30%]">Instagram</th>
-                </tr>
-              </thead>
-              <tbody>
-                <LigneTableau theme={theme} label="Followers" tiktok={mediaKit.abonnes_tiktok} instagram={mediaKit.abonnes_instagram} />
-                <LigneTableau theme={theme} label="Vues moyennes" tiktok={mediaKit.c_vues_moy_tiktok} instagram={mediaKit.c_vues_moy_instagram} />
-                <LigneTableau theme={theme} label="Hommes" suffix="%" tiktok={mediaKit.c_pct_hommes_tiktok} instagram={mediaKit.c_pct_hommes_instagram} />
-                <LigneTableau theme={theme} label="Femmes" suffix="%" tiktok={mediaKit.c_pct_femmes_tiktok} instagram={mediaKit.c_pct_femmes_instagram} />
-                <LigneTableau theme={theme} label="Autres" suffix="%" tiktok={mediaKit.c_pct_autres_tiktok} instagram={mediaKit.c_pct_autres_instagram} />
-                {TRANCHES_AGE.map((t) => (
-                  <LigneTableau
-                    key={t.key}
-                    theme={theme}
-                    label={t.label}
-                    suffix="%"
-                    tiktok={mediaKit[`${t.key}_tiktok`]}
-                    instagram={mediaKit[`${t.key}_instagram`]}
-                  />
-                ))}
-                {nationalites.map((n, i) => (
-                  <LigneTableau
-                    key={i}
-                    theme={theme}
-                    label={n.pays}
-                    suffix="%"
-                    tiktok={n.pct_tiktok}
-                    instagram={n.pct_instagram}
-                  />
-                ))}
-              </tbody>
-            </table>
+          {/* Audience & démographie */}
+          <div className="mt-5 text-center">
+            <h2
+              className="inline-block font-semibold uppercase border-b-2 pb-0.5"
+              style={{ fontFamily: '"Oswald", "Arial Narrow", sans-serif', color: theme.accent, borderColor: theme.accent, fontSize: 'clamp(.75rem, 2.4vw, 1.05rem)', letterSpacing: '.04em' }}
+            >
+              Audience &amp; Démographie
+            </h2>
           </div>
 
-          {/* 2 photos "polaroid" sous le tableau, dans la colonne gauche -- conforme à la référence.
-              Hauteur fixe (pas flex-1) : le tableau au-dessus a une hauteur
-              variable selon le nombre de nationalités ajoutées, donc rien ici
-              ne doit dépendre de l'espace "restant" dans un cadre à hauteur
-              fixée -- ça écrasait ce bloc à zéro dès que le tableau dépassait
-              la hauteur du cadre (voir bug signalé : photos invisibles). */}
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <PhotoFrame {...grillePhotos[4]} cropFormat="media_kit_c_grille" onOpenProfile={onOpenProfile} className="aspect-[4/3] w-full" withBorder />
-            <PhotoFrame {...grillePhotos[5]} cropFormat="media_kit_c_grille" onOpenProfile={onOpenProfile} className="aspect-[4/3] w-full" withBorder />
+          <table
+            className="w-full mt-3 border-collapse table-fixed text-[10px]"
+            style={{ border: `1px solid ${theme.accent}`, backgroundColor: theme.polaroidBg, color: theme.polaroidFg }}
+          >
+            <thead>
+              <tr style={{ backgroundColor: theme.accentSoft, color: theme.text }}>
+                <th className="py-2 px-3 text-left font-semibold uppercase tracking-wide" style={{ border: `1px solid ${theme.accent}` }}>Audience</th>
+                <th className="py-2 px-3 font-semibold uppercase tracking-wide text-center" style={{ border: `1px solid ${theme.accent}` }}>TikTok</th>
+                <th className="py-2 px-3 font-semibold uppercase tracking-wide text-center" style={{ border: `1px solid ${theme.accent}` }}>Instagram</th>
+              </tr>
+            </thead>
+            <tbody>
+              <LigneTableau theme={theme} label="Followers" tiktok={mediaKit.abonnes_tiktok} instagram={mediaKit.abonnes_instagram} />
+              <LigneTableau theme={theme} label="Vues moyennes" tiktok={mediaKit.c_vues_moy_tiktok} instagram={mediaKit.c_vues_moy_instagram} />
+              <LigneTableau theme={theme} label="Hommes" suffix="%" tiktok={mediaKit.c_pct_hommes_tiktok} instagram={mediaKit.c_pct_hommes_instagram} />
+              <LigneTableau theme={theme} label="Femmes" suffix="%" tiktok={mediaKit.c_pct_femmes_tiktok} instagram={mediaKit.c_pct_femmes_instagram} />
+              <LigneTableau theme={theme} label="Autres" suffix="%" tiktok={mediaKit.c_pct_autres_tiktok} instagram={mediaKit.c_pct_autres_instagram} />
+              {TRANCHES_AGE.map((t) => (
+                <LigneTableau
+                  key={t.key}
+                  theme={theme}
+                  label={t.label}
+                  suffix="%"
+                  tiktok={mediaKit[`${t.key}_tiktok`]}
+                  instagram={mediaKit[`${t.key}_instagram`]}
+                />
+              ))}
+              {nationalites.map((n, i) => (
+                <LigneTableau
+                  key={i}
+                  theme={theme}
+                  label={n.pays}
+                  suffix="%"
+                  tiktok={n.pct_tiktok}
+                  instagram={n.pct_instagram}
+                />
+              ))}
+            </tbody>
+          </table>
+
+          {/* 2 photos polaroid côte à côte sous le tableau */}
+          <div className="mt-3 flex gap-2">
+            {[4, 5].map((idx) => (
+              <figure key={idx} className="flex-1 p-1.5 pb-4 shadow-md" style={{ backgroundColor: theme.polaroidBg }}>
+                <PhotoFrame {...grillePhotos[idx]} cropFormat="media_kit_c_grille" onOpenProfile={onOpenProfile} className="w-full aspect-[4/3.4]" />
+              </figure>
+            ))}
           </div>
         </div>
 
-        {/* Colonne droite : 4 photos "polaroid" empilées. Hauteur fixe par
-            photo (pas flex-1 sur une hauteur héritée) : chaque photo garde
-            son propre ratio 4:3, la colonne s'étire naturellement à la
-            hauteur totale de la colonne de gauche grâce à items-stretch sur
-            le parent flex, sans dépendre d'un cadre englobant à ratio figé. */}
-        <div className="w-1/2 flex flex-col gap-2 p-2">
+        {/* Colonne droite : 4 photos polaroid empilées */}
+        <div className="flex-[.72] min-w-0 flex flex-col gap-2">
           {[0, 1, 2, 3].map((i) => (
-            <PhotoFrame
-              key={i}
-              {...grillePhotos[i]}
-              cropFormat="media_kit_c_grille"
-              onOpenProfile={onOpenProfile}
-              className="aspect-[4/3] w-full"
-              withBorder
-            />
+            <figure key={i} className="flex-1 p-1.5 pb-4 shadow-md" style={{ backgroundColor: theme.polaroidBg }}>
+              <PhotoFrame {...grillePhotos[i]} cropFormat="media_kit_c_grille" onOpenProfile={onOpenProfile} className="w-full h-full" />
+            </figure>
           ))}
         </div>
       </div>

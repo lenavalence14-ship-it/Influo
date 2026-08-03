@@ -20,7 +20,7 @@ export const RATIO_VALUES = {
   vertical_45: 4 / 5,
   souvenir: 2 / 3,
   media_kit: 4 / 3, // cadre photo du Media Kit (MediaKit.jsx / MediaKitSuggestion.jsx)
-  media_kit_c_profil: 1, // TemplateC : photo de profil, carrée sur la référence
+  media_kit_c_profil: 3 / 3.4, // TemplateC : photo de profil, ratio exact de la référence (3:3.4)
   media_kit_c_grille: 4 / 3, // TemplateC : les 6 photos "polaroid", format paysage sur la référence
 }
 
@@ -126,6 +126,6 @@ export const CROP_ASPECT_CLASSES = {
   vertical_45: 'aspect-[4/5]',
   souvenir: 'aspect-[2/3]', // ratio des templates souvenirs (voir TemplatePreview.jsx)
   media_kit: 'aspect-[4/3]',
-  media_kit_c_profil: 'aspect-square',
+  media_kit_c_profil: 'aspect-[3/3.4]',
   media_kit_c_grille: 'aspect-[4/3]',
 }
