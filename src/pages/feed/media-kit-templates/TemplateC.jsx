@@ -101,7 +101,7 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
   return (
     <div className="w-full aspect-[2/3] relative overflow-hidden" style={{ backgroundColor: theme.bg, color: theme.text, fontFamily: '"Barlow", system-ui, sans-serif' }}>
       <div className="w-full h-full overflow-y-auto p-3">
-      <div className="flex items-stretch gap-2">
+      <div className="flex items-start gap-2">
 
         {/* Colonne gauche : header, bio, tableau, 2 photos du bas */}
         <div className="flex-[1] min-w-0 flex flex-col">
@@ -167,13 +167,8 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
             </div>
           )}
 
-          {/* Audience & démographie -- mt-auto pousse ce bloc ENTIER (titre +
-              tableau + 2 photos du bas, qui le suivent naturellement dans le
-              flux) collé en bas de la colonne gauche, alignée avec le bas de
-              la colonne droite (items-stretch égalise les 2 hauteurs). Si le
-              texte "à propos" est court, l'espace au-dessus reste vide --
-              pas de comblement automatique. */}
-          <div className="mt-auto text-center">
+          {/* Audience & démographie */}
+          <div className="mt-5 text-center">
             <h2
               className="inline-block font-semibold uppercase border-b-2 pb-0.5"
               style={{ fontFamily: '"Oswald", "Arial Narrow", sans-serif', color: theme.accent, borderColor: theme.accent, fontSize: 'clamp(.75rem, 2.4vw, 1.05rem)', letterSpacing: '.04em' }}
@@ -239,11 +234,13 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
           </div>
         </div>
 
-        {/* Colonne droite : 4 photos polaroid empilées */}
+        {/* Colonne droite : 4 photos polaroid carrées, empilées, taille
+            naturelle (pas d'étirement flex-1) -- la colonne droite doit
+            faire la même hauteur totale que le contenu de la colonne gauche. */}
         <div className="flex-[.72] min-w-0 flex flex-col gap-2">
           {[0, 1, 2, 3].map((i) => (
-            <figure key={i} className="flex-1 p-1.5 pb-4 shadow-md" style={{ backgroundColor: theme.polaroidBg }}>
-              <PhotoFrame {...grillePhotos[i]} cropFormat="media_kit_c_grille" onOpenProfile={onOpenProfile} className="w-full h-full" />
+            <figure key={i} className="p-1.5 pb-4 shadow-md" style={{ backgroundColor: theme.polaroidBg }}>
+              <PhotoFrame {...grillePhotos[i]} cropFormat="media_kit_c_grille" onOpenProfile={onOpenProfile} className="w-full aspect-square" />
             </figure>
           ))}
         </div>
