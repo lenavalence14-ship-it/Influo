@@ -163,12 +163,12 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
               >
                 À propos de moi
               </h2>
-              <p className="mt-2 px-2 text-[11px] leading-relaxed">{mediaKit.c_a_propos}</p>
+              <p className="mt-2 px-2 text-[13px] leading-relaxed">{mediaKit.c_a_propos}</p>
             </div>
           )}
 
           {/* Audience & démographie */}
-          <div className="mt-5 text-center">
+          <div className="mt-10 text-center">
             <h2
               className="inline-block font-semibold uppercase border-b-2 pb-0.5"
               style={{ fontFamily: '"Oswald", "Arial Narrow", sans-serif', color: theme.accent, borderColor: theme.accent, fontSize: 'clamp(.75rem, 2.4vw, 1.05rem)', letterSpacing: '.04em' }}
@@ -223,7 +223,7 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
           </table>
 
           {/* 2 photos polaroid côte à côte sous le tableau */}
-          <div className="mt-3 flex gap-2">
+          <div className="mt-6 flex gap-2">
             {[4, 5].map((idx) => (
               <figure key={idx} className="flex-1 p-1.5 pb-4 shadow-md" style={{ backgroundColor: theme.polaroidBg }}>
                 <PhotoFrame {...grillePhotos[idx]} cropFormat="media_kit_c_grille" onOpenProfile={onOpenProfile} className="w-full aspect-[4/3.4]" />
