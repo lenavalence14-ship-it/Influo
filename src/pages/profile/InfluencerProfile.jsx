@@ -112,7 +112,7 @@ export default function InfluencerProfile() {
           </button>
           <h1
             className="text-xl"
-            style={{ fontFamily: 'var(--font-logo)', color: '#4f0c2d' }}
+            style={{ fontFamily: 'var(--font-logo)', color: 'var(--accent)' }}
           >
             Influo
           </h1>
@@ -148,7 +148,7 @@ export default function InfluencerProfile() {
             {activeNoteUserIds.has(target.user_id) ? (
               <div
                 className="w-20 h-20 rounded-full p-[2.5px] cursor-pointer"
-                style={{ background: 'linear-gradient(to bottom right, #4f0c2d, #7a1240)' }}
+                style={{ background: 'linear-gradient(to bottom right, var(--accent), #7a1240)' }}
                 onClick={openNote}
               >
                 <div className="w-full h-full rounded-full bg-[var(--bg-primary)] p-[2px]">

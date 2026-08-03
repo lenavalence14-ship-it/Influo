@@ -32,7 +32,7 @@ function PlayIcon({ size = 24, className = '', style, isActive = false }) {
           width="18"
           height="18"
           rx="5"
-          fill="#4f0c2d"
+          fill="var(--accent)"
           mask={`url(#${maskId})`}
         />
       ) : (
@@ -99,13 +99,13 @@ export default function BottomNav() {
                   isActive ? 'opacity-100' : 'opacity-50'
                 }`
               }
-              style={({ isActive }) => (isActive ? { color: '#4f0c2d' } : undefined)}
+              style={({ isActive }) => (isActive ? { color: 'var(--accent)' } : undefined)}
             >
               {({ isActive }) =>
                 isAvatar ? (
                   <span
                     className="flex items-center justify-center rounded-full"
-                    style={isActive ? { boxShadow: '0 0 0 2px #4f0c2d', padding: '2px' } : undefined}
+                    style={isActive ? { boxShadow: '0 0 0 2px var(--accent)', padding: '2px' } : undefined}
                   >
                     <img
                       src={
@@ -122,19 +122,19 @@ export default function BottomNav() {
                       <PlayIcon
                         size={24}
                         isActive={isActive}
-                        style={{ color: '#4f0c2d' }}
+                        style={{ color: 'var(--accent)' }}
                       />
                     ) : (
                       <Icon
                         size={24}
                         strokeWidth={2.6}
-                        fill={isActive ? '#4f0c2d' : 'none'}
-                        style={isActive ? { color: '#4f0c2d' } : undefined}
+                        fill={isActive ? 'var(--accent)' : 'none'}
+                        style={isActive ? { color: 'var(--accent)' } : undefined}
                       />
                     )}
 
                     {dot && (
-                      <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full" style={{ backgroundColor: '#4f0c2d' }} />
+                      <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--accent)' }} />
                     )}
                   </>
                 )

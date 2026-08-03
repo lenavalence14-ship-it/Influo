@@ -45,6 +45,13 @@
   --glass-border: rgba(0, 0, 0, 0.1);
 }
 
+/* Accent alternatif (vert sauge foncé, même teinte que le fond "vert sauge"
+   du média kit TemplateC). Basculé en tapant sur le logo AFLUO. S'applique
+   par-dessus :root ou .light, quel que soit le thème clair/sombre actif. */
+.accent-sauge {
+  --accent: #2f3b32;
+}
+
 * {
   -webkit-tap-highlight-color: transparent;
 }

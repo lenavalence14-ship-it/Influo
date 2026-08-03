@@ -13,12 +13,14 @@ import { useUnreadCounts } from '../../hooks/useUnreadCounts'
 import { usePostUploadProgress } from '../../contexts/PostUploadContext'
 import { usePullToRefresh } from '../../hooks/usePullToRefresh'
 import Logo from '../../components/ui/Logo'
+import { useTheme } from '../../contexts/ThemeContext'
 
 const PAGE_SIZE = 10
 
 export default function Feed() {
   const { user, profile, influencerProfile } = useAuth()
   const navigate = useNavigate()
+  const { toggleAccent } = useTheme()
   const { hasUnreadMessages } = useUnreadCounts()
   const uploadProgress = usePostUploadProgress(influencerProfile?.id)
   const queryClient = useQueryClient()
@@ -161,7 +163,14 @@ export default function Feed() {
   return (
     <div>
       <header className="flex items-center justify-between px-4 pt-6 pb-2 sticky top-0 z-30 bg-[var(--bg-primary)]">
-        <Logo size={20} />
+        <button
+          type="button"
+          onClick={toggleAccent}
+          aria-label="Changer la couleur d'accent"
+          className="flex items-center"
+        >
+          <Logo size={20} />
+        </button>
 
         <div className="flex items-center gap-1.5">
           <button
@@ -222,7 +231,7 @@ export default function Feed() {
           >
             <MessageCircle size={14} />
             {hasUnreadMessages && (
-              <span className="absolute top-1 right-1.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#4f0c2d' }} />
+              <span className="absolute top-1 right-1.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--accent)' }} />
             )}
           </button>
         </div>
@@ -236,7 +245,7 @@ export default function Feed() {
           <RefreshCw
             size={20}
             className={refreshing ? 'animate-spin' : 'text-[var(--text-secondary)]'}
-            style={refreshing ? { color: '#4f0c2d' } : undefined}
+            style={refreshing ? { color: 'var(--accent)' } : undefined}
             style={
               refreshing
                 ? undefined

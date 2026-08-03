@@ -16,8 +16,31 @@ const getSystemTheme = () =>
     ? 'light'
     : 'dark'
 
+// Accent global de l'app (cramoisi par défaut, basculable en vert sauge
+// foncé en tapant sur le logo AFLUO dans le header du fil). Persiste via
+// localStorage, indépendant du thème clair/sombre ci-dessus.
+const getStoredAccent = () => {
+  const stored = localStorage.getItem('influo-accent')
+  return stored === 'sauge' ? 'sauge' : 'cramoisi'
+}
+
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(getSystemTheme)
+  const [accent, setAccent] = useState(getStoredAccent)
+
+  useEffect(() => {
+    const root = document.documentElement
+    if (accent === 'sauge') {
+      root.classList.add('accent-sauge')
+    } else {
+      root.classList.remove('accent-sauge')
+    }
+    localStorage.setItem('influo-accent', accent)
+  }, [accent])
+
+  const toggleAccent = () => {
+    setAccent((a) => (a === 'cramoisi' ? 'sauge' : 'cramoisi'))
+  }
 
   // Suit le mode système en direct (changement de thème OS sans relancer l'app)
   useEffect(() => {
@@ -66,7 +89,7 @@ export function ThemeProvider({ children }) {
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme, accent, toggleAccent }}>
       {children}
     </ThemeContext.Provider>
   )

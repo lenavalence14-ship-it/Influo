@@ -229,7 +229,7 @@ export default function Notifications() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {!n.lu && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#4f0c2d' }} />}
+                      {!n.lu && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--accent)' }} />}
                       {n.post_thumbnail?.url && (
                         n.post_thumbnail.type === 'video' ? (
                           n.post_thumbnail.thumbnailUrl ? (

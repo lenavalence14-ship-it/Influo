@@ -59,7 +59,7 @@ export default function ClientProfile() {
         </button>
         <h1
           className="text-xl"
-          style={{ fontFamily: 'var(--font-logo)', color: '#4f0c2d' }}
+          style={{ fontFamily: 'var(--font-logo)', color: 'var(--accent)' }}
         >
           Influo
         </h1>
