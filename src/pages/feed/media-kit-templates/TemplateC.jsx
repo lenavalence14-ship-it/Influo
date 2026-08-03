@@ -239,7 +239,7 @@ export default function TemplateC({ mediaKit, onOpenProfile }) {
             faire la même hauteur totale que le contenu de la colonne gauche. */}
         <div className="flex-[.72] min-w-0 flex flex-col gap-2">
           {[0, 1, 2, 3].map((i) => (
-            <figure key={i} className="p-1.5 pb-4 shadow-md" style={{ backgroundColor: theme.polaroidBg }}>
+            <figure key={i} className="p-1.5 shadow-md" style={{ backgroundColor: theme.polaroidBg, paddingBottom: '20px' }}>
               <PhotoFrame {...grillePhotos[i]} cropFormat="media_kit_c_grille" onOpenProfile={onOpenProfile} className="w-full aspect-square" />
             </figure>
           ))}
