@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Heart, MessageCircle, Send, MoreVertical, Video, ArrowLeft, Plus, Volume2, VolumeX, Play, Repeat2, Bookmark, Music2 } from 'lucide-react'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -67,14 +67,36 @@ export default function ReelsViewer() {
   const [muted, setMuted] = useState(false)
   const [pausedSlides, setPausedSlides] = useState(() => new Set())
 
-  const toggleSlidePaused = (index) => {
+  // useCallback ici (et pour toggleMute plus bas) : sans ça, ces fonctions
+  // étaient recréées à CHAQUE rendu de ReelsList, et passées telles quelles
+  // (inline, ligne setVideoRef/onToggleMute/onTogglePause) à ReelSlide. Même
+  // avec ReelSlide en memo(), une nouvelle référence de fonction à chaque
+  // rendu fait que memo() considère la prop "changée" -> ReelSlide se
+  // re-rend -> HlsVideo se remonte -> son useEffect [hlsPlaylistUrl,
+  // fallbackMp4Url] se redéclenche -> hls.js redémarre le téléchargement du
+  // manifest et des segments depuis zéro. Vu dans les logs Storage Supabase :
+  // les mêmes segments HLS (360p/480p/720p) rechargés en boucle en continu,
+  // ce qui explique le pic anormal de Cached Egress (9+ To en ~3 semaines
+  // pour 0 utilisateur réel).
+  const toggleSlidePaused = useCallback((index) => {
     setPausedSlides((prev) => {
       const next = new Set(prev)
       if (next.has(index)) next.delete(index)
       else next.add(index)
       return next
     })
-  }
+  }, [])
+
+  const toggleMute = useCallback(() => {
+    setMuted((m) => !m)
+  }, [])
+
+  // Même raisonnement que toggleSlidePaused ci-dessus : référence stable,
+  // l'index est passé en paramètre au moment de l'appel (depuis ReelSlide)
+  // plutôt que capturé par une closure inline recréée à chaque rendu.
+  const setVideoRefAt = useCallback((index, el) => {
+    videoRefs.current[index] = el
+  }, [])
 
   const { data: reels = [], isLoading: loading } = useQuery({
     queryKey: ['reels', user?.id],
@@ -256,11 +278,11 @@ export default function ReelsViewer() {
           shouldPreload={i === activeIndex || i === activeIndex + 1}
           shouldPrefetchMeta={i === activeIndex + 2}
           isActive={i === activeIndex}
-          setVideoRef={(el) => (videoRefs.current[i] = el)}
+          setVideoRef={setVideoRefAt}
           muted={muted}
-          onToggleMute={() => setMuted((m) => !m)}
+          onToggleMute={toggleMute}
           isPaused={pausedSlides.has(i)}
-          onTogglePause={() => toggleSlidePaused(i)}
+          onTogglePause={toggleSlidePaused}
         />
       ))}
     </div>
@@ -367,7 +389,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
       // il reste affiché tant que isPaused est vrai (comportement Instagram),
       // et se cache automatiquement dès que la lecture reprend (voir le style
       // de l'overlay plus bas, piloté directement par isPaused).
-      onTogglePause()
+      onTogglePause(index)
     }, 300)
   }
 
@@ -447,7 +469,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
             )}
             {shouldMount && (
               <HlsVideo
-                videoRef={(el) => { setVideoRef(el); videoElRef.current = el }}
+                videoRef={(el) => { setVideoRef(index, el); videoElRef.current = el }}
                 hlsPlaylistUrl={hlsPlaylistUrl}
                 fallbackMp4Url={mediaUrl}
                 poster={thumbnailUrl || undefined}
@@ -474,7 +496,7 @@ const ReelSlide = memo(function ReelSlide({ reel, index, shouldMount, shouldPrel
           )}
           {shouldMount && (
             <HlsVideo
-              videoRef={(el) => { setVideoRef(el); videoElRef.current = el }}
+              videoRef={(el) => { setVideoRef(index, el); videoElRef.current = el }}
               hlsPlaylistUrl={hlsPlaylistUrl}
               fallbackMp4Url={mediaUrl}
               poster={thumbnailUrl || undefined}
